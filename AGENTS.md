@@ -41,7 +41,7 @@ under Significant Hobbies (`com.significanthobbies.anchor`).
 ## Build, test, run
 
 ```bash
-swift build && swift test          # shared package — 60 tests, no Xcode needed
+swift build && swift test          # shared package — 77 tests, no Xcode needed
 cd Apps && xcodegen generate       # regenerate the Xcode project after editing project.yml
 xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (macOS)" build
 xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (iOS)" \

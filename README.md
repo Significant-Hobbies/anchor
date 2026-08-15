@@ -98,7 +98,7 @@ Apps/
   Mac/ iOS/ Watch/  thin app shells; project.yml generates the Xcode project
   Shared/          asset catalog (accent colour + app icon)
 landing/           Astro landing, support and privacy pages
-Tests/            60 tests, no Xcode required
+Tests/            77 tests, no Xcode required
 ```
 
 ## Documentation

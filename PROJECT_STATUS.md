@@ -28,7 +28,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 ## Timeline
 
 - **2026-08-16** — Built. Shared package (`AnchorCore`, `AnchorUI`, `anchor-mcp`),
-  both app targets, 60 tests, on-device tagging verified 12/12, both apps run and
+  both app targets, 77 tests, on-device tagging verified 12/12, both apps run and
   screenshotted.
 - **2026-08-16** — Moved under Significant Hobbies. CloudKit + app-group
   entitlements wired against team `8F7LXHTJZR`, Apple Watch target added and run
@@ -46,9 +46,10 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | Landing pages | Built (`landing/`), **not deployed** — Pages project not created |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
-`8F7LXHTJZR`. iOS and watchOS build signed; **macOS signed builds are blocked on
-registering this Mac in the developer account** — use the `DebugLocal`
-configuration until then.
+`8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
+Apple-issued provisioning profile that carries the iCloud container and app
+group. **macOS signed builds are blocked on registering this Mac in the developer
+account** — use the `DebugLocal` configuration until then.
 
 ## Features (shipped)
 
@@ -74,6 +75,7 @@ configuration until then.
   pause/resume, and one-tap distraction capture
 - CloudKit sync via a shared app group and private iCloud database
 - Landing, support and privacy pages for App Store Connect
+- App icon for all three platforms, drawn from the app's own ring mark
 
 ## Work queue
 
@@ -83,10 +85,10 @@ Known gaps carried forward:
 
 - **macOS signed builds blocked**: this Mac is not registered in the developer
   account. One interactive step in Xcode unblocks it.
-- **CloudKit sync unverified end-to-end**: entitlements and container are wired
-  and iOS/watchOS build signed, but two-device sync has not been exercised.
+- **CloudKit sync unverified end-to-end**: the entitlements are confirmed
+  embedded in a signed iOS device build (`iCloud.com.significanthobbies.anchor`,
+  CloudKit service, `group.com.significanthobbies.anchor`, team `8F7LXHTJZR`),
+  but two devices syncing to each other has not been exercised.
 - **Landing page not deployed**: `landing/` builds; the Pages project has not
   been created, so `anchor.significanthobbies.com` does not resolve yet.
-- **No app icon artwork**: `AppIcon.appiconset` is an empty placeholder.
-
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).

@@ -93,9 +93,17 @@ developer account, so there is a third configuration, `DebugLocal`, that drops
 entitlements and signing entirely. CloudKit is simply off there and the store
 falls back to local-only — which the container was already designed to survive.
 
+Verified rather than assumed: a generic iOS **device** build succeeds, and the
+embedded entitlements read back as `iCloud.com.significanthobbies.anchor`, the
+CloudKit service, `group.com.significanthobbies.anchor` and team `8F7LXHTJZR`,
+against an Apple-issued profile. watchOS device builds sign too.
+
 The remaining blocker is genuinely interactive: this Mac is not registered in the
-account, so signed macOS builds fail until someone clicks through Xcode once. iOS
-and watchOS build signed today.
+account, so signed macOS builds fail until someone clicks through Xcode once.
+
+One trap worth remembering: on the **simulator** the main `.xcent` is empty and
+the real entitlements live in `*-Simulated.xcent`. Reading the wrong one makes it
+look like the entitlements never applied.
 
 ## Snapshots between storage and everything else
 
@@ -158,8 +166,8 @@ usual "we may collect" boilerplate.
   account. `DebugLocal` is the workaround until then.
 - **The landing page is built but not deployed.** No Pages project exists, so
   `anchor.significanthobbies.com` does not resolve.
-- **The app icon is an empty placeholder.** The asset catalog declares the slots;
-  no artwork has been drawn.
+- **The app icon is generated, not hand-drawn.** `scripts/make-icon.py` renders
+  the ring mark; it reads well down to 16px but a designer could do better.
 - **The MCP server reads the store directly.** Fine for concurrent reads under
   SQLite WAL, but it means the binary and the app must agree on store location.
   They share `AnchorStore.storeURL()` for exactly this reason.
