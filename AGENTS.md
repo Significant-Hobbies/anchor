@@ -5,10 +5,11 @@
 
 ## What Anchor is
 
-A focus timer for macOS and iOS. You name a goal, run a timer, and when something
-distracts you, you park it in one keystroke instead of losing the session. It then
-reports what actually costs you your focus. Storage is SwiftData + CloudKit;
-grouping and tagging use Apple's on-device foundation model.
+A focus timer for macOS, iOS and watchOS. You name a goal, run a timer, and when
+something distracts you, you park it in one keystroke instead of losing the
+session. It then reports what actually costs you your focus. Storage is SwiftData
++ CloudKit; grouping and tagging use Apple's on-device foundation model. Ships
+under Significant Hobbies (`com.significanthobbies.anchor`).
 
 ## Critical constraints
 
@@ -45,7 +46,15 @@ cd Apps && xcodegen generate       # regenerate the Xcode project after editing 
 xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (macOS)" build
 xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (iOS)" \
   -destination 'generic/platform=iOS Simulator' build
+xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (watchOS)" \
+  -destination 'generic/platform=watchOS Simulator' build
 ```
+
+**Three configurations.** `Debug`/`Release` sign against team `8F7LXHTJZR` with
+the CloudKit and app-group entitlements — that is the shipping configuration and
+must stay the default. `DebugLocal` drops entitlements and signing so the apps
+build on a machine that isn't registered in the developer account; CloudKit is
+simply off there. Never "fix" a signing error by weakening `Debug`.
 
 `Apps/Anchor.xcodeproj` is **generated** — edit `Apps/project.yml`, never the
 `.xcodeproj`, and never commit build output.
@@ -75,6 +84,9 @@ to avoid touching real data while testing.
 | Hand-written xlsx and zip | `Sources/AnchorCore/Export/` |
 | Design tokens | `Sources/AnchorUI/Design/AnchorTheme.swift` |
 | MCP server | `Sources/anchor-mcp/main.swift` |
+| Watch views | `Sources/AnchorUI/Watch/WatchRootView.swift` |
+| Signing, entitlements, targets | `Apps/project.yml` + `Apps/*/Anchor.entitlements` |
+| Landing / support / privacy | `landing/` (Astro, static) |
 
 ## Conventions
 
@@ -86,8 +98,15 @@ to avoid touching real data while testing.
   on-device model is small; it needed worked examples and the rule matcher's
   suggestion as a hint before it stopped reading "Slack from Ravi" as a physical
   interruption.
-- Platform differences belong behind `#if os(...)` in `AnchorUI`, not in duplicated
-  screens. The two apps are shells.
+- Platform differences between Mac and iPhone belong behind `#if os(...)` in
+  `AnchorUI`, not in duplicated screens. Those two apps are shells.
+- **watchOS is the exception.** The Mac/iPhone screens are wrapped in
+  `#if !os(watchOS)` because the watch has no file exporter, pasteboard or
+  keyboard shortcuts, and the watch has its own views in `AnchorUI/Watch/`. Only
+  the design system and `FocusRing` are shared with it. Keep it that way rather
+  than threading size guards through the big screens.
+- The watch is a **remote**, not a small copy: it starts, pauses, resumes and
+  captures, and never shows analytics.
 
 ## Documentation
 

@@ -7,7 +7,7 @@ When something pulls at you, one keystroke parks it: you name it in a sentence,
 it's filed, and you're handed back your goal and the time remaining. Afterwards
 Anchor tells you what actually costs you your focus.
 
-Runs on macOS and iOS from one shared codebase. Everything stays on your device.
+Runs on macOS, iOS and Apple Watch from one shared codebase. Everything stays on your device.
 
 ![Anchor running a focus session](docs/images/session.png)
 
@@ -20,6 +20,9 @@ Runs on macOS and iOS from one shared codebase. Everything stays on your device.
   coming back captures it — with "nothing, just a break" one key away.
 - **A compact version** that lives in the menu bar, or as a floating mini timer
   (`⌘0`). Start, pause, resume, capture and end without opening the main window.
+- **Apple Watch** as a remote: start, pause, and catch the interruption at the
+  moment it happens without picking anything up.
+- **Sync** through your own private iCloud database. No account, no server.
 - **On-device tagging** — Apple Intelligence sorts goals into themes and
   distractions into categories, so analytics work without you tagging anything.
 - **Analytics** — where your hours go, what interrupts you, whether the pull came
@@ -29,8 +32,10 @@ Runs on macOS and iOS from one shared codebase. Everything stays on your device.
 
 ## Requirements
 
-macOS 26 / iOS 26 or later, Xcode 27. Apple Intelligence is optional: without it,
-tagging falls back to built-in rules and the app is otherwise unchanged.
+macOS 26 / iOS 26 / watchOS 26 or later, Xcode 27. Apple Intelligence is optional:
+without it, tagging falls back to built-in rules and the app is otherwise
+unchanged. Apple Watch never has it, so anything captured there is refined by the
+phone or Mac once it syncs.
 
 ## Build and run
 
@@ -43,7 +48,17 @@ swift test
 cd Apps && xcodegen generate && open Anchor.xcodeproj
 ```
 
-Pick the **Anchor (macOS)** or **Anchor (iOS)** scheme and run.
+Pick the **Anchor (macOS)**, **Anchor (iOS)** or **Anchor (watchOS)** scheme and run.
+
+CloudKit sync and the shared app group are entitlements, so the default `Debug`
+and `Release` configurations sign against the team. If this machine isn't
+registered in the developer account yet, build the `DebugLocal` configuration —
+it drops entitlements and signing, and the store falls back to local-only:
+
+```bash
+xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (macOS)" \
+  -configuration DebugLocal build
+```
 
 To explore with three weeks of plausible history instead of an empty database:
 
@@ -80,7 +95,9 @@ Sources/
   AnchorUI/       SwiftUI screens and the design system, shared by both apps
   anchor-mcp/     stdio MCP server over the same store
 Apps/
-  Mac/  iOS/      thin app shells; project.yml generates the Xcode project
+  Mac/ iOS/ Watch/  thin app shells; project.yml generates the Xcode project
+  Shared/          asset catalog (accent colour + app icon)
+landing/           Astro landing, support and privacy pages
 Tests/            60 tests, no Xcode required
 ```
 

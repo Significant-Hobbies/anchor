@@ -1,3 +1,7 @@
+// Mac and iPhone screens. The watch is a genuinely different shape — no
+// file exporter, no pasteboard, no keyboard shortcuts — so it gets its own
+// views in Watch/ rather than a pile of size guards in these.
+#if !os(watchOS)
 import AnchorCore
 import SwiftUI
 
@@ -186,3 +190,4 @@ public struct RunningSessionView: View {
         }
     }
 }
+#endif

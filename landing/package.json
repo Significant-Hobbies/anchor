@@ -1,0 +1,20 @@
+{
+  "name": "anchor-landing",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static Astro landing, support and privacy pages for Anchor. Deliberately small — its job is to satisfy App Store Connect's marketing, support and privacy URLs.",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "astro": "^5.18.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,17 +1,27 @@
 name: Anchor
 
 options:
-  bundleIdPrefix: com.sarthak
+  bundleIdPrefix: com.significanthobbies
   createIntermediateGroups: true
   deploymentTarget:
     macOS: "26.0"
     iOS: "26.0"
+    watchOS: "26.0"
   groupSortPosition: top
+
+configs:
+  Debug: debug
+  Release: release
+  # Signed builds need this Mac registered in the developer account, which is a
+  # one-time interactive step. DebugLocal drops entitlements and signing so the
+  # Mac app still builds and runs before that happens — CloudKit sync is simply
+  # off in that configuration, and the store falls back to local-only.
+  DebugLocal: debug
 
 packages:
   AnchorPackage:
-    # The shared Swift package one level up. Everything except the two app
-    # shells lives there, so both platforms stay genuinely identical.
+    # The shared Swift package one level up. Everything except the app shells
+    # lives there, so the platforms stay genuinely identical.
     path: ..
 
 settings:
@@ -21,12 +31,12 @@ settings:
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
-    # Ad-hoc signing so the app builds and runs locally without a team.
-    # Set DEVELOPMENT_TEAM and swap to Automatic to enable iCloud sync.
-    CODE_SIGN_STYLE: Manual
-    CODE_SIGN_IDENTITY: "-"
-    CODE_SIGNING_REQUIRED: NO
-    CODE_SIGNING_ALLOWED: NO
+    # Real signing: CloudKit and the shared app group are entitlements, so they
+    # only work against a provisioning profile. Automatic + the fleet team.
+    DEVELOPMENT_TEAM: 8F7LXHTJZR
+    CODE_SIGN_STYLE: Automatic
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
 targets:
   AnchorMac:
@@ -43,19 +53,30 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Anchor
-        PRODUCT_BUNDLE_IDENTIFIER: com.sarthak.anchor
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor
+        CODE_SIGN_ENTITLEMENTS: Mac/Anchor.entitlements
         COMBINE_HIDPI_IMAGES: YES
-        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_HARDENED_RUNTIME: YES
+      configs:
+        DebugLocal:
+          CODE_SIGN_ENTITLEMENTS: ""
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+          DEVELOPMENT_TEAM: ""
+          ENABLE_HARDENED_RUNTIME: NO
     info:
       path: Mac/Info.plist
       properties:
         CFBundleName: Anchor
         CFBundleDisplayName: Anchor
         CFBundlePackageType: APPL
-        CFBundleShortVersionString: "1.0"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: "26.0"
         LSApplicationCategoryType: public.app-category.productivity
+        ITSAppUsesNonExemptEncryption: false
         NSHumanReadableCopyright: ""
         # Not an agent app: Anchor has a real window as well as the menu bar.
         LSUIElement: false
@@ -71,18 +92,32 @@ targets:
         product: AnchorUI
       - package: AnchorPackage
         product: AnchorCore
+      # Embeds the watch app so a single iPhone install carries both.
+      - target: AnchorWatch
+        embed: true
     settings:
       base:
         PRODUCT_NAME: Anchor
-        PRODUCT_BUNDLE_IDENTIFIER: com.sarthak.anchor
+        PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor
+        CODE_SIGN_ENTITLEMENTS: iOS/Anchor.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        DebugLocal:
+          CODE_SIGN_ENTITLEMENTS: ""
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+          DEVELOPMENT_TEAM: ""
+          ENABLE_HARDENED_RUNTIME: NO
     info:
       path: iOS/Info.plist
       properties:
         CFBundleName: Anchor
         CFBundleDisplayName: Anchor
-        CFBundleShortVersionString: "1.0"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen:
           UIColorName: ""
         UIApplicationSceneManifest:
@@ -97,6 +132,47 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
 
+  AnchorWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: Watch
+      - path: Shared
+    dependencies:
+      - package: AnchorPackage
+        product: AnchorUI
+      - package: AnchorPackage
+        product: AnchorCore
+    settings:
+      base:
+        PRODUCT_NAME: Anchor
+        # Must be the iPhone app's identifier plus `.watchkitapp` for the pairing
+        # to be recognised.
+        PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.watchkitapp
+        CODE_SIGN_ENTITLEMENTS: Watch/Anchor.entitlements
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
+      configs:
+        DebugLocal:
+          CODE_SIGN_ENTITLEMENTS: ""
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+          DEVELOPMENT_TEAM: ""
+          ENABLE_HARDENED_RUNTIME: NO
+    info:
+      path: Watch/Info.plist
+      properties:
+        CFBundleName: Anchor
+        CFBundleDisplayName: Anchor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: com.significanthobbies.anchor
+        WKRunsIndependentlyOfCompanionApp: true
+
 schemes:
   Anchor (macOS):
     build:
@@ -108,5 +184,11 @@ schemes:
     build:
       targets:
         AnchorIOS: all
+    run:
+      config: Debug
+  Anchor (watchOS):
+    build:
+      targets:
+        AnchorWatch: all
     run:
       config: Debug

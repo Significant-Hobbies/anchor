@@ -1,0 +1,5 @@
+# Cloudflare Pages project for anchor.significanthobbies.com.
+# Static output; no Worker, no bindings — three pages and four screenshots.
+name = "anchor-landing"
+compatibility_date = "2026-08-16"
+pages_build_output_dir = "dist"

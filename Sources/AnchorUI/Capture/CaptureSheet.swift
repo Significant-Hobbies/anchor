@@ -1,3 +1,7 @@
+// Mac and iPhone screens. The watch is a genuinely different shape — no
+// file exporter, no pasteboard, no keyboard shortcuts — so it gets its own
+// views in Watch/ rather than a pile of size guards in these.
+#if !os(watchOS)
 import AnchorCore
 import SwiftUI
 
@@ -245,54 +249,4 @@ public struct CaptureSheet: View {
         dismiss()
     }
 }
-
-/// Wrapping row of chips. `LazyVGrid` can't do variable-width items, and a
-/// horizontal `ScrollView` hides options — so the chips wrap.
-public struct FlowRow: Layout {
-    public var spacing: CGFloat
-
-    public init(spacing: CGFloat = 6) {
-        self.spacing = spacing
-    }
-
-    public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let maxWidth = proposal.width ?? .infinity
-        var rows: CGFloat = 1
-        var x: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var total: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > 0, x + spacing + size.width > maxWidth {
-                total += rowHeight + spacing
-                rows += 1
-                x = size.width
-                rowHeight = size.height
-            } else {
-                x += (x > 0 ? spacing : 0) + size.width
-                rowHeight = max(rowHeight, size.height)
-            }
-        }
-        total += rowHeight
-        return CGSize(width: maxWidth == .infinity ? x : maxWidth, height: total)
-    }
-
-    public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var x = bounds.minX
-        var y = bounds.minY
-        var rowHeight: CGFloat = 0
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if x > bounds.minX, x + size.width > bounds.maxX {
-                x = bounds.minX
-                y += rowHeight + spacing
-                rowHeight = 0
-            }
-            subview.place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
-            x += size.width + spacing
-            rowHeight = max(rowHeight, size.height)
-        }
-    }
-}
+#endif

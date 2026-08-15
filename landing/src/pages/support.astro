@@ -1,0 +1,78 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+  title="Support — Anchor"
+  description="Help with Anchor: how sessions, parking and Apple Intelligence work, plus how to get in touch."
+>
+  <section class="hero" style="border-top: 0; padding-bottom: 20px;">
+    <h1 style="font-size: clamp(30px, 5vw, 42px);">Support</h1>
+    <p class="lede">
+      Email <a href="mailto:hello@significanthobbies.com">hello@significanthobbies.com</a> and
+      you'll get a reply from the person who built it.
+    </p>
+  </section>
+
+  <section class="prose">
+    <h2>Common questions</h2>
+
+    <h3>Does Anchor block apps or websites?</h3>
+    <p>
+      No. Apple's Screen Time blocking APIs exist only on iPhone and iPad — there is no macOS
+      equivalent — so a blocker would work on half your devices and quietly fail on the rest.
+      Anchor takes the other approach: capture the distraction in one keystroke and hand you
+      back your goal. It also records honestly when a distraction won, which is what makes the
+      analytics worth reading.
+    </p>
+
+    <h3>Why does resuming ask me a question?</h3>
+    <p>
+      Because a pause is usually an interruption you would otherwise never log. Answering takes
+      a few words, and declining with "Nothing — just a break" (or the Escape key) takes one
+      keypress.
+    </p>
+
+    <h3>My timer kept counting while my Mac was asleep. Is that a bug?</h3>
+    <p>
+      No — that's deliberate. Anchor measures elapsed time from the clock rather than by ticking,
+      so a session stays accurate across sleep, quitting the app, and syncing between devices.
+      Time you spend <em>paused</em> is always excluded.
+    </p>
+
+    <h3>My distractions are being categorised oddly.</h3>
+    <p>
+      Tap the category icon on any item in Parked to correct it. A category you set by hand is
+      locked, and will never be overwritten by the on-device model.
+    </p>
+
+    <h3>It says Apple Intelligence isn't available.</h3>
+    <p>
+      Apple Intelligence needs a supported device with the feature switched on in Settings, and
+      the model may still be downloading. Anchor works fully without it — grouping falls back to
+      built-in rules, and the optional written summary is simply hidden rather than faked. Apple
+      Watch never has it, so anything captured there is refined by your iPhone or Mac once it
+      syncs.
+    </p>
+
+    <h3>My devices aren't syncing.</h3>
+    <p>
+      Sync uses your own private iCloud database. Check that the same Apple Account is signed in
+      on both devices and that iCloud Drive is on. If iCloud is unavailable, Anchor keeps working
+      against a local database rather than refusing to start a timer.
+    </p>
+
+    <h3>How do I get my data out?</h3>
+    <p>
+      Insights → Export gives you an Excel workbook, CSV or JSON. Anchor also ships a local MCP
+      server so an AI client on your machine can query your history directly; see the
+      instructions in Settings.
+    </p>
+
+    <h2>Reporting a bug</h2>
+    <p>
+      Email what you did, what you expected, and what happened, plus your OS version. Please
+      don't include your distraction notes unless they're relevant — they're your business.
+    </p>
+  </section>
+</Layout>

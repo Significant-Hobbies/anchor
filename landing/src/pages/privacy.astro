@@ -1,0 +1,106 @@
+---
+import Layout from '../layouts/Layout.astro';
+const updated = '16 August 2026';
+---
+
+<Layout
+  title="Privacy Policy — Anchor"
+  description="Anchor collects nothing. No account, no analytics, no servers. Your focus history stays on your device and syncs only through your own private iCloud."
+>
+  <section class="hero" style="border-top: 0; padding-bottom: 20px;">
+    <h1 style="font-size: clamp(30px, 5vw, 42px);">Privacy Policy</h1>
+    <p class="lede">
+      Anchor has no servers, no account system and no analytics. There is no data for us to
+      collect, because none of it ever reaches us.
+    </p>
+    <p class="updated">Last updated {updated}.</p>
+  </section>
+
+  <section class="prose">
+    <h2>What Anchor stores</h2>
+    <p>
+      Anchor stores the focus sessions you run and the distractions you write down: the goal,
+      the intended and actual length, timestamps, the note you typed, and a category. This is
+      written to a database on your device.
+    </p>
+
+    <h3>Where it goes</h3>
+    <ul>
+      <li>
+        <strong>On your device.</strong> The database lives in Anchor's own container on your
+        Mac, iPhone or Apple Watch.
+      </li>
+      <li>
+        <strong>In your iCloud, if you use it.</strong> When you're signed in to iCloud, Anchor
+        syncs through Apple's CloudKit into your <em>private</em> database. That data is held in
+        your Apple account under Apple's terms. We cannot see it, and we have no way to request
+        it.
+      </li>
+      <li>
+        <strong>Nowhere else.</strong> Anchor has no backend. It does not send your sessions,
+        notes, categories, usage or device information to us or to any third party.
+      </li>
+    </ul>
+
+    <h2>What Anchor does not do</h2>
+    <ul>
+      <li>No accounts, sign-ups, logins or email collection.</li>
+      <li>No analytics, telemetry, crash reporting or usage measurement.</li>
+      <li>No advertising, no advertising identifiers, no tracking across apps or websites.</li>
+      <li>No third-party SDKs. Anchor is built only on Apple's frameworks.</li>
+      <li>No selling or sharing of data — there is none to sell or share.</li>
+    </ul>
+
+    <h2>Apple Intelligence</h2>
+    <p>
+      Anchor uses Apple's on-device foundation model to group goals into themes and sort
+      distractions into categories, and to write an optional one-paragraph summary of a period.
+      This runs entirely on your device through Apple's Foundation Models framework. Your notes
+      are not sent to Apple, to us, or to any cloud model.
+    </p>
+    <p>
+      Where Apple Intelligence is unavailable — an ineligible device, the feature switched off,
+      or on Apple Watch, where Apple ships no on-device model — Anchor falls back to built-in
+      keyword rules that also run locally.
+    </p>
+
+    <h2>The MCP server</h2>
+    <p>
+      Anchor includes an optional local MCP server so an AI client on your own machine can query
+      your focus history. It runs on your computer, reads the same local database, and is
+      started only by a client you have configured yourself. Anchor does not transmit anything
+      to run it. If you connect it to an AI client that itself sends data to a cloud service,
+      that transfer is governed by that client's privacy policy, not this one.
+    </p>
+
+    <h2>Export</h2>
+    <p>
+      You can export your history to Excel, CSV or JSON at any time. Exported files go wherever
+      you save them, and are then yours to handle.
+    </p>
+
+    <h2>Deleting your data</h2>
+    <p>
+      Deleting the app removes its local database. To remove synced copies, delete Anchor's data
+      from iCloud in your device settings. Because we hold nothing, there is no deletion request
+      to send us.
+    </p>
+
+    <h2>Children</h2>
+    <p>
+      Anchor is not directed at children under 13 and collects no personal information from
+      anyone, of any age.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      If this policy changes, the revised version will be posted here with a new date. Anchor's
+      posture — no collection, no servers — is a design decision, not a temporary state.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions: <a href="mailto:hello@significanthobbies.com">hello@significanthobbies.com</a>.
+    </p>
+  </section>
+</Layout>

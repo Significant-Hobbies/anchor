@@ -20,12 +20,25 @@ won, because a tool that logs only your wins produces analytics you cannot act o
 **Revisit if** the entitlement is granted — `ShieldProvider` would slot in behind
 the existing capture flow on iOS without changing the model.
 
-## Apple Watch deferred
+## The watch is a remote, not a small copy
 
-Planned, then dropped from this pass on evidence: `SystemLanguageModel` is marked
-`@available(watchOS, unavailable)` in the SDK. A watch app is still worth building
-as a remote — start, glance, tap to park — but it cannot carry the intelligence
-layer, so it is a genuinely separate design rather than a third target.
+`SystemLanguageModel` is marked `@available(watchOS, unavailable)` in the SDK, so
+the watch cannot carry the intelligence layer at all. That settled its shape: it
+starts, pauses, resumes and captures, and never shows analytics. Anything it
+records is tagged by rules and re-tagged properly by the phone or Mac once the
+store syncs.
+
+Two consequences in the code:
+
+- `TaggingService` guards on `canImport(FoundationModels) && !os(watchOS)`, not
+  plain `canImport` — the module *does* exist on watchOS, only the model doesn't.
+- The Mac/iPhone screens are wrapped in `#if !os(watchOS)` and the watch gets its
+  own views. Threading size guards through screens built around a file exporter,
+  a pasteboard and keyboard shortcuts would have produced worse code on all three
+  platforms.
+
+Capture on the wrist is mostly one tap: the categories *are* the input, and
+dictation is offered for when the specific thing matters.
 
 ## Wall-clock timing instead of a tick counter
 
@@ -69,6 +82,21 @@ owner's machine.
 So the same `CompactPanel` is also a small floating window (`⌘0`). One view, two
 mounts — no duplicated compact UI to keep in sync.
 
+## CloudKit is signed, not simulated
+
+Sync is a real private CloudKit database plus a shared app group, which means
+entitlements, which means a provisioning profile. `Debug`/`Release` therefore sign
+against the fleet team and are the shipping truth.
+
+That would have made the repo unbuildable on any machine not registered in the
+developer account, so there is a third configuration, `DebugLocal`, that drops
+entitlements and signing entirely. CloudKit is simply off there and the store
+falls back to local-only — which the container was already designed to survive.
+
+The remaining blocker is genuinely interactive: this Mac is not registered in the
+account, so signed macOS builds fail until someone clicks through Xcode once. iOS
+and watchOS build signed today.
+
 ## Snapshots between storage and everything else
 
 Analytics, export and MCP read plain `Codable` value types, not SwiftData objects.
@@ -110,15 +138,32 @@ The workspace has a standing rule against scaffolding new products. This was bui
 on an explicit direct request, which overrides it. Flagged at the time rather than
 silently absorbed.
 
+## A landing page sized for App Store Connect
+
+Apple requires a support URL and a privacy policy URL, and takes a marketing URL.
+That is the entire brief, so `landing/` is three static Astro pages with one
+stylesheet and no framework — no Tailwind, no components library, no analytics
+(which would contradict the privacy page).
+
+The privacy policy is short because it is true: no account, no telemetry, no
+servers, no third-party SDKs. It says so plainly rather than hedging with the
+usual "we may collect" boilerplate.
+
 ## Known gaps
 
-- **CloudKit sync is unverified.** The schema is CloudKit-shaped and the container
-  falls back cleanly, but sync has not been exercised against a real iCloud
-  account — that needs a signing team and two devices. Local storage is verified.
-- **No Apple Watch target** (see above).
+- **CloudKit sync is unverified end-to-end.** Entitlements, container and app
+  group are wired, and iOS and watchOS build signed against them. Two-device sync
+  has not been exercised — that needs signed builds on real hardware.
+- **macOS signed builds are blocked** on registering this Mac in the developer
+  account. `DebugLocal` is the workaround until then.
+- **The landing page is built but not deployed.** No Pages project exists, so
+  `anchor.significanthobbies.com` does not resolve.
+- **The app icon is an empty placeholder.** The asset catalog declares the slots;
+  no artwork has been drawn.
 - **The MCP server reads the store directly.** Fine for concurrent reads under
   SQLite WAL, but it means the binary and the app must agree on store location.
   They share `AnchorStore.storeURL()` for exactly this reason.
-- **Ad-hoc signing.** `Apps/project.yml` disables code signing so the apps build
-  and run locally without a team. Set `DEVELOPMENT_TEAM` and switch
-  `CODE_SIGN_STYLE` to `Automatic` to enable iCloud and the app group.
+- **Watch demo data can't be seeded by environment variable.** `SIMCTL_CHILD_*`
+  does not reach a watchOS simulator app, so the watch UI was verified by copying
+  a store the Mac had written into the simulator's app-group container — which is
+  also a fair rehearsal of the real sync path.

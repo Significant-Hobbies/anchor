@@ -13,10 +13,10 @@ public enum AnchorStore {
     /// App group so the Mac app, the iOS app and any future extension all read
     /// the same file. Falls back to the default location if the group is absent
     /// (which is the case for `swift test` and for unsigned local builds).
-    public static let appGroupIdentifier = "group.com.sarthak.anchor"
+    public static let appGroupIdentifier = "group.com.significanthobbies.anchor"
 
     /// CloudKit container backing cross-device sync.
-    public static let cloudKitIdentifier = "iCloud.com.sarthak.anchor"
+    public static let cloudKitIdentifier = "iCloud.com.significanthobbies.anchor"
 
     public enum StoreKind: Sendable {
         /// On disk, synced through CloudKit when entitlements allow it.

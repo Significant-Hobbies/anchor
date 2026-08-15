@@ -8,3 +8,8 @@ xcuserdata/
 Apps/Anchor.xcodeproj/
 
 .DS_Store
+
+# Landing page
+landing/node_modules/
+landing/dist/
+landing/.astro/

@@ -1,0 +1,270 @@
+/* Anchor's app palette, ported to the web. Cobalt is focus; warm is interruption. */
+:root {
+  --canvas: #0a0c10;
+  --surface: #141922;
+  --raised: #1d2532;
+  --hairline: rgb(255 255 255 / 0.08);
+  --text: #edf1f7;
+  --text-2: #94a0b3;
+  --text-3: #636f82;
+  --accent: #3b82f6;
+  --accent-soft: #7dd3fc;
+  --warm: #fb7185;
+  --radius: 16px;
+  --measure: 62ch;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--text);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Header */
+.site-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.site-head nav {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+}
+
+.site-head nav a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.site-head nav a:hover {
+  color: var(--text);
+}
+
+/* Hero */
+.hero {
+  padding: 56px 0 40px;
+  max-width: var(--measure);
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: clamp(34px, 6vw, 54px);
+  line-height: 1.06;
+  letter-spacing: -0.033em;
+  font-weight: 680;
+}
+
+.lede {
+  margin: 0;
+  font-size: clamp(17px, 2.4vw, 20px);
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.lede strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.meta {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.pill--soon {
+  border-color: rgb(59 130 246 / 0.4);
+  background: rgb(59 130 246 / 0.12);
+  color: var(--accent-soft);
+}
+
+/* Shots */
+.shot {
+  margin: 8px 0 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  line-height: 0;
+}
+
+.shot img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.shot figcaption {
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-3);
+  border-top: 1px solid var(--hairline);
+}
+
+.shots {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+  margin: 40px 0;
+}
+
+@media (min-width: 720px) {
+  .shots--pair {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+/* Sections */
+section {
+  padding: 36px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  letter-spacing: -0.018em;
+  font-weight: 640;
+}
+
+h3 {
+  margin: 28px 0 6px;
+  font-size: 16px;
+  font-weight: 620;
+}
+
+p {
+  max-width: var(--measure);
+}
+
+.points {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 18px;
+  max-width: var(--measure);
+}
+
+.points li strong {
+  display: block;
+  font-weight: 620;
+  margin-bottom: 2px;
+}
+
+.points li span {
+  color: var(--text-2);
+}
+
+.warm {
+  color: var(--warm);
+}
+
+.accent {
+  color: var(--accent-soft);
+}
+
+/* Prose pages */
+.prose {
+  padding: 20px 0 8px;
+  max-width: var(--measure);
+}
+
+.prose ul {
+  padding-left: 20px;
+  color: var(--text-2);
+}
+
+.prose li {
+  margin: 8px 0;
+}
+
+.prose a,
+main a {
+  color: var(--accent-soft);
+}
+
+.updated {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+/* Footer */
+footer {
+  border-top: 1px solid var(--hairline);
+  margin-top: 24px;
+  padding: 26px 0 48px;
+  color: var(--text-3);
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: space-between;
+}
+
+footer a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+footer a:hover {
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}

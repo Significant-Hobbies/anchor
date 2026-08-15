@@ -8,8 +8,10 @@ keystroke parks it and hands you back your goal and your remaining time. Anchor
 then reports what actually costs you your focus — and, crucially, whether the pull
 came from the world or from you.
 
-macOS and iOS from one shared Swift package. Local-first: distraction notes never
-leave the device, and grouping and tagging run against Apple's on-device model.
+macOS, iOS and Apple Watch from one shared Swift package, shipping under
+Significant Hobbies. Local-first: distraction notes never leave the device,
+grouping and tagging run against Apple's on-device model, and sync goes through
+the user's own private CloudKit database.
 
 ## Dependencies
 
@@ -21,24 +23,32 @@ Zero third-party packages. Everything is Apple platform frameworks:
 - **SwiftUI + Swift Charts** — both apps and all analytics
 - **XcodeGen** — generates `Apps/Anchor.xcodeproj` from `Apps/project.yml`
 
-Requires macOS 26 / iOS 26 and Xcode 27.
+Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
 - **2026-08-16** — Built. Shared package (`AnchorCore`, `AnchorUI`, `anchor-mcp`),
   both app targets, 60 tests, on-device tagging verified 12/12, both apps run and
   screenshotted.
+- **2026-08-16** — Moved under Significant Hobbies. CloudKit + app-group
+  entitlements wired against team `8F7LXHTJZR`, Apple Watch target added and run
+  in the simulator against a store written by the Mac, and Astro landing/support/
+  privacy pages built for App Store Connect.
 
 ## Products
 
 | Surface | State |
 | --- | --- |
 | Anchor for macOS | Builds and runs; main window, menu-bar panel, floating mini timer |
-| Anchor for iOS | Builds and runs in simulator; full app |
+| Anchor for iOS | Builds and runs in simulator; full app, embeds the watch app |
+| Anchor for watchOS | Builds and runs in simulator; remote for start/pause/capture |
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
+| Landing pages | Built (`landing/`), **not deployed** — Pages project not created |
 
-Not deployed — these are local Apple apps, not a web surface. No signing team is
-configured, so builds are ad-hoc signed for local use.
+Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
+`8F7LXHTJZR`. iOS and watchOS build signed; **macOS signed builds are blocked on
+registering this Mac in the developer account** — use the `DebugLocal`
+configuration until then.
 
 ## Features (shipped)
 
@@ -60,11 +70,23 @@ configured, so builds are ad-hoc signed for local use.
 - Export to `.xlsx` (hand-written writer, no dependencies), CSV and JSON
 - MCP server with diagnostics mode
 - macOS menu-bar extra: live countdown, quick park, pause/end
+- Apple Watch app: session ring, start from a recent goal with the Digital Crown,
+  pause/resume, and one-tap distraction capture
+- CloudKit sync via a shared app group and private iCloud database
+- Landing, support and privacy pages for App Store Connect
 
 ## Work queue
 
 GitHub Issues. Not yet created — the repository has no remote.
 
-Known gaps carried forward: CloudKit sync unverified against a real account, no
-Apple Watch target (`SystemLanguageModel` is unavailable on watchOS), and no
-signing team configured. See [`docs/decisions.md`](docs/decisions.md#known-gaps).
+Known gaps carried forward:
+
+- **macOS signed builds blocked**: this Mac is not registered in the developer
+  account. One interactive step in Xcode unblocks it.
+- **CloudKit sync unverified end-to-end**: entitlements and container are wired
+  and iOS/watchOS build signed, but two-device sync has not been exercised.
+- **Landing page not deployed**: `landing/` builds; the Pages project has not
+  been created, so `anchor.significanthobbies.com` does not resolve yet.
+- **No app icon artwork**: `AppIcon.appiconset` is an empty placeholder.
+
+See [`docs/decisions.md`](docs/decisions.md#known-gaps).

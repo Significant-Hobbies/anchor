@@ -6,6 +6,10 @@ let package = Package(
     platforms: [
         .macOS("26.0"),
         .iOS("26.0"),
+        // watchOS 26 has SwiftData and SwiftUI, but not `SystemLanguageModel` —
+        // on-device tagging is compiled out there and the watch relies on the
+        // phone/Mac to tag what it captures. See TaggingService.
+        .watchOS("26.0"),
     ],
     products: [
         .library(name: "AnchorCore", targets: ["AnchorCore"]),

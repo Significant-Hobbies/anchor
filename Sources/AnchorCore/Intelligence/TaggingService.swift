@@ -1,6 +1,11 @@
 import Foundation
 
-#if canImport(FoundationModels)
+// watchOS is the reason this is not a plain `canImport` check: the
+// FoundationModels module *does* exist there, but `SystemLanguageModel` is
+// marked `@available(watchOS, unavailable)`. Compiling the model path for the
+// watch would fail, so the watch always takes the rule-based route and lets the
+// phone or Mac re-tag what it captured once the store syncs.
+#if canImport(FoundationModels) && !os(watchOS)
 import FoundationModels
 #endif
 
@@ -36,13 +41,15 @@ public struct TaggingService: Sendable {
             case .deviceNotEligible: "This device doesn't support Apple Intelligence. Anchor is using built-in rules instead."
             case .notEnabled: "Turn on Apple Intelligence in System Settings for smarter grouping."
             case .modelNotReady: "Apple Intelligence is still downloading. Anchor is using built-in rules until it's ready."
-            case .unsupportedOS: "This system is too old for Apple Intelligence. Anchor is using built-in rules instead."
+            // Covers both "OS too old" and watchOS, where Apple ships no
+            // on-device model at all.
+            case .unsupportedOS: "Apple Intelligence isn't available on this device. Anchor is using built-in rules, and your phone or Mac will refine the tags once this syncs."
             }
         }
     }
 
     public static var availability: Availability {
-        #if canImport(FoundationModels)
+        #if canImport(FoundationModels) && !os(watchOS)
         switch SystemLanguageModel.default.availability {
         case .available:
             return .available
@@ -68,7 +75,7 @@ public struct TaggingService: Sendable {
     /// Warm the model up while the user is typing their goal, so the first tag
     /// after they hit start doesn't pay the load cost.
     public func prewarm() {
-        #if canImport(FoundationModels)
+        #if canImport(FoundationModels) && !os(watchOS)
         guard useModel else { return }
         let session = LanguageModelSession(instructions: Self.distractionInstructions)
         session.prewarm()
@@ -79,7 +86,7 @@ public struct TaggingService: Sendable {
 
     public func classifyDistraction(note: String, duringGoal goal: String) async -> DistractionTagging {
         let fallback = heuristic.classifyDistraction(note: note)
-        #if canImport(FoundationModels)
+        #if canImport(FoundationModels) && !os(watchOS)
         guard useModel else { return fallback }
         do {
             let session = LanguageModelSession(instructions: Self.distractionInstructions)
@@ -121,7 +128,7 @@ public struct TaggingService: Sendable {
 
     public func classifyGoal(title: String, notes: String) async -> GoalTagging {
         let fallback = heuristic.classifyGoal(title: title, notes: notes)
-        #if canImport(FoundationModels)
+        #if canImport(FoundationModels) && !os(watchOS)
         guard useModel else { return fallback }
         do {
             let session = LanguageModelSession(instructions: Self.goalInstructions)
@@ -154,7 +161,7 @@ public struct TaggingService: Sendable {
     /// model is unavailable the analytics screen simply omits it rather than
     /// showing a worse machine-written sentence.
     public func summarise(_ brief: String) async -> String? {
-        #if canImport(FoundationModels)
+        #if canImport(FoundationModels) && !os(watchOS)
         guard useModel else { return nil }
         do {
             let session = LanguageModelSession(instructions: Self.summaryInstructions)
@@ -248,7 +255,7 @@ public struct TaggingService: Sendable {
     """
 }
 
-#if canImport(FoundationModels)
+#if canImport(FoundationModels) && !os(watchOS)
 
 /// Structured output shapes. Kept `internal` — callers see the domain types.
 @Generable
