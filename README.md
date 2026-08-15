@@ -30,6 +30,9 @@ Runs on macOS, iOS and Apple Watch from one shared codebase. Everything stays on
 - **Export** — real `.xlsx`, CSV, JSON.
 - **MCP server** — point Claude at your focus history and just ask.
 
+Landing, support and privacy pages: <https://anchor-landing-ejy.pages.dev>
+(moving to `anchor.significanthobbies.com` once the custom domain is attached).
+
 ## Requirements
 
 macOS 26 / iOS 26 / watchOS 26 or later, Xcode 27. Apple Intelligence is optional:

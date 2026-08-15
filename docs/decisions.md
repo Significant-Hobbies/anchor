@@ -157,6 +157,12 @@ The privacy policy is short because it is true: no account, no telemetry, no
 servers, no third-party SDKs. It says so plainly rather than hedging with the
 usual "we may collect" boilerplate.
 
+Deployed to Cloudflare Pages as `anchor-landing`. One trap worth recording: with
+`build.format: 'file'`, `Astro.url.pathname` is `/privacy.html` at build time
+while Pages serves `/privacy`, so the first deploy shipped canonical URLs nobody
+could visit. The layout now strips `.html` and `index.html` before building the
+canonical.
+
 ## Known gaps
 
 - **CloudKit sync is unverified end-to-end.** Entitlements, container and app

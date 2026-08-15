@@ -8,7 +8,16 @@ interface Props {
 
 const { title, description } = Astro.props;
 const site = 'https://anchor.significanthobbies.com';
-const canonical = new URL(Astro.url.pathname, site).href.replace(/\/$/, '') || site;
+
+// `build.format: 'file'` means Astro.url.pathname is "/privacy.html" at build
+// time, but Cloudflare Pages serves the page at "/privacy". Canonicalise to the
+// URL people actually get, or every page declares a canonical nobody visits.
+const canonical =
+  site +
+  Astro.url.pathname
+    .replace(/index\.html$/, '')
+    .replace(/\.html$/, '')
+    .replace(/\/$/, '');
 ---
 
 <!doctype html>
