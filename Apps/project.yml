@@ -1,0 +1,112 @@
+name: Anchor
+
+options:
+  bundleIdPrefix: com.sarthak
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "26.0"
+    iOS: "26.0"
+  groupSortPosition: top
+
+packages:
+  AnchorPackage:
+    # The shared Swift package one level up. Everything except the two app
+    # shells lives there, so both platforms stay genuinely identical.
+    path: ..
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    # Ad-hoc signing so the app builds and runs locally without a team.
+    # Set DEVELOPMENT_TEAM and swap to Automatic to enable iCloud sync.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGNING_ALLOWED: NO
+
+targets:
+  AnchorMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Mac
+      - path: Shared
+    dependencies:
+      - package: AnchorPackage
+        product: AnchorUI
+      - package: AnchorPackage
+        product: AnchorCore
+    settings:
+      base:
+        PRODUCT_NAME: Anchor
+        PRODUCT_BUNDLE_IDENTIFIER: com.sarthak.anchor
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_HARDENED_RUNTIME: NO
+    info:
+      path: Mac/Info.plist
+      properties:
+        CFBundleName: Anchor
+        CFBundleDisplayName: Anchor
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: "1.0"
+        LSMinimumSystemVersion: "26.0"
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: ""
+        # Not an agent app: Anchor has a real window as well as the menu bar.
+        LSUIElement: false
+
+  AnchorIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOS
+      - path: Shared
+    dependencies:
+      - package: AnchorPackage
+        product: AnchorUI
+      - package: AnchorPackage
+        product: AnchorCore
+    settings:
+      base:
+        PRODUCT_NAME: Anchor
+        PRODUCT_BUNDLE_IDENTIFIER: com.sarthak.anchor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: iOS/Info.plist
+      properties:
+        CFBundleName: Anchor
+        CFBundleDisplayName: Anchor
+        CFBundleShortVersionString: "1.0"
+        UILaunchScreen:
+          UIColorName: ""
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+
+schemes:
+  Anchor (macOS):
+    build:
+      targets:
+        AnchorMac: all
+    run:
+      config: Debug
+  Anchor (iOS):
+    build:
+      targets:
+        AnchorIOS: all
+    run:
+      config: Debug
