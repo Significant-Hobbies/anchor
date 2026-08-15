@@ -30,9 +30,11 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 - **2026-08-16** — Built. Shared package (`AnchorCore`, `AnchorUI`, `anchor-mcp`),
   both app targets, 77 tests, on-device tagging verified 12/12, both apps run and
   screenshotted.
-- **2026-08-16** — Landing, support and privacy pages deployed to Cloudflare
-  Pages (`anchor-landing`). The `anchor.significanthobbies.com` custom domain is
-  not attached yet, which is a single dashboard action.
+- **2026-08-16** — Landing, support and privacy pages live at
+  `anchor.significanthobbies.com` (Cloudflare Pages `anchor-landing`, custom
+  domain attached with a Google Trust Services certificate).
+- **2026-08-16** — Developer ID signed, hardened-runtime `Anchor-1.0.dmg` built
+  by `scripts/release-mac.sh`. Notarisation still needs an app-specific password.
 - **2026-08-16** — Moved under Significant Hobbies. CloudKit + app-group
   entitlements wired against team `8F7LXHTJZR`, Apple Watch target added and run
   in the simulator against a store written by the Mac, and Astro landing/support/
@@ -46,7 +48,8 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | Anchor for iOS | Builds and runs in simulator; full app, embeds the watch app |
 | Anchor for watchOS | Builds and runs in simulator; remote for start/pause/capture |
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
-| Landing pages | **Live** on Cloudflare Pages (`anchor-landing`) at `anchor-landing-ejy.pages.dev` |
+| Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`) |
+| macOS DMG | **Signed** Developer ID build, hardened runtime, in `dist/` — not notarised |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -92,8 +95,10 @@ Known gaps carried forward:
   embedded in a signed iOS device build (`iCloud.com.significanthobbies.anchor`,
   CloudKit service, `group.com.significanthobbies.anchor`, team `8F7LXHTJZR`),
   but two devices syncing to each other has not been exercised.
-- **Custom domain not attached**: the pages are live on `.pages.dev`, but
-  `anchor.significanthobbies.com` is not bound to the Pages project, so the
-  canonical URLs the pages declare do not resolve yet. Wrangler 4 has no
-  `pages domain` command — attach it in the Cloudflare dashboard.
+- **DMG is signed but not notarised**: Gatekeeper will warn on other Macs until
+  it is. Needs an app-specific password from appleid.apple.com stored via
+  `xcrun notarytool store-credentials`, then re-run the release script with
+  `ANCHOR_NOTARY_PROFILE` set.
+- **The direct-download build has no iCloud sync** — see the release notes in
+  `scripts/release-mac.sh`. The App Store build keeps CloudKit.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).

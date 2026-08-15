@@ -157,11 +157,36 @@ The privacy policy is short because it is true: no account, no telemetry, no
 servers, no third-party SDKs. It says so plainly rather than hedging with the
 usual "we may collect" boilerplate.
 
-Deployed to Cloudflare Pages as `anchor-landing`. One trap worth recording: with
+Live at `anchor.significanthobbies.com` on Cloudflare Pages as `anchor-landing`.
+Wrangler 4 has no `pages domain` command, so the custom domain and its CNAME went
+in through the API using the same OAuth-token helper the fleet's other Cloudflare
+scripts use. One trap worth recording: with
 `build.format: 'file'`, `Astro.url.pathname` is `/privacy.html` at build time
 while Pages serves `/privacy`, so the first deploy shipped canonical URLs nobody
 could visit. The layout now strips `.html` and `index.html` before building the
 canonical.
+
+## The direct-download DMG trades sync for shippability
+
+`scripts/release-mac.sh` produces a Developer ID signed, hardened-runtime DMG.
+
+It ships **without iCloud sync**, and that is forced rather than chosen: iCloud
+and app groups are *restricted* entitlements, Apple requires them to be backed by
+a provisioning profile, and minting a macOS Developer ID profile needs either this
+Mac registered in the developer account or an App Store Connect API key. Neither
+exists yet. The app falls back to a local-only database — a path `AnchorStore`
+already had — so the build is honest rather than broken. A separate
+`ReleaseDirect` configuration keeps this split explicit instead of quietly
+weakening the App Store build's entitlements.
+
+Two things the script guards, both learned by tripping over them:
+
+- **Archive, never a plain `build`.** A plain build injects
+  `com.apple.security.get-task-allow`, and notarisation rejects anything carrying
+  it. The first DMG had it; the script now fails loudly if it reappears.
+- **Don't pipe `codesign` into `grep -q` under `pipefail`.** `grep -q` exits on
+  first match, SIGPIPEs codesign, and the pipeline reads as failed — which is
+  exactly how the hardened-runtime check produced a false negative.
 
 ## Known gaps
 
@@ -170,8 +195,9 @@ canonical.
   has not been exercised — that needs signed builds on real hardware.
 - **macOS signed builds are blocked** on registering this Mac in the developer
   account. `DebugLocal` is the workaround until then.
-- **The landing page is built but not deployed.** No Pages project exists, so
-  `anchor.significanthobbies.com` does not resolve.
+- **The DMG is signed but not notarised.** Gatekeeper warns on other Macs until
+  an app-specific password is stored with `xcrun notarytool store-credentials`
+  and the release script is re-run with `ANCHOR_NOTARY_PROFILE`.
 - **The app icon is generated, not hand-drawn.** `scripts/make-icon.py` renders
   the ring mark; it reads well down to 16px but a designer could do better.
 - **The MCP server reads the store directly.** Fine for concurrent reads under

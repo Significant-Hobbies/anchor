@@ -13,3 +13,7 @@ Apps/Anchor.xcodeproj/
 landing/node_modules/
 landing/dist/
 landing/.astro/
+
+# Release artifacts
+build/
+dist/

@@ -50,11 +50,14 @@ xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (watchOS)" \
   -destination 'generic/platform=watchOS Simulator' build
 ```
 
-**Three configurations.** `Debug`/`Release` sign against team `8F7LXHTJZR` with
-the CloudKit and app-group entitlements — that is the shipping configuration and
-must stay the default. `DebugLocal` drops entitlements and signing so the apps
-build on a machine that isn't registered in the developer account; CloudKit is
-simply off there. Never "fix" a signing error by weakening `Debug`.
+**Four configurations.** `Debug`/`Release` sign against team `8F7LXHTJZR` with the
+CloudKit and app-group entitlements — that is the App Store truth and must stay
+the default. `DebugLocal` drops entitlements and signing so the apps build on a
+machine that isn't registered in the developer account. `ReleaseDirect` is the
+Developer ID direct-download build behind `scripts/release-mac.sh`; it drops the
+restricted iCloud/app-group entitlements because Apple will not notarise them
+without a provisioning profile. Never "fix" a signing error by weakening `Debug`
+or `Release`.
 
 `Apps/Anchor.xcodeproj` is **generated** — edit `Apps/project.yml`, never the
 `.xcodeproj`, and never commit build output.
@@ -87,6 +90,7 @@ to avoid touching real data while testing.
 | Watch views | `Sources/AnchorUI/Watch/WatchRootView.swift` |
 | Signing, entitlements, targets | `Apps/project.yml` + `Apps/*/Anchor.entitlements` |
 | Landing / support / privacy | `landing/` (Astro, static) |
+| Mac release (DMG) | `scripts/release-mac.sh` + `Apps/Mac/Anchor.DirectDistribution.entitlements` |
 
 ## Conventions
 

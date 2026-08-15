@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Entitlements for the Developer ID (direct download) build.
+
+  iCloud and app groups are *restricted* entitlements: Apple requires them to be
+  backed by a provisioning profile, and notarisation rejects them otherwise. This
+  build therefore ships without them, which means no cross-device sync — the
+  store falls back to a local-only database, which `AnchorStore` was already
+  built to survive.
+
+  The App Store build uses Anchor.entitlements and keeps CloudKit.
+-->
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

@@ -17,6 +17,10 @@ configs:
   # Mac app still builds and runs before that happens — CloudKit sync is simply
   # off in that configuration, and the store falls back to local-only.
   DebugLocal: debug
+  # Developer ID build for direct download (the DMG). Signs with the Developer ID
+  # certificate and drops the restricted iCloud/app-group entitlements, which
+  # Apple requires to be backed by a provisioning profile.
+  ReleaseDirect: release
 
 packages:
   AnchorPackage:
@@ -66,6 +70,13 @@ targets:
           CODE_SIGNING_ALLOWED: NO
           DEVELOPMENT_TEAM: ""
           ENABLE_HARDENED_RUNTIME: NO
+        ReleaseDirect:
+          CODE_SIGN_ENTITLEMENTS: Mac/Anchor.DirectDistribution.entitlements
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          PROVISIONING_PROFILE_SPECIFIER: ""
+          ENABLE_HARDENED_RUNTIME: YES
+          OTHER_CODE_SIGN_FLAGS: "--timestamp"
     info:
       path: Mac/Info.plist
       properties:

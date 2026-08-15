@@ -30,8 +30,7 @@ Runs on macOS, iOS and Apple Watch from one shared codebase. Everything stays on
 - **Export** — real `.xlsx`, CSV, JSON.
 - **MCP server** — point Claude at your focus history and just ask.
 
-Landing, support and privacy pages: <https://anchor-landing-ejy.pages.dev>
-(moving to `anchor.significanthobbies.com` once the custom domain is attached).
+Landing, support and privacy pages: <https://anchor.significanthobbies.com>
 
 ## Requirements
 
@@ -70,6 +69,20 @@ ANCHOR_DEMO_DATA=1 ./path/to/Anchor.app/Contents/MacOS/Anchor
 ```
 
 Demo data is only ever written into an empty store.
+
+## Releasing the Mac app
+
+```bash
+./scripts/release-mac.sh          # signed, hardened Anchor-<version>.dmg in dist/
+ANCHOR_NOTARY_PROFILE=anchor-notary ./scripts/release-mac.sh   # + notarise & staple
+```
+
+The direct-download build ships without iCloud sync. iCloud and app groups are
+*restricted* entitlements that Apple requires to be backed by a provisioning
+profile, and minting a macOS Developer ID profile needs this Mac registered in
+the developer account. Without them the app runs against a local-only database,
+which the store was already built to fall back to. The App Store build keeps
+CloudKit.
 
 ## Talking to your data
 
