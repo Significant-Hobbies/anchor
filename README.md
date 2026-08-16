@@ -70,19 +70,37 @@ ANCHOR_DEMO_DATA=1 ./path/to/Anchor.app/Contents/MacOS/Anchor
 
 Demo data is only ever written into an empty store.
 
-## Releasing the Mac app
+## Releasing
 
 ```bash
-./scripts/release-mac.sh          # signed, hardened Anchor-<version>.dmg in dist/
-ANCHOR_NOTARY_PROFILE=anchor-notary ./scripts/release-mac.sh   # + notarise & staple
+./scripts/release-mac.sh    # Developer ID signed, hardened Anchor-<v>.dmg
+./scripts/release-ios.sh    # App Store signed Anchor-<v>.ipa, watch app embedded
 ```
 
-The direct-download build ships without iCloud sync. iCloud and app groups are
-*restricted* entitlements that Apple requires to be backed by a provisioning
-profile, and minting a macOS Developer ID profile needs this Mac registered in
-the developer account. Without them the app runs against a local-only database,
-which the store was already built to fall back to. The App Store build keeps
-CloudKit.
+Both write to `dist/` and verify what they produced — signature, hardened
+runtime, entitlements, and (for iOS) that the watch app is really in the payload.
+
+Finishing each one needs your Apple credentials:
+
+```bash
+# Notarise the DMG (once: store an app-specific password from appleid.apple.com)
+xcrun notarytool store-credentials "anchor-notary" \
+  --apple-id "<apple-id>" --team-id 8F7LXHTJZR --password "<app-specific-password>"
+ANCHOR_NOTARY_PROFILE=anchor-notary ./scripts/release-mac.sh
+
+# Upload the IPA — or just drag it into Transporter
+xcrun altool --upload-app -f dist/Anchor-1.0.ipa -t ios \
+  --apple-id "<apple-id>" --password "<app-specific-password>"
+```
+
+**The Mac direct-download build ships without iCloud sync.** iCloud and app
+groups are *restricted* entitlements that Apple requires to be backed by a
+provisioning profile, and minting a macOS Developer ID profile needs this Mac
+registered in the developer account. Without them the app runs against a
+local-only database, which the store was already built to fall back to.
+
+The iOS/watchOS App Store build keeps CloudKit — Store provisioning profiles can
+carry restricted entitlements, so nothing is stripped there.
 
 ## Talking to your data
 

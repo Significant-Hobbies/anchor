@@ -91,6 +91,7 @@ to avoid touching real data while testing.
 | Signing, entitlements, targets | `Apps/project.yml` + `Apps/*/Anchor.entitlements` |
 | Landing / support / privacy | `landing/` (Astro, static) |
 | Mac release (DMG) | `scripts/release-mac.sh` + `Apps/Mac/Anchor.DirectDistribution.entitlements` |
+| iOS/watch release (IPA) | `scripts/release-ios.sh` |
 
 ## Conventions
 

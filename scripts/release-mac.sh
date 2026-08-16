@@ -96,8 +96,16 @@ else
 fi
 
 # get-task-allow is a debug entitlement; notarisation refuses anything carrying it.
-if codesign -d --entitlements :- "$APP" 2>/dev/null | grep -q "get-task-allow"; then
-  echo "✘ get-task-allow present — notarisation would reject this." >&2
+# Checked by value, not by substring: `get-task-allow = false` is legitimate and a
+# naive grep would reject a perfectly good build.
+if ! codesign -d --entitlements :- "$APP" 2>/dev/null | python3 -c '
+import sys, plistlib
+raw = sys.stdin.buffer.read()
+start = raw.find(b"<?xml")
+entitlements = plistlib.loads(raw[start:]) if start >= 0 else {}
+sys.exit(1 if entitlements.get("get-task-allow") else 0)
+'; then
+  echo "✘ get-task-allow is true — notarisation would reject this." >&2
   exit 1
 fi
 echo "   debug entitlements: none"
