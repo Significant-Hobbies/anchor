@@ -17,3 +17,7 @@ landing/.astro/
 # Release artifacts
 build/
 dist/
+
+site/node_modules/
+site/dist/
+site/.astro/
