@@ -31,6 +31,10 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-22** — Apple completed processing Anchor for iOS 1.0 (2) from an
+  Xcode 27 Beta 5 personal-team archive. The signed IPA retains CloudKit and the
+  shared app group and embeds the Watch app; the build still needs internal
+  tester assignment before it appears in TestFlight.
 - **2026-08-22** — Installed Anchor 1.0 (2) from merged Personal Platform sync
   revision `5d07e7e19eb23c6a352dbc5e1c4cfb143d497e77` in `/Applications` using Xcode
   27 Beta 5. The Developer ID signature, hardened runtime, version metadata,
@@ -87,7 +91,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`) |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **Beta 5 account sign-in pending** — the source and 89 shared tests pass under Beta 5, but Xcode must refresh the App Store profile with Sign in with Apple before the archive can upload |
+| iOS/watchOS IPA | **Processing complete** for 1.0 (2); internal tester assignment remains before it appears in TestFlight |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -133,17 +137,17 @@ Open work is tracked in
 
 Known gaps carried forward:
 
-- **macOS App Store signing is blocked**: Xcode Beta 5 has no authenticated
-  developer account. The Developer ID build is signed, installed, and running;
-  adding the personal account enables an entitlement-complete App Store build.
+- **macOS App Store distribution remains unverified**: the personal account is
+  now authenticated and the Developer ID build is signed, installed, and
+  running, but an entitlement-complete Mac App Store archive has not been made.
 - **CloudKit sync unverified end-to-end**: the entitlements are confirmed
   embedded in a signed iOS device build (`iCloud.com.significanthobbies.anchor`,
   CloudKit service, `group.com.significanthobbies.anchor`, team `8F7LXHTJZR`),
   but two devices syncing to each other has not been exercised.
-- **DMG is signed but not notarised**. The App Store Connect record exists, and
-  the iOS/watchOS icon validation defects are fixed. Signing in to the personal
-  account in Xcode 27 Beta 5, refreshing the provisioning profile, rebuilding,
-  and uploading are the remaining TestFlight gates.
+- **DMG is signed but not notarised**. The App Store Connect record exists, the
+  iOS/watchOS icon validation defects are fixed, and build 1.0 (2) completed
+  processing. Adding that build to the owner's internal tester group is the
+  remaining TestFlight gate.
 - **The direct-download build has no iCloud sync** — see the release notes in
   `scripts/release-mac.sh`. The App Store build keeps CloudKit.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).
