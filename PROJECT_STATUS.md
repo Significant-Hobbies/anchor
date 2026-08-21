@@ -31,6 +31,11 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-22** — Installed Anchor 1.0 (2) from merged Personal Platform sync
+  revision `5d07e7e19eb23c6a352dbc5e1c4cfb143d497e77` in `/Applications` using Xcode
+  27 Beta 5. The Developer ID signature, hardened runtime, version metadata,
+  launch, and running process were verified; the previous app remains
+  recoverable in Trash.
 - **2026-08-21** — Added the first iPhone UI automation target and verified the
   complete existing loop under Xcode 27 Beta 5: start a session, park an
   interruption, return, pause and resume with the free decline path, end, and
