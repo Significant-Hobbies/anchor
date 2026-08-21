@@ -31,6 +31,14 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-21** — Added the first iPhone UI automation target and verified the
+  complete existing loop under Xcode 27 Beta 5: start a session, park an
+  interruption, return, pause and resume with the free decline path, end, and
+  find the persisted item in Parked. The run exposed and fixed a covered-keyboard
+  usability problem by adding explicit Done controls to both multiline forms.
+  The personal-team archive remains blocked only on authenticating the Apple
+  account in this Xcode installation and refreshing the Sign in with Apple
+  profile; tracked in GitHub issue #4.
 - **2026-08-21** — Installed Anchor 1.0 (2) in `/Applications` from current
   `main` using Xcode 27 Beta 5. The Developer ID signature, hardened runtime,
   89 shared tests, launch, and running process were verified. The direct build
@@ -86,6 +94,9 @@ account** — use the `DebugLocal` configuration until then.
 
 - Focus sessions against a goal, with wall-clock timing that survives relaunch,
   sleep and cross-device sync
+- Automated iPhone coverage for the start, interruption, return, pause/resume,
+  end, and persisted Parked-item journey, with explicit keyboard dismissal for
+  both multiline entry forms
 - Pause, resume, extend at the bell, and honest end-reason recording
   (completed / ended early / abandoned)
 - Distraction capture (`⌘⇧L`) with a park-and-return confirmation, plus an explicit

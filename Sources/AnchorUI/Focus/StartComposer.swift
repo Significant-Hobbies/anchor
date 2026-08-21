@@ -114,6 +114,13 @@ public struct StartComposer: View {
             // window doesn't leave the composer stranded above a field of empty.
             .containerRelativeFrame(.vertical, alignment: .center)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { intentFocused = false }
+            }
+        }
         .background(theme.canvas)
         .onAppear {
             // Focus the field on the Mac, where a keyboard is already there and

@@ -171,6 +171,13 @@ public struct CaptureSheet: View {
         }
         .padding(Space.lg)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { fieldFocused = false }
+            }
+        }
         .onAppear { fieldFocused = true }
     }
 

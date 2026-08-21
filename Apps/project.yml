@@ -192,6 +192,18 @@ targets:
         WKCompanionAppBundleIdentifier: com.significanthobbies.anchor
         WKRunsIndependentlyOfCompanionApp: true
 
+  AnchorIOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/AnchorIOSUITests
+    dependencies:
+      - target: AnchorIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   Anchor (macOS):
     build:
@@ -203,6 +215,10 @@ schemes:
     build:
       targets:
         AnchorIOS: all
+        AnchorIOSUITests: [test]
+    test:
+      targets:
+        - AnchorIOSUITests
     run:
       config: Debug
   Anchor (watchOS):
