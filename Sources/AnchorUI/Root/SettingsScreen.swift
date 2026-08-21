@@ -2,6 +2,7 @@
 // file exporter, no pasteboard, no keyboard shortcuts — so it gets its own
 // views in Watch/ rather than a pile of size guards in these.
 #if !os(watchOS)
+import AuthenticationServices
 import AnchorCore
 import SwiftData
 import SwiftUI
@@ -114,7 +115,20 @@ public struct SettingsScreen: View {
                                 Button("Sign out") { Task { await account.signOut() } }
                                     .buttonStyle(QuietButtonStyle(expands: false))
                             } else {
-                                Button(account.isConnecting ? "Connecting…" : "Connect Significant Hobbies") {
+                                SignInWithAppleButton(.continue) { request in
+                                    account.prepareApple(request)
+                                } onCompletion: { result in
+                                    Task {
+                                        await account.completeApple(result)
+                                        if account.isSignedIn {
+                                            await platform.synchronize(announcing: true)
+                                        }
+                                    }
+                                }
+                                .signInWithAppleButtonStyle(.black)
+                                .frame(minHeight: 42)
+                                .disabled(account.isConnecting)
+                                Button(account.isConnecting ? "Connecting…" : "Continue with Google") {
                                     Task { await platform.connect() }
                                 }
                                 .buttonStyle(QuietButtonStyle(expands: false))
