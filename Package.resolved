@@ -1,12 +1,12 @@
 {
-  "originHash" : "a184fa408961d978139bd7f0a9e7841a5f21eb225e422e04cf2690c00364f773",
+  "originHash" : "d731be6ea6df3b49143808df0135ad30e94ef83036dcca0de6afed0f15b3bb26",
   "pins" : [
     {
       "identity" : "personal-platform",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Significant-Hobbies/personal-platform.git",
       "state" : {
-        "revision" : "a254f77f883e0ff3a85841ea9620754875a21666"
+        "revision" : "55176cac008d3857ef815d9bc5c8e74b68e7c3f3"
       }
     }
   ],
