@@ -31,6 +31,12 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-21** — Installed Anchor 1.0 (2) in `/Applications` from current
+  `main` using Xcode 27 Beta 5. The Developer ID signature, hardened runtime,
+  89 shared tests, launch, and running process were verified. The direct build
+  remains intentionally local/Google-connectable because Apple does not permit
+  its CloudKit, app-group, or Sign in with Apple entitlements without a matching
+  provisioning profile.
 - **2026-08-21** — Prepared and tested Anchor 1.0 (2) for optional Personal Platform sync
   on iPhone and Mac. Finished sessions push goal/timing/outcome/count metadata,
   Pace-created sessions pull into SwiftData, and raw distraction text is covered
@@ -38,8 +44,9 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
   Store Connect record `6803853891` now exists as “Anchor by Significant
   Hobbies,” and both 1024px app icons have been flattened to remove invalid
   alpha channels. The Xcode 27 Beta 4 personal-team archive and Apple
-  Distribution IPA pass local inspection, but Apple rejects Beta 4 as obsolete;
-  the current Beta 5 installer is waiting for interactive two-factor authentication.
+  Distribution IPA pass local inspection, but Apple rejects Beta 4 as obsolete.
+  Beta 5 is installed; its App Store archive now waits for the personal Apple
+  account to be added so Xcode can refresh the Sign in with Apple profile.
 
 - **2026-08-16** — Built. Shared package (`AnchorCore`, `AnchorUI`, `anchor-mcp`),
   both app targets, 77 tests, on-device tagging verified 12/12, both apps run and
@@ -67,7 +74,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`) |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **Beta 5 rebuild pending** — Beta 4 package is Apple Distribution signed with CloudKit and the watch app intact, but Apple requires current Xcode 27 Beta 5 for TestFlight upload |
+| iOS/watchOS IPA | **Beta 5 account sign-in pending** — the source and 89 shared tests pass under Beta 5, but Xcode must refresh the App Store profile with Sign in with Apple before the archive can upload |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -110,16 +117,17 @@ Open work is tracked in
 
 Known gaps carried forward:
 
-- **macOS signed builds blocked**: this Mac is not registered in the developer
-  account. One interactive step in Xcode unblocks it.
+- **macOS App Store signing is blocked**: Xcode Beta 5 has no authenticated
+  developer account. The Developer ID build is signed, installed, and running;
+  adding the personal account enables an entitlement-complete App Store build.
 - **CloudKit sync unverified end-to-end**: the entitlements are confirmed
   embedded in a signed iOS device build (`iCloud.com.significanthobbies.anchor`,
   CloudKit service, `group.com.significanthobbies.anchor`, team `8F7LXHTJZR`),
   but two devices syncing to each other has not been exercised.
 - **DMG is signed but not notarised**. The App Store Connect record exists, and
-  the iOS/watchOS icon validation defects are fixed. Installing Xcode 27 Beta 5
-  after interactive two-factor authentication, rebuilding, and uploading are
-  the remaining TestFlight gates.
+  the iOS/watchOS icon validation defects are fixed. Signing in to the personal
+  account in Xcode 27 Beta 5, refreshing the provisioning profile, rebuilding,
+  and uploading are the remaining TestFlight gates.
 - **The direct-download build has no iCloud sync** — see the release notes in
   `scripts/release-mac.sh`. The App Store build keeps CloudKit.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).
