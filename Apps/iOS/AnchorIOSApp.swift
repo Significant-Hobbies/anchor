@@ -6,12 +6,21 @@ import SwiftUI
 /// The iOS app. Same screens, same store, native shell.
 @main
 struct AnchorIOSApp: App {
-    @State private var world = AnchorWorld()
+    @State private var world: AnchorWorld
+    @State private var platform: AnchorPlatformSync
+
+    init() {
+        let world = AnchorWorld()
+        _world = State(initialValue: world)
+        _platform = State(initialValue: AnchorPlatformSync(context: world.container.mainContext))
+    }
 
     var body: some Scene {
         WindowGroup {
             RootView(controller: world.controller)
                 .anchorTheme()
+                .environment(\.anchorPlatformSync, platform)
+                .task { await platform.restoreAndSynchronize() }
         }
         .modelContainer(world.container)
     }
@@ -31,6 +40,10 @@ final class AnchorWorld {
         if DemoData.isRequested {
             DemoData.seedIfNeeded(into: container.mainContext)
         }
-        self.controller = FocusController(context: container.mainContext)
+        let controller = FocusController(
+            context: container.mainContext,
+            completionNotifier: SystemSessionCompletionNotifier()
+        )
+        self.controller = controller
     }
 }

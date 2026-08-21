@@ -19,6 +19,13 @@ public struct SessionRecord: Sendable, Codable, Equatable, Identifiable {
     public var state: SessionState
     public var endReason: SessionEndReason?
     public var distractions: [DistractionRecord]
+    public var projectTitle: String
+    public var notes: String
+    public var tags: [String]
+    public var hourlyRate: Double
+    public var currencyCode: String
+    public var computerActiveSeconds: Double
+    public var computerAwaySeconds: Double
 
     public init(
         id: UUID,
@@ -31,7 +38,14 @@ public struct SessionRecord: Sendable, Codable, Equatable, Identifiable {
         focusedSeconds: Double,
         state: SessionState,
         endReason: SessionEndReason?,
-        distractions: [DistractionRecord]
+        distractions: [DistractionRecord],
+        projectTitle: String = "",
+        notes: String = "",
+        tags: [String] = [],
+        hourlyRate: Double = 0,
+        currencyCode: String = "USD",
+        computerActiveSeconds: Double = 0,
+        computerAwaySeconds: Double = 0
     ) {
         self.id = id
         self.goalTitle = goalTitle
@@ -44,9 +58,21 @@ public struct SessionRecord: Sendable, Codable, Equatable, Identifiable {
         self.state = state
         self.endReason = endReason
         self.distractions = distractions
+        self.projectTitle = projectTitle
+        self.notes = notes
+        self.tags = tags
+        self.hourlyRate = hourlyRate
+        self.currencyCode = currencyCode
+        self.computerActiveSeconds = computerActiveSeconds
+        self.computerAwaySeconds = computerAwaySeconds
     }
 
     public var focusedMinutes: Double { focusedSeconds / 60 }
+    public var earnedAmount: Double { focusedSeconds / 3600 * hourlyRate }
+    public var computerObservedSeconds: Double { computerActiveSeconds + computerAwaySeconds }
+    public var computerActiveRate: Double? {
+        computerObservedSeconds > 0 ? computerActiveSeconds / computerObservedSeconds : nil
+    }
 
     /// Interruptions per hour of actual focus — the comparable number, since a
     /// 25-minute session with two interruptions is worse than a 2-hour one with three.
@@ -59,6 +85,22 @@ public struct SessionRecord: Sendable, Codable, Equatable, Identifiable {
     public var didComplete: Bool { endReason == .completed }
 }
 
+public struct MachineActivityRecord: Sendable, Codable, Equatable, Identifiable {
+    public var id: UUID
+    public var day: Date
+    public var activeSeconds: Double
+    public var trackedSeconds: Double
+
+    public init(id: UUID, day: Date, activeSeconds: Double, trackedSeconds: Double) {
+        self.id = id
+        self.day = day
+        self.activeSeconds = activeSeconds
+        self.trackedSeconds = trackedSeconds
+    }
+
+    public var untrackedSeconds: Double { max(0, activeSeconds - trackedSeconds) }
+}
+
 public struct DistractionRecord: Sendable, Codable, Equatable, Identifiable {
     public var id: UUID
     public var note: String
@@ -69,6 +111,7 @@ public struct DistractionRecord: Sendable, Codable, Equatable, Identifiable {
     public var didReturnToFocus: Bool
     public var isHandled: Bool
     public var confidence: Double
+    public var tags: [String]
 
     public init(
         id: UUID,
@@ -79,7 +122,8 @@ public struct DistractionRecord: Sendable, Codable, Equatable, Identifiable {
         offsetSeconds: Double,
         didReturnToFocus: Bool,
         isHandled: Bool,
-        confidence: Double
+        confidence: Double,
+        tags: [String] = []
     ) {
         self.id = id
         self.note = note
@@ -90,6 +134,7 @@ public struct DistractionRecord: Sendable, Codable, Equatable, Identifiable {
         self.didReturnToFocus = didReturnToFocus
         self.isHandled = isHandled
         self.confidence = confidence
+        self.tags = tags
     }
 
     public var origin: DistractionOrigin { kind.origin }
@@ -98,7 +143,7 @@ public struct DistractionRecord: Sendable, Codable, Equatable, Identifiable {
 // MARK: - Mapping
 
 public extension Distraction {
-    func snapshot() -> DistractionRecord {
+    func snapshot(tagNamesByID: [String: String] = [:]) -> DistractionRecord {
         DistractionRecord(
             id: id,
             note: note,
@@ -108,13 +153,14 @@ public extension Distraction {
             offsetSeconds: offsetSeconds,
             didReturnToFocus: didReturnToFocus,
             isHandled: isHandled,
-            confidence: kindConfidence
+            confidence: kindConfidence,
+            tags: tagIDStrings.compactMap { tagNamesByID[$0] }
         )
     }
 }
 
 public extension FocusSession {
-    func snapshot(at now: Date = Date()) -> SessionRecord {
+    func snapshot(at now: Date = Date(), tagNamesByID: [String: String] = [:]) -> SessionRecord {
         SessionRecord(
             id: id,
             goalTitle: goal?.title ?? "",
@@ -128,7 +174,25 @@ public extension FocusSession {
             endReason: endReason,
             distractions: (distractions ?? [])
                 .sorted { $0.capturedAt < $1.capturedAt }
-                .map { $0.snapshot() }
+                .map { $0.snapshot(tagNamesByID: tagNamesByID) },
+            projectTitle: project?.name ?? "",
+            notes: notes,
+            tags: tagIDStrings.compactMap { tagNamesByID[$0] },
+            hourlyRate: hourlyRate,
+            currencyCode: currencyCode,
+            computerActiveSeconds: computerActiveSeconds,
+            computerAwaySeconds: computerAwaySeconds
+        )
+    }
+}
+
+public extension MachineActivityDay {
+    func snapshot() -> MachineActivityRecord {
+        MachineActivityRecord(
+            id: id,
+            day: day,
+            activeSeconds: activeSeconds,
+            trackedSeconds: trackedSeconds
         )
     }
 }
@@ -136,12 +200,15 @@ public extension FocusSession {
 public extension ModelContext {
     /// Every session, newest first, as snapshots.
     func sessionRecords(since: Date? = nil, at now: Date = Date()) throws -> [SessionRecord] {
+        let tagNamesByID = Dictionary(
+            uniqueKeysWithValues: try fetch(FetchDescriptor<SavedTag>()).map { ($0.storageID, $0.name) }
+        )
         var descriptor = FetchDescriptor<FocusSession>(
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
         )
         if let since {
             descriptor.predicate = #Predicate { $0.startedAt >= since }
         }
-        return try fetch(descriptor).map { $0.snapshot(at: now) }
+        return try fetch(descriptor).map { $0.snapshot(at: now, tagNamesByID: tagNamesByID) }
     }
 }

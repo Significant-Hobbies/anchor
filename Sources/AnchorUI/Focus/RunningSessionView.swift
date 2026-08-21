@@ -3,12 +3,14 @@
 // views in Watch/ rather than a pile of size guards in these.
 #if !os(watchOS)
 import AnchorCore
+import SwiftData
 import SwiftUI
 
 /// The live session. The ring holds the eye; everything else is one row of
 /// controls and the growing list of things you refused to do instead.
 public struct RunningSessionView: View {
     @Environment(\.anchorTheme) private var theme
+    @Query(sort: \SavedTag.createdAt) private var savedTags: [SavedTag]
     private let controller: FocusController
 
     public init(controller: FocusController) {
@@ -36,11 +38,7 @@ public struct RunningSessionView: View {
                 .frame(maxWidth: 340)
                 .padding(.vertical, Space.xs)
 
-                if controller.hasReachedPlan {
-                    bell
-                } else {
-                    transport
-                }
+                transport
 
                 parkedList
             }
@@ -62,8 +60,19 @@ public struct RunningSessionView: View {
         let goal = session?.goal
         let headline = intent.isEmpty ? (goal?.title ?? "Focusing") : intent
         let showGoal = goal.map { $0.title != headline } ?? false
+        let tagNames = savedTags
+            .filter { session?.tagIDStrings.contains($0.storageID) == true }
+            .map(\.name)
 
         return VStack(spacing: Space.xxs) {
+            if let project = session?.project {
+                HStack(spacing: Space.xxs) {
+                    Image(systemName: project.symbolName)
+                    Text(project.name)
+                }
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(AnchorTheme.tint(project.tintIndex))
+            }
             if showGoal, let goal {
                 HStack(spacing: Space.xxs) {
                     Image(systemName: goal.symbolName)
@@ -78,6 +87,26 @@ public struct RunningSessionView: View {
                 .foregroundStyle(theme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
+            if let notes = session?.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.system(size: 12))
+                    .foregroundStyle(theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+            }
+            if !tagNames.isEmpty {
+                Text(tagNames.map { "#\($0)" }.joined(separator: "  "))
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(theme.textTertiary)
+                    .lineLimit(1)
+            }
+            if let session, session.hourlyRate > 0 {
+                Text(
+                    "\(Format.money(controller.elapsed / 3600 * session.hourlyRate, currencyCode: session.currencyCode)) earned"
+                )
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(theme.positive)
+            }
         }
         .padding(.top, Space.xs)
     }
@@ -92,33 +121,6 @@ public struct RunningSessionView: View {
         let count = controller.parked.count
         guard count > 0 else { return nil }
         return count == 1 ? "1 thing parked" : "\(count) things parked"
-    }
-
-    /// The bell: the plan is served. Never auto-stops — deciding to continue is
-    /// itself worth recording, and being yanked out of flow by a modal is worse
-    /// than the timer quietly waiting.
-    private var bell: some View {
-        VStack(spacing: Space.sm) {
-            Text("You served the full \(Format.duration(Double(session?.plannedSeconds ?? 0))).")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(theme.textPrimary)
-                .multilineTextAlignment(.center)
-
-            HStack(spacing: Space.xs) {
-                Button("5 more") { controller.extend(byMinutes: 5) }
-                    .buttonStyle(QuietButtonStyle())
-                Button("15 more") { controller.extend(byMinutes: 15) }
-                    .buttonStyle(QuietButtonStyle())
-            }
-
-            Button {
-                controller.end(reason: .completed)
-            } label: {
-                Label("Finish", systemImage: "checkmark")
-            }
-            .buttonStyle(PrimaryButtonStyle())
-        }
-        .transition(.scale(scale: 0.96).combined(with: .opacity))
     }
 
     private var transport: some View {

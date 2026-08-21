@@ -86,6 +86,20 @@ public enum DemoData {
             return goal
         }
 
+        let projects = [
+            Project(name: "Anchor launch", symbolName: "app.badge", tintIndex: 0, hourlyRate: 125),
+            Project(name: "Learning", symbolName: "book.closed", tintIndex: 2),
+            Project(name: "Operations", symbolName: "briefcase", tintIndex: 3, hourlyRate: 90),
+        ]
+        for project in projects { context.insert(project) }
+
+        let tags = [
+            SavedTag(name: "deep work", tintIndex: 0),
+            SavedTag(name: "shipping", tintIndex: 2),
+            SavedTag(name: "admin", tintIndex: 3),
+        ]
+        for tag in tags { context.insert(tag) }
+
         let weightedGoalIndices = goalSpecs.enumerated().flatMap { index, spec in
             Array(repeating: index, count: spec.weight)
         }
@@ -102,6 +116,7 @@ public enum DemoData {
 
             let sessionCount = isWeekend ? 1 : 1 + random.next(3)
             var hour = 9 + random.next(2)
+            var trackedToday: Double = 0
 
             for _ in 0..<sessionCount {
                 hour += 1 + random.next(3)
@@ -135,15 +150,23 @@ public enum DemoData {
                 let session = FocusSession(
                     goal: goals[goalIndex],
                     intent: goalSpecs[goalIndex].title,
+                    project: projects[goalIndex < 2 ? 0 : (goalIndex == 2 ? 1 : 2)],
+                    notes: reason == .completed ? "Moved the work forward." : "Stopped before the planned finish.",
+                    tagIDStrings: [tags[goalIndex < 2 ? 1 : (goalIndex == 4 ? 2 : 0)].storageID],
                     plannedSeconds: planned,
                     startedAt: startedAt
                 )
                 session.bankedSeconds = focused
+                session.hourlyRate = session.project?.hourlyRate ?? 0
+                session.currencyCode = session.project?.currencyCode ?? "USD"
+                session.computerActiveSeconds = focused * (0.78 + Double(random.next(18)) / 100)
+                session.computerAwaySeconds = max(0, focused - session.computerActiveSeconds)
                 session.runningSince = nil
                 session.state = .finished
                 session.endedAt = startedAt.addingTimeInterval(focused * 1.15)
                 session.endReason = reason
                 context.insert(session)
+                trackedToday += session.computerActiveSeconds
 
                 // Interruptions cluster later in a session, which is also true
                 // in life — the first ten minutes are the easy ones.
@@ -159,7 +182,8 @@ public enum DemoData {
                         capturedAt: startedAt.addingTimeInterval(offset),
                         offsetSeconds: offset,
                         session: session,
-                        didReturnToFocus: !(reason == .abandoned && isLast)
+                        didReturnToFocus: !(reason == .abandoned && isLast),
+                        tagIDStrings: random.chance(35) ? [tags[2].storageID] : []
                     )
                     distraction.kind = spec.kind
                     distraction.keywords = spec.keywords
@@ -171,6 +195,15 @@ public enum DemoData {
                     context.insert(distraction)
                 }
             }
+
+            let activeToday = trackedToday + Double(45 + random.next(150)) * 60
+            context.insert(
+                MachineActivityDay(
+                    day: day,
+                    activeSeconds: activeToday,
+                    trackedSeconds: min(activeToday, trackedToday)
+                )
+            )
         }
 
         try? context.save()

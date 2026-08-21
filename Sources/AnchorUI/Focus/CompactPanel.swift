@@ -86,43 +86,44 @@ public struct CompactPanel: View {
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .tracking(1)
                         .foregroundStyle(theme.textTertiary)
+                    if let session = controller.session, session.hourlyRate > 0 {
+                        Text(
+                            Format.money(
+                                controller.elapsed / 3600 * session.hourlyRate,
+                                currencyCode: session.currencyCode
+                            )
+                        )
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(theme.positive)
+                    }
                 }
                 Spacer(minLength: 0)
             }
 
-            if controller.hasReachedPlan {
-                HStack(spacing: Space.xs) {
-                    Button("5 more") { controller.extend(byMinutes: 5) }
-                        .buttonStyle(QuietButtonStyle())
-                    Button("Finish") { controller.end(reason: .completed) }
-                        .buttonStyle(PrimaryButtonStyle())
-                }
-            } else {
+            Button {
+                controller.beginManualCapture()
+            } label: {
+                Label("Lock a distraction", systemImage: "lock.fill")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+
+            HStack(spacing: Space.xs) {
                 Button {
-                    controller.beginManualCapture()
+                    controller.isPaused ? controller.resume() : controller.pause()
                 } label: {
-                    Label("Lock a distraction", systemImage: "lock.fill")
+                    Label(
+                        controller.isPaused ? "Resume" : "Pause",
+                        systemImage: controller.isPaused ? "play.fill" : "pause.fill"
+                    )
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(QuietButtonStyle())
 
-                HStack(spacing: Space.xs) {
-                    Button {
-                        controller.isPaused ? controller.resume() : controller.pause()
-                    } label: {
-                        Label(
-                            controller.isPaused ? "Resume" : "Pause",
-                            systemImage: controller.isPaused ? "play.fill" : "pause.fill"
-                        )
-                    }
-                    .buttonStyle(QuietButtonStyle())
-
-                    Button {
-                        controller.end(reason: .endedEarly)
-                    } label: {
-                        Label("End", systemImage: "stop.fill")
-                    }
-                    .buttonStyle(QuietButtonStyle())
+                Button {
+                    controller.end(reason: .endedEarly)
+                } label: {
+                    Label("End", systemImage: "stop.fill")
                 }
+                .buttonStyle(QuietButtonStyle())
             }
 
             if !controller.parked.isEmpty {

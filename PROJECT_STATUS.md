@@ -11,21 +11,35 @@ came from the world or from you.
 macOS, iOS and Apple Watch from one shared Swift package, shipping under
 Significant Hobbies. Local-first: distraction notes never leave the device,
 grouping and tagging run against Apple's on-device model, and sync goes through
-the user's own private CloudKit database.
+the user's own private CloudKit database. Optional Personal Platform sync sends
+session timing and interruption counts, never distraction text.
 
 ## Dependencies
 
-Zero third-party packages. Everything is Apple platform frameworks:
+No third-party runtime packages. The app uses Apple platform frameworks plus
+the first-party PersonalSyncKit package:
 
 - **SwiftData + CloudKit** — storage and private sync
 - **FoundationModels** — on-device tagging, grouping and summaries (optional; falls
   back to built-in rules)
 - **SwiftUI + Swift Charts** — both apps and all analytics
 - **XcodeGen** — generates `Apps/Anchor.xcodeproj` from `Apps/project.yml`
+- **PersonalSyncKit** — optional Better Auth connection plus a durable
+  Cloudflare session-summary outbox; distraction notes are excluded by contract
 
 Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
+
+- **2026-08-21** — Prepared and tested Anchor 1.0 (2) for optional Personal Platform sync
+  on iPhone and Mac. Finished sessions push goal/timing/outcome/count metadata,
+  Pace-created sessions pull into SwiftData, and raw distraction text is covered
+  by a focused non-egress test. The existing CloudKit path stays enabled. App
+  Store Connect record `6803853891` now exists as “Anchor by Significant
+  Hobbies,” and both 1024px app icons have been flattened to remove invalid
+  alpha channels. The Xcode 27 Beta 4 personal-team archive and Apple
+  Distribution IPA pass local inspection, but Apple rejects Beta 4 as obsolete;
+  the current Beta 5 installer is waiting for interactive two-factor authentication.
 
 - **2026-08-16** — Built. Shared package (`AnchorCore`, `AnchorUI`, `anchor-mcp`),
   both app targets, 77 tests, on-device tagging verified 12/12, both apps run and
@@ -53,7 +67,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`) |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **App Store ready**, Apple Distribution signed, CloudKit intact, watch app embedded — not uploaded |
+| iOS/watchOS IPA | **Beta 5 rebuild pending** — Beta 4 package is Apple Distribution signed with CloudKit and the watch app intact, but Apple requires current Xcode 27 Beta 5 for TestFlight upload |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -84,12 +98,15 @@ account** — use the `DebugLocal` configuration until then.
 - Apple Watch app: session ring, start from a recent goal with the Digital Crown,
   pause/resume, and one-tap distraction capture
 - CloudKit sync via a shared app group and private iCloud database
+- Optional Cloudflare synchronization for finished session summaries, with
+  explicit sign-in and no distraction-note egress
 - Landing, support and privacy pages for App Store Connect
 - App icon for all three platforms, drawn from the app's own ring mark
 
 ## Work queue
 
-GitHub Issues. Not yet created — the repository has no remote.
+Open work is tracked in
+[GitHub Issues](https://github.com/Significant-Hobbies/anchor/issues).
 
 Known gaps carried forward:
 
@@ -99,9 +116,10 @@ Known gaps carried forward:
   embedded in a signed iOS device build (`iCloud.com.significanthobbies.anchor`,
   CloudKit service, `group.com.significanthobbies.anchor`, team `8F7LXHTJZR`),
   but two devices syncing to each other has not been exercised.
-- **DMG is signed but not notarised**, and **the IPA has not been uploaded**.
-  Both need an app-specific password from appleid.apple.com — the one thing no
-  automation here can produce. See the release commands in the README.
+- **DMG is signed but not notarised**. The App Store Connect record exists, and
+  the iOS/watchOS icon validation defects are fixed. Installing Xcode 27 Beta 5
+  after interactive two-factor authentication, rebuilding, and uploading are
+  the remaining TestFlight gates.
 - **The direct-download build has no iCloud sync** — see the release notes in
   `scripts/release-mac.sh`. The App Store build keeps CloudKit.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).

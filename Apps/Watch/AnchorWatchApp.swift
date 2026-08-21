@@ -34,7 +34,8 @@ final class AnchorWatchWorld {
         // construction. The phone or Mac refines it after the store syncs.
         self.controller = FocusController(
             context: container.mainContext,
-            tagger: TaggingService(allowsOnDeviceModel: false)
+            tagger: TaggingService(allowsOnDeviceModel: false),
+            completionNotifier: SystemSessionCompletionNotifier()
         )
     }
 }

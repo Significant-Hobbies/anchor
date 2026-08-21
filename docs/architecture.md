@@ -38,11 +38,31 @@ the ring would jump backwards).
 active session, restores an in-flight one on launch, and drives a cooperative
 tick loop that cancels itself when the controller goes away.
 
+For a planned session, `TimeAccount` also derives the exact completion date from
+banked time and the current wall-clock interval. `FocusController` uses that date
+for both auto-finish and a local system notification. Paused and open-ended
+sessions never auto-finish, and notification permission or scheduling failures
+are non-fatal.
+
 ## Storage
 
 SwiftData, with CloudKit sync when entitlements allow it. The schema is
 CloudKit-shaped by construction — defaults everywhere, optional relationships, no
 unique constraints — because CloudKit violations fail at runtime, not compile time.
+
+`Project` is an optional container above a focus session. `SavedTag` is the
+user-owned reusable tag catalog; sessions and distractions store its stable IDs
+as primitive string arrays so tags can be renamed without a CloudKit many-to-many
+graph or a history rewrite. Generated on-device keywords remain separate.
+
+`MachineActivityDay` stores only daily active and session-covered seconds. On the
+Mac, Anchor samples system idle duration while the app is running; it never stores
+apps, windows, sites, keys, pointer data, or event content. This aggregate is
+analytics context, not timer input: `TimeAccount` remains the sole authority for
+focus elapsed time.
+
+Projects carry an optional hourly rate and currency. Each session snapshots those
+values when it starts so later project edits cannot rewrite historical earnings.
 
 `AnchorStore.makeResilientContainer()` tries CloudKit, then local-only, then
 memory. Losing sync should never mean losing the ability to start a timer.
@@ -56,8 +76,8 @@ Both the app and the MCP server run this same logic, so they agree in both world
 ## Snapshots
 
 Analytics, export and MCP never touch SwiftData objects. They read
-`SessionRecord` / `DistractionRecord` — plain `Codable` value types produced by
-`snapshot()`.
+`SessionRecord`, `DistractionRecord`, and `MachineActivityRecord` — plain
+`Codable` value types produced by snapshots.
 
 This buys three things: `AnalyticsEngine` is pure and trivially testable, the MCP
 server runs in a plain CLI process without dragging the main-actor world along,

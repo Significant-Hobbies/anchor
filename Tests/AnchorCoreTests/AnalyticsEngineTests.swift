@@ -42,7 +42,11 @@ enum Fixture {
         planned: Int = 1500,
         state: SessionState = .finished,
         reason: SessionEndReason? = .completed,
-        distractions: [DistractionRecord] = []
+        distractions: [DistractionRecord] = [],
+        project: String = "",
+        tags: [String] = [],
+        hourlyRate: Double = 0,
+        currency: String = "USD"
     ) -> SessionRecord {
         SessionRecord(
             id: UUID(),
@@ -55,7 +59,11 @@ enum Fixture {
             focusedSeconds: focused,
             state: state,
             endReason: reason,
-            distractions: distractions
+            distractions: distractions,
+            projectTitle: project,
+            tags: tags,
+            hourlyRate: hourlyRate,
+            currencyCode: currency
         )
     }
 }
@@ -85,6 +93,38 @@ struct AnalyticsEngineTests {
         #expect(stats.recoveryRate == 0.5)
         #expect(abs(stats.completionRate - 1.0 / 3.0) < 0.0001)
         #expect(stats.medianSessionSeconds == 1500)
+        #expect(stats.longestSessionSeconds == 1800)
+        #expect(stats.uninterruptedSessionCount == 2)
+    }
+
+    @Test("Projects, tags, and billing preserve useful reporting dimensions")
+    func workAndBilling() {
+        let records = [
+            Fixture.session(focused: 3600, project: "Anchor", tags: ["deep"], hourlyRate: 100),
+            Fixture.session(focused: 1800, reason: .endedEarly, project: "Anchor", tags: ["admin"], hourlyRate: 100),
+            Fixture.session(focused: 7200, project: "Client", tags: ["deep"], hourlyRate: 50, currency: "EUR"),
+        ]
+        let projects = engine.byProject(records)
+        #expect(projects.first?.label == "Client")
+        #expect(projects.first?.focusedSeconds == 7200)
+        #expect(engine.byTag(records).first(where: { $0.label == "deep" })?.sessionCount == 2)
+
+        let totals = engine.billingTotals(records)
+        #expect(totals.first(where: { $0.currencyCode == "USD" })?.amount == 150)
+        #expect(totals.first(where: { $0.currencyCode == "EUR" })?.amount == 100)
+    }
+
+    @Test("Machine presence separates logged from untracked active time")
+    func machinePresence() {
+        let records = [
+            MachineActivityRecord(id: UUID(), day: Fixture.day0, activeSeconds: 3_600, trackedSeconds: 2_700),
+            MachineActivityRecord(id: UUID(), day: Fixture.day0, activeSeconds: 1_800, trackedSeconds: 900),
+        ]
+        let presence = engine.machinePresence(records)
+        #expect(presence.activeSeconds == 5_400)
+        #expect(presence.trackedSeconds == 3_600)
+        #expect(presence.untrackedSeconds == 1_800)
+        #expect(abs(presence.trackedRate - 2.0 / 3.0) < 0.0001)
     }
 
     @Test("Recovery rate is 1 when nothing has interrupted you")

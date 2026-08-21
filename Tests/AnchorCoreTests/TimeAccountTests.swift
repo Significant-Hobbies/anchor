@@ -89,6 +89,15 @@ struct TimeAccountTests {
         #expect(account.remaining(at: start.addingTimeInterval(300)) == 300)
     }
 
+    @Test("The completion date is derived from banked time and the open wall-clock interval")
+    func plannedCompletionDate() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let account = TimeAccount(plannedSeconds: 1_500, bankedSeconds: 300, runningSince: start)
+        #expect(account.plannedCompletionDate == start.addingTimeInterval(1_200))
+        #expect(TimeAccount(plannedSeconds: 0, runningSince: start).plannedCompletionDate == nil)
+        #expect(TimeAccount(plannedSeconds: 1_500, bankedSeconds: 300).plannedCompletionDate == nil)
+    }
+
     @Test("Extending an open-ended session does nothing")
     func extendIgnoresOpenEnded() {
         var account = TimeAccount(plannedSeconds: 0, runningSince: start)

@@ -23,9 +23,16 @@ public struct FocusScreen: View {
                 RunningSessionView(controller: controller)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else {
-                StartComposer { goal, intent, minutes in
-                    withAnimation(Motion.gentle) {
-                        controller.start(goal: goal, intent: intent, minutes: minutes)
+                StartComposer { goal, intent, minutes, project, notes, tagIDs in
+                    _ = withAnimation(Motion.gentle) {
+                        controller.start(
+                            goal: goal,
+                            intent: intent,
+                            minutes: minutes,
+                            project: project,
+                            notes: notes,
+                            tagIDStrings: tagIDs
+                        )
                     }
                 }
                 .transition(.opacity)

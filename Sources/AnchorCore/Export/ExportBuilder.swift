@@ -57,8 +57,16 @@ public struct ExportBuilder: Sendable {
                 .text(record.goalTitle.isEmpty ? "Unassigned" : record.goalTitle),
                 .optionalText(record.goalTheme?.label),
                 .text(record.intent),
+                .text(record.projectTitle),
+                .text(record.tags.joined(separator: ", ")),
+                .text(record.notes),
+                .number(record.hourlyRate),
+                .text(record.currencyCode),
+                .number(record.earnedAmount),
                 .number(Double(record.plannedSeconds) / 60),
                 .number(record.focusedSeconds / 60),
+                .number(record.computerActiveSeconds / 60),
+                .number(record.computerAwaySeconds / 60),
                 .text(record.state.rawValue),
                 .optionalText(record.endReason?.label),
                 .integer(record.distractions.count),
@@ -71,8 +79,15 @@ public struct ExportBuilder: Sendable {
             columns: [
                 .init("Started", width: 20), .init("Ended", width: 20),
                 .init("Goal", width: 28), .init("Theme", width: 16),
-                .init("Intent", width: 34), .init("Planned (min)", width: 14),
-                .init("Focused (min)", width: 14), .init("State", width: 12),
+                .init("Intent", width: 34), .init("Project", width: 24),
+                .init("Tags", width: 24), .init("Notes", width: 42),
+                .init("Hourly rate", width: 14), .init("Currency", width: 11),
+                .init("Tracked value", width: 15),
+                .init("Planned (min)", width: 14),
+                .init("Focused (min)", width: 14),
+                .init("Computer active (min)", width: 21),
+                .init("Computer away (min)", width: 20),
+                .init("State", width: 12),
                 .init("Outcome", width: 14), .init("Interruptions", width: 14),
                 .init("Per focused hour", width: 17), .init("Session ID", width: 38),
             ],
@@ -89,7 +104,9 @@ public struct ExportBuilder: Sendable {
                     .text(distraction.kind.label),
                     .text(distraction.origin.label),
                     .text(distraction.keywords.joined(separator: ", ")),
+                    .text(distraction.tags.joined(separator: ", ")),
                     .text(record.goalTitle.isEmpty ? "Unassigned" : record.goalTitle),
+                    .text(record.projectTitle),
                     .number(distraction.offsetSeconds / 60),
                     .text(distraction.didReturnToFocus ? "Returned" : "Broke the session"),
                     .text(distraction.isHandled ? "Handled" : "Open"),
@@ -102,7 +119,8 @@ public struct ExportBuilder: Sendable {
             columns: [
                 .init("When", width: 20), .init("Note", width: 44),
                 .init("Category", width: 18), .init("Origin", width: 16),
-                .init("Keywords", width: 26), .init("Goal", width: 26),
+                .init("Keywords", width: 26), .init("Tags", width: 24),
+                .init("Goal", width: 26), .init("Project", width: 24),
                 .init("Minutes into session", width: 20), .init("Outcome", width: 18),
                 .init("Follow-up", width: 12), .init("Tag confidence", width: 15),
             ],
@@ -180,7 +198,7 @@ public struct ExportBuilder: Sendable {
 
     public func sessionsCSV(from records: [SessionRecord]) -> String {
         let formatter = ISO8601DateFormatter()
-        var lines = ["started,ended,goal,theme,intent,planned_minutes,focused_minutes,state,outcome,interruptions,session_id"]
+        var lines = ["started,ended,goal,theme,intent,project,tags,notes,hourly_rate,currency,tracked_value,planned_minutes,focused_minutes,computer_active_minutes,computer_away_minutes,state,outcome,interruptions,session_id"]
         for record in records {
             lines.append(Self.csvRow([
                 formatter.string(from: record.startedAt),
@@ -188,8 +206,16 @@ public struct ExportBuilder: Sendable {
                 record.goalTitle,
                 record.goalTheme?.rawValue ?? "",
                 record.intent,
+                record.projectTitle,
+                record.tags.joined(separator: " "),
+                record.notes,
+                String(format: "%.2f", record.hourlyRate),
+                record.currencyCode,
+                String(format: "%.2f", record.earnedAmount),
                 String(format: "%.2f", Double(record.plannedSeconds) / 60),
                 String(format: "%.2f", record.focusedSeconds / 60),
+                String(format: "%.2f", record.computerActiveSeconds / 60),
+                String(format: "%.2f", record.computerAwaySeconds / 60),
                 record.state.rawValue,
                 record.endReason?.rawValue ?? "",
                 String(record.distractions.count),
@@ -201,7 +227,7 @@ public struct ExportBuilder: Sendable {
 
     public func distractionsCSV(from records: [SessionRecord]) -> String {
         let formatter = ISO8601DateFormatter()
-        var lines = ["captured_at,note,category,origin,keywords,goal,minutes_into_session,returned_to_focus,handled,session_id"]
+        var lines = ["captured_at,note,category,origin,keywords,tags,goal,project,minutes_into_session,returned_to_focus,handled,session_id"]
         for record in records {
             for distraction in record.distractions {
                 lines.append(Self.csvRow([
@@ -210,7 +236,9 @@ public struct ExportBuilder: Sendable {
                     distraction.kind.rawValue,
                     distraction.origin.rawValue,
                     distraction.keywords.joined(separator: " "),
+                    distraction.tags.joined(separator: " "),
                     record.goalTitle,
+                    record.projectTitle,
                     String(format: "%.2f", distraction.offsetSeconds / 60),
                     distraction.didReturnToFocus ? "true" : "false",
                     distraction.isHandled ? "true" : "false",

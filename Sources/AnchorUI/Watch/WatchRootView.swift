@@ -85,38 +85,31 @@ struct WatchSessionView: View {
                 }
                 .frame(height: 132)
 
-                if controller.hasReachedPlan {
-                    Button("5 more") { controller.extend(byMinutes: 5) }
-                        .buttonStyle(QuietButtonStyle())
-                    Button("Finish") { controller.end(reason: .completed) }
-                        .buttonStyle(PrimaryButtonStyle())
-                } else {
-                    // The wrist's whole advantage: catching the interruption
-                    // without picking anything up.
-                    Button {
-                        controller.beginManualCapture()
-                    } label: {
-                        Label("Lock", systemImage: "lock.fill")
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-
-                    Button {
-                        controller.isPaused ? controller.resume() : controller.pause()
-                    } label: {
-                        Label(
-                            controller.isPaused ? "Resume" : "Pause",
-                            systemImage: controller.isPaused ? "play.fill" : "pause.fill"
-                        )
-                    }
-                    .buttonStyle(QuietButtonStyle())
-
-                    Button {
-                        controller.end(reason: .endedEarly)
-                    } label: {
-                        Label("End", systemImage: "stop.fill")
-                    }
-                    .buttonStyle(QuietButtonStyle())
+                // The wrist's whole advantage: catching the interruption
+                // without picking anything up.
+                Button {
+                    controller.beginManualCapture()
+                } label: {
+                    Label("Lock", systemImage: "lock.fill")
                 }
+                .buttonStyle(PrimaryButtonStyle())
+
+                Button {
+                    controller.isPaused ? controller.resume() : controller.pause()
+                } label: {
+                    Label(
+                        controller.isPaused ? "Resume" : "Pause",
+                        systemImage: controller.isPaused ? "play.fill" : "pause.fill"
+                    )
+                }
+                .buttonStyle(QuietButtonStyle())
+
+                Button {
+                    controller.end(reason: .endedEarly)
+                } label: {
+                    Label("End", systemImage: "stop.fill")
+                }
+                .buttonStyle(QuietButtonStyle())
 
                 if !controller.parked.isEmpty {
                     Text("\(controller.parked.count) parked")

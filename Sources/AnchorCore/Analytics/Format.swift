@@ -34,6 +34,15 @@ public enum Format {
         "\(Int((value * 100).rounded()))%"
     }
 
+    public static func money(_ amount: Double, currencyCode: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currencyCode
+        formatter.maximumFractionDigits = amount >= 100 ? 0 : 2
+        return formatter.string(from: NSNumber(value: max(0, amount)))
+            ?? "\(currencyCode) \(String(format: "%.2f", max(0, amount)))"
+    }
+
     public static func hour(_ hour: Int) -> String {
         let components = DateComponents(hour: hour)
         guard let date = Calendar.current.date(from: components) else { return "\(hour)" }

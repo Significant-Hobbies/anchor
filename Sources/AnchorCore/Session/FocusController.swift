@@ -14,10 +14,6 @@ public final class FocusController {
     /// without each view owning its own timer.
     public private(set) var now: Date = Date()
 
-    /// Set when the planned duration is met and the user has not yet answered
-    /// the bell. Drives the "done — extend or finish?" moment.
-    public private(set) var hasReachedPlan: Bool = false
-
     /// Raised when a distraction is being captured. The capture sheet binds to this.
     public var isCapturing: Bool = false
 
@@ -35,11 +31,19 @@ public final class FocusController {
 
     private let context: ModelContext
     private let tagger: TaggingService
+    private let completionNotifier: any SessionCompletionNotifying
     private var ticker: Task<Void, Never>?
+    private var lastMachineObservation: (sessionID: UUID, at: Date)?
+    private var unsavedMachineSeconds: Double = 0
 
-    public init(context: ModelContext, tagger: TaggingService = TaggingService()) {
+    public init(
+        context: ModelContext,
+        tagger: TaggingService = TaggingService(),
+        completionNotifier: any SessionCompletionNotifying = NoopSessionCompletionNotifier()
+    ) {
         self.context = context
         self.tagger = tagger
+        self.completionNotifier = completionNotifier
         restoreActiveSession()
     }
 
@@ -73,7 +77,8 @@ public final class FocusController {
         descriptor.fetchLimit = 1
         session = (try? context.fetch(descriptor))?.first
         if session != nil {
-            refreshNow()
+            scheduleCompletionNotification()
+            refresh(at: Date())
             startTicking()
         }
     }
@@ -81,20 +86,33 @@ public final class FocusController {
     // MARK: - Commands
 
     @discardableResult
-    public func start(goal: Goal?, intent: String, minutes: Int) -> FocusSession {
+    public func start(
+        goal: Goal?,
+        intent: String,
+        minutes: Int,
+        project: Project? = nil,
+        notes: String = "",
+        tagIDStrings: [String] = []
+    ) -> FocusSession {
         end(reason: .endedEarly)
 
         let new = FocusSession(
             goal: goal,
             intent: intent.trimmingCharacters(in: .whitespacesAndNewlines),
+            project: project,
+            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
+            tagIDStrings: tagIDStrings,
+            hourlyRate: project?.hourlyRate ?? 0,
+            currencyCode: project?.currencyCode ?? "USD",
             plannedSeconds: max(0, minutes * 60),
             startedAt: Date()
         )
         context.insert(new)
         session = new
-        hasReachedPlan = false
+        resetMachineObservation()
         save()
         refreshNow()
+        scheduleCompletionNotification()
         startTicking()
 
         if let goal { tagGoal(goal) }
@@ -109,6 +127,8 @@ public final class FocusController {
         session.apply(account)
         session.state = .paused
         session.pausedAt = now
+        resetMachineObservation(saving: true)
+        completionNotifier.cancel(sessionID: session.id)
         save()
         refreshNow()
         stopTicking()
@@ -130,8 +150,10 @@ public final class FocusController {
         session.apply(account)
         session.state = .running
         session.pausedAt = nil
+        resetMachineObservation()
         save()
         refreshNow()
+        scheduleCompletionNotification()
         startTicking()
 
         captureReason = .returnedFromPause(awaySeconds: awaySeconds)
@@ -158,15 +180,23 @@ public final class FocusController {
         if account.runningSince == nil { account.resume(at: Date()) }
         session.apply(account)
         session.state = .running
-        hasReachedPlan = false
         save()
         refreshNow()
+        scheduleCompletionNotification()
         startTicking()
     }
 
     public func end(reason: SessionEndReason = .endedEarly) {
         guard let session, session.isActive else { return }
-        let stopAt = Date()
+        finish(session, reason: reason, at: Date(), cancelNotification: true)
+    }
+
+    private func finish(
+        _ session: FocusSession,
+        reason: SessionEndReason,
+        at stopAt: Date,
+        cancelNotification: Bool
+    ) {
         var account = session.account
         account.stop(at: stopAt)
         session.apply(account)
@@ -175,15 +205,22 @@ public final class FocusController {
         // Honour the real outcome: if the plan was met, it completed regardless
         // of which button ended it.
         session.endReason = account.hasMetPlan(at: stopAt) ? .completed : reason
+        if cancelNotification {
+            completionNotifier.cancel(sessionID: session.id)
+        }
+        resetMachineObservation(saving: true)
         self.session = nil
-        hasReachedPlan = false
         save()
         stopTicking()
     }
 
     /// Park a distraction and stay in the session. This is the core interaction.
     @discardableResult
-    public func park(note: String, kind: DistractionKind? = nil) -> Distraction? {
+    public func park(
+        note: String,
+        kind: DistractionKind? = nil,
+        tagIDStrings: [String] = []
+    ) -> Distraction? {
         guard let session else { return nil }
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -193,7 +230,8 @@ public final class FocusController {
             capturedAt: Date(),
             offsetSeconds: session.account.elapsed(at: Date()),
             session: session,
-            didReturnToFocus: true
+            didReturnToFocus: true,
+            tagIDStrings: tagIDStrings
         )
         if let kind {
             distraction.kind = kind
@@ -209,8 +247,8 @@ public final class FocusController {
 
     /// The distraction won. Record it honestly — a tool that only logs your wins
     /// produces analytics you cannot act on.
-    public func surrender(to note: String) {
-        let distraction = park(note: note)
+    public func surrender(to note: String, tagIDStrings: [String] = []) {
+        let distraction = park(note: note, tagIDStrings: tagIDStrings)
         distraction?.didReturnToFocus = false
         end(reason: .abandoned)
         save()
@@ -219,6 +257,32 @@ public final class FocusController {
     public func markHandled(_ distraction: Distraction, handled: Bool = true) {
         distraction.handledAt = handled ? Date() : nil
         save()
+    }
+
+    /// Called by the macOS shell with the system's current input-idle duration.
+    /// The split is derived from wall-clock intervals and is analytics-only; it
+    /// never changes `TimeAccount` or the focus timer.
+    public func observeMachineIdle(seconds idleSeconds: Double, at timestamp: Date = Date()) {
+        guard let session, session.state == .running else {
+            resetMachineObservation()
+            return
+        }
+        defer { lastMachineObservation = (session.id, timestamp) }
+        guard let previous = lastMachineObservation,
+              previous.sessionID == session.id,
+              timestamp >= previous.at
+        else { return }
+
+        let interval = timestamp.timeIntervalSince(previous.at)
+        guard interval > 0 else { return }
+        let away = min(interval, max(0, idleSeconds))
+        session.computerAwaySeconds += away
+        session.computerActiveSeconds += max(0, interval - away)
+        unsavedMachineSeconds += interval
+        if unsavedMachineSeconds >= 60 {
+            save()
+            unsavedMachineSeconds = 0
+        }
     }
 
     // MARK: - Tagging (on-device)
@@ -274,11 +338,36 @@ public final class FocusController {
     }
 
     private func refreshNow() {
-        now = Date()
-        guard let session, session.isActive else { return }
-        if !hasReachedPlan, session.account.hasMetPlan(at: now) {
-            hasReachedPlan = true
-        }
+        refresh(at: Date())
+    }
+
+    /// Internal so controller tests can advance wall-clock time without sleeping.
+    func refresh(at timestamp: Date) {
+        now = timestamp
+        guard let session, session.state == .running else { return }
+        guard let completionDate = session.account.plannedCompletionDate else { return }
+        guard timestamp >= completionDate else { return }
+
+        // Freeze at the exact planned instant. If the process wakes late after
+        // sleep or relaunch, that delay is not counted as extra focused time.
+        // Keep the already-scheduled notification alive so the system can show it.
+        finish(session, reason: .completed, at: completionDate, cancelNotification: false)
+    }
+
+    private func scheduleCompletionNotification() {
+        guard let session, session.state == .running else { return }
+        guard let completionDate = session.account.plannedCompletionDate else { return }
+        completionNotifier.schedule(
+            sessionID: session.id,
+            intent: session.intent,
+            after: completionDate.timeIntervalSinceNow
+        )
+    }
+
+    private func resetMachineObservation(saving: Bool = false) {
+        lastMachineObservation = nil
+        if saving, unsavedMachineSeconds > 0 { save() }
+        unsavedMachineSeconds = 0
     }
 
     private func save() {

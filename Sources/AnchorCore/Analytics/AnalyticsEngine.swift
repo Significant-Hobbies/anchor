@@ -20,6 +20,9 @@ public struct AnalyticsEngine: Sendable {
         public var distractionCount: Int
         public var parkedAndReturnedCount: Int
         public var medianSessionSeconds: Double
+        public var longestSessionSeconds: Double
+        public var uninterruptedSessionCount: Int
+        public var deepSessionCount: Int
         public var currentStreakDays: Int
         public var bestStreakDays: Int
 
@@ -39,6 +42,10 @@ public struct AnalyticsEngine: Sendable {
         public var interruptionsPerHour: Double {
             focusedSeconds < 60 ? 0 : Double(distractionCount) / (focusedSeconds / 3600)
         }
+
+        public var uninterruptedRate: Double {
+            sessionCount == 0 ? 0 : Double(uninterruptedSessionCount) / Double(sessionCount)
+        }
     }
 
     public func overview(_ records: [SessionRecord], now: Date = Date()) -> Overview {
@@ -54,8 +61,95 @@ public struct AnalyticsEngine: Sendable {
             distractionCount: distractions.count,
             parkedAndReturnedCount: distractions.filter(\.didReturnToFocus).count,
             medianSessionSeconds: Self.median(durations),
+            longestSessionSeconds: durations.last ?? 0,
+            uninterruptedSessionCount: finished.filter { $0.distractions.isEmpty }.count,
+            deepSessionCount: finished.filter { $0.focusedSeconds >= 45 * 60 }.count,
             currentStreakDays: currentStreak(records, now: now),
             bestStreakDays: bestStreak(records)
+        )
+    }
+
+    // MARK: - Projects, tags and billing
+
+    public struct WorkStat: Sendable, Equatable, Codable, Identifiable {
+        public var id: String { label }
+        public var label: String
+        public var sessionCount: Int
+        public var focusedSeconds: Double
+        public var completedCount: Int
+        public var distractionCount: Int
+
+        public var completionRate: Double {
+            sessionCount == 0 ? 0 : Double(completedCount) / Double(sessionCount)
+        }
+        public var interruptionsPerHour: Double {
+            focusedSeconds < 60 ? 0 : Double(distractionCount) / (focusedSeconds / 3600)
+        }
+    }
+
+    public func byProject(_ records: [SessionRecord]) -> [WorkStat] {
+        workStats(Dictionary(grouping: records) { $0.projectTitle.isEmpty ? "No project" : $0.projectTitle })
+    }
+
+    public func byTag(_ records: [SessionRecord]) -> [WorkStat] {
+        var groups: [String: [SessionRecord]] = [:]
+        for record in records {
+            for tag in Set(record.tags) { groups[tag, default: []].append(record) }
+        }
+        return workStats(groups)
+    }
+
+    private func workStats(_ groups: [String: [SessionRecord]]) -> [WorkStat] {
+        groups.map { label, rows in
+            WorkStat(
+                label: label,
+                sessionCount: rows.count,
+                focusedSeconds: rows.reduce(0) { $0 + $1.focusedSeconds },
+                completedCount: rows.filter(\.didComplete).count,
+                distractionCount: rows.reduce(0) { $0 + $1.distractions.count }
+            )
+        }
+        .sorted { ($0.focusedSeconds, $0.sessionCount) > ($1.focusedSeconds, $1.sessionCount) }
+    }
+
+    public struct BillingTotal: Sendable, Equatable, Codable, Identifiable {
+        public var id: String { currencyCode }
+        public var currencyCode: String
+        public var amount: Double
+        public var billableSeconds: Double
+        public var sessionCount: Int
+    }
+
+    public func billingTotals(_ records: [SessionRecord]) -> [BillingTotal] {
+        let billable = records.filter { $0.hourlyRate > 0 }
+        return Dictionary(grouping: billable, by: \.currencyCode).map { currency, rows in
+            BillingTotal(
+                currencyCode: currency,
+                amount: rows.reduce(0) { $0 + $1.earnedAmount },
+                billableSeconds: rows.reduce(0) { $0 + $1.focusedSeconds },
+                sessionCount: rows.count
+            )
+        }
+        .sorted { $0.amount > $1.amount }
+    }
+
+    public struct MachinePresence: Sendable, Equatable, Codable {
+        public var activeSeconds: Double
+        public var trackedSeconds: Double
+        public var untrackedSeconds: Double
+
+        public var trackedRate: Double {
+            activeSeconds > 0 ? min(1, trackedSeconds / activeSeconds) : 0
+        }
+    }
+
+    public func machinePresence(_ records: [MachineActivityRecord]) -> MachinePresence {
+        let active = records.reduce(0) { $0 + $1.activeSeconds }
+        let tracked = min(active, records.reduce(0) { $0 + $1.trackedSeconds })
+        return MachinePresence(
+            activeSeconds: active,
+            trackedSeconds: tracked,
+            untrackedSeconds: max(0, active - tracked)
         )
     }
 
@@ -193,6 +287,59 @@ public struct AnalyticsEngine: Sendable {
         public var focusedSeconds: Double
         public var sessionCount: Int
         public var distractionCount: Int
+    }
+
+    public struct WeekdayBucket: Sendable, Equatable, Codable, Identifiable {
+        public var id: Int { weekday }
+        public var weekday: Int
+        public var focusedSeconds: Double
+        public var sessionCount: Int
+        public var distractionCount: Int
+    }
+
+    public func byWeekday(_ records: [SessionRecord]) -> [WeekdayBucket] {
+        (1...7).map { weekday in
+            let rows = records.filter { calendar.component(.weekday, from: $0.startedAt) == weekday }
+            return WeekdayBucket(
+                weekday: weekday,
+                focusedSeconds: rows.reduce(0) { $0 + $1.focusedSeconds },
+                sessionCount: rows.count,
+                distractionCount: rows.reduce(0) { $0 + $1.distractions.count }
+            )
+        }
+    }
+
+    public enum DistractionPhase: String, Sendable, Codable, CaseIterable, Identifiable {
+        case early, middle, late
+        public var id: String { rawValue }
+        public var label: String { rawValue.capitalized }
+    }
+
+    public struct DistractionPhaseStat: Sendable, Equatable, Codable, Identifiable {
+        public var id: String { phase.id }
+        public var phase: DistractionPhase
+        public var count: Int
+        public var brokeSessionCount: Int
+    }
+
+    public func distractionTiming(_ records: [SessionRecord]) -> [DistractionPhaseStat] {
+        var grouped: [DistractionPhase: [DistractionRecord]] = [:]
+        for record in records {
+            let denominator = max(1, Double(record.plannedSeconds > 0 ? record.plannedSeconds : Int(record.focusedSeconds)))
+            for distraction in record.distractions {
+                let progress = distraction.offsetSeconds / denominator
+                let phase: DistractionPhase = progress < 1.0 / 3.0 ? .early : (progress < 2.0 / 3.0 ? .middle : .late)
+                grouped[phase, default: []].append(distraction)
+            }
+        }
+        return DistractionPhase.allCases.map { phase in
+            let rows = grouped[phase] ?? []
+            return DistractionPhaseStat(
+                phase: phase,
+                count: rows.count,
+                brokeSessionCount: rows.filter { !$0.didReturnToFocus }.count
+            )
+        }
     }
 
     /// A dense daily series — every day in the range, including empty ones, so

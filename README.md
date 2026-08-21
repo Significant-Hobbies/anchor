@@ -7,13 +7,15 @@ When something pulls at you, one keystroke parks it: you name it in a sentence,
 it's filed, and you're handed back your goal and the time remaining. Afterwards
 Anchor tells you what actually costs you your focus.
 
-Runs on macOS, iOS and Apple Watch from one shared codebase. Everything stays on your device.
+Runs on macOS, iOS and Apple Watch from one shared codebase. The app is local-first;
+distraction text always stays on your device.
 
 ![Anchor running a focus session](docs/images/session.png)
 
 ## What it does
 
 - **Focus timer** with a goal, wall-clock accurate across relaunch, sleep and sync.
+  Planned sessions end automatically and post a local notification.
 - **Lock a distraction** (`⌘⇧L`) — name it, park it, keep working. Or record
   honestly that it won.
 - **Resuming asks what pulled you away.** A pause is usually an interruption, so
@@ -22,13 +24,15 @@ Runs on macOS, iOS and Apple Watch from one shared codebase. Everything stays on
   (`⌘0`). Start, pause, resume, capture and end without opening the main window.
 - **Apple Watch** as a remote: start, pause, and catch the interruption at the
   moment it happens without picking anything up.
-- **Sync** through your own private iCloud database. No account, no server.
+- **Sync** through your own private iCloud database, plus optional Personal
+  Platform session totals after you connect Significant Hobbies.
 - **On-device tagging** — Apple Intelligence sorts goals into themes and
   distractions into categories, so analytics work without you tagging anything.
-- **Analytics** — where your hours go, what interrupts you, whether the pull came
-  from the world or from you, when you're actually good at this.
+- **Analytics** — where your hours and billable value go, what interrupts you,
+  project and tag breakdowns, session depth, weekday rhythm, and active time that
+  was not covered by a session.
 - **Export** — real `.xlsx`, CSV, JSON.
-- **MCP server** — point Claude at your focus history and just ask.
+- **MCP server** — point Codex at your focus history and just ask.
 
 Landing, support and privacy pages: <https://anchor.significanthobbies.com>
 
@@ -109,11 +113,11 @@ rather than making you export a file first.
 
 ```bash
 swift build -c release
-claude mcp add anchor -- "$PWD/.build/release/anchor-mcp"
+codex mcp add anchor -- "$PWD/.build/release/anchor-mcp"
 ```
 
 Then ask things like *"what broke my focus most this month?"* or *"which goal do I
-protect best?"*. Seven read-only tools; see [`docs/mcp-and-export.md`](docs/mcp-and-export.md).
+protect best?"*. Nine read-only tools; see [`docs/mcp-and-export.md`](docs/mcp-and-export.md).
 
 Check that on-device tagging is working on your machine:
 
@@ -132,7 +136,7 @@ Apps/
   Mac/ iOS/ Watch/  thin app shells; project.yml generates the Xcode project
   Shared/          asset catalog (accent colour + app icon)
 landing/           Astro landing, support and privacy pages
-Tests/            77 tests, no Xcode required
+Tests/            87 tests, no Xcode required
 ```
 
 ## Documentation
@@ -144,6 +148,7 @@ Tests/            77 tests, no Xcode required
 ## Privacy
 
 Distraction notes are the most personal thing in the app, so they never leave the
-device. Tagging and summarising run against Apple's on-device model. Sync, when
-enabled, is your own private CloudKit database. There is no analytics SDK, no
-account, and no server.
+device. Tagging and summarising run against Apple's on-device model. SwiftData
+and private CloudKit remain local-first storage. If you explicitly connect
+Significant Hobbies, Anchor also sends only the goal, timing, outcome, and
+interruption count to Personal Platform. There is no analytics SDK.

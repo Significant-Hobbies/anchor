@@ -10,7 +10,7 @@ CLI has no entitlements and only needs the local file).
 
 ```bash
 swift build -c release
-claude mcp add anchor -- "$PWD/.build/release/anchor-mcp"
+codex mcp add anchor -- "$PWD/.build/release/anchor-mcp"
 ```
 
 ### Tools
@@ -18,11 +18,13 @@ claude mcp add anchor -- "$PWD/.build/release/anchor-mcp"
 | Tool | Answers |
 | --- | --- |
 | `focus_overview` | Hours focused, sessions, completion rate, interruption rate, streaks |
-| `list_sessions` | Recent sessions with goal, length, outcome, and what interrupted each |
+| `list_sessions` | Recent sessions with goal, project, tags, entry notes, length, outcome, and interruptions |
 | `distraction_patterns` | Counts by category, internal/external split, break rates, recurring themes |
 | `goal_progress` | Time and interruptions per goal |
 | `best_hours` | Focused time and interruptions by hour of day |
-| `search_distractions` | Free-text search across notes, keywords and categories |
+| `search_distractions` | Free-text search across notes, saved tags, keywords and categories |
+| `work_patterns` | Project, tag, billing and distraction-timing breakdowns |
+| `machine_presence` | Aggregate active, tracked and untracked computer time |
 | `export_workbook` | Writes an `.xlsx` to a path you give it |
 
 All take an optional `since_days`. Everything except `export_workbook` is
@@ -44,6 +46,10 @@ invisible until it has already mislabelled a week of your data. Expect `8/8` and
 `.xlsx`, sessions CSV, distractions CSV, and JSON — all from `ExportBuilder`, all
 built on the same snapshots the analytics screen reads, so no format can disagree
 with the UI.
+
+Raw session rows include their project, reusable tags, entry notes, snapshotted
+rate and currency, tracked value, and aggregate computer-active/away duration.
+Raw distraction rows include their editable text and reusable tags.
 
 The workbook has six sheets: **Summary**, **Sessions**, **Distractions**, **By
 goal**, **By distraction**, **By day**. Raw rows come first so nothing is hidden

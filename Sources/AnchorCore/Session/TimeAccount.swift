@@ -26,6 +26,14 @@ public struct TimeAccount: Equatable, Sendable, Codable {
     public var isRunning: Bool { runningSince != nil }
     public var isOpenEnded: Bool { plannedSeconds <= 0 }
 
+    /// The wall-clock instant when the current running interval will satisfy
+    /// the plan. Paused and open-ended sessions have no completion date.
+    public var plannedCompletionDate: Date? {
+        guard !isOpenEnded, let runningSince else { return nil }
+        let secondsStillNeeded = max(0, Double(plannedSeconds) - bankedSeconds)
+        return runningSince.addingTimeInterval(secondsStillNeeded)
+    }
+
     /// Active seconds so far. Excludes every paused stretch.
     public func elapsed(at now: Date) -> Double {
         guard let runningSince else { return bankedSeconds }

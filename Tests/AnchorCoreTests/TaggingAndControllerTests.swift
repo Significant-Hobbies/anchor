@@ -107,12 +107,34 @@ struct TaggingServiceTests {
 @MainActor
 @Suite("Focus controller")
 struct FocusControllerTests {
+    final class RecordingNotifier: SessionCompletionNotifying {
+        var scheduled: [(UUID, String, TimeInterval)] = []
+        var cancelled: [UUID] = []
+
+        func schedule(sessionID: UUID, intent: String, after delay: TimeInterval) {
+            scheduled.append((sessionID, intent, delay))
+        }
+
+        func cancel(sessionID: UUID) {
+            cancelled.append(sessionID)
+        }
+    }
+
     /// Real SwiftData, in memory — the controller's job is coordinating the
     /// store, so stubbing it out would test nothing.
-    func makeController() throws -> (FocusController, ModelContext) {
+    func makeController(
+        completionNotifier: any SessionCompletionNotifying = NoopSessionCompletionNotifier()
+    ) throws -> (FocusController, ModelContext) {
         let container = try AnchorStore.makeContainer(kind: .inMemory)
         let context = ModelContext(container)
-        return (FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false)), context)
+        return (
+            FocusController(
+                context: context,
+                tagger: TaggingService(allowsOnDeviceModel: false),
+                completionNotifier: completionNotifier
+            ),
+            context
+        )
     }
 
     @Test("Starting a session makes it current and running")
@@ -286,14 +308,95 @@ struct FocusControllerTests {
         #expect(controller.captureReason == .manual)
     }
 
-    @Test("Extending past the bell clears the reached-plan state and keeps running")
-    func extendAfterBell() throws {
+    @Test("Extending a running plan keeps the session active")
+    func extendRunningPlan() throws {
         let (controller, _) = try makeController()
         controller.start(goal: nil, intent: "Ship auth", minutes: 25)
         controller.extend(byMinutes: 5)
         #expect(controller.session?.plannedSeconds == 1800)
         #expect(controller.isRunning)
-        #expect(!controller.hasReachedPlan)
+    }
+
+    @Test("A planned session stops itself at the exact finish instant")
+    func autoCompletesAtPlan() throws {
+        let (controller, context) = try makeController()
+        controller.start(goal: nil, intent: "Ship auth", minutes: 25)
+        let start = Date(timeIntervalSince1970: 10_000)
+        controller.session?.plannedSeconds = 60
+        controller.session?.bankedSeconds = 15
+        controller.session?.runningSince = start
+
+        controller.refresh(at: start.addingTimeInterval(44.9))
+        #expect(controller.hasSession)
+        controller.refresh(at: start.addingTimeInterval(90))
+
+        #expect(!controller.hasSession)
+        let finished = try #require(context.fetch(FetchDescriptor<FocusSession>()).first)
+        #expect(finished.state == .finished)
+        #expect(finished.endReason == .completed)
+        #expect(finished.endedAt == start.addingTimeInterval(45))
+        #expect(finished.bankedSeconds == 60)
+    }
+
+    @Test("Open-ended and paused sessions never auto-complete")
+    func autoCompletionBoundaries() throws {
+        let (controller, _) = try makeController()
+        controller.start(goal: nil, intent: "Explore", minutes: 0)
+        controller.refresh(at: Date().addingTimeInterval(86_400))
+        #expect(controller.hasSession)
+
+        controller.session?.plannedSeconds = 60
+        controller.session?.bankedSeconds = 20
+        controller.session?.runningSince = nil
+        controller.session?.state = .paused
+        controller.refresh(at: Date().addingTimeInterval(86_400))
+        #expect(controller.isPaused)
+    }
+
+    @Test("An overdue running session completes safely when restored")
+    func overdueRestoreCompletes() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let start = Date().addingTimeInterval(-600)
+        let session = FocusSession(goal: nil, intent: "Old timer", plannedSeconds: 60, startedAt: start)
+        context.insert(session)
+        try context.save()
+
+        let controller = FocusController(
+            context: context,
+            tagger: TaggingService(allowsOnDeviceModel: false)
+        )
+        #expect(!controller.hasSession)
+        #expect(session.endReason == .completed)
+        #expect(session.endedAt == start.addingTimeInterval(60))
+    }
+
+    @Test("Completion notifications follow start, pause, resume, and manual end")
+    func notificationLifecycle() throws {
+        let notifier = RecordingNotifier()
+        let (controller, _) = try makeController(completionNotifier: notifier)
+        let session = controller.start(goal: nil, intent: "Paid work", minutes: 25)
+        #expect(notifier.scheduled.count == 1)
+        #expect(notifier.scheduled.first?.0 == session.id)
+        #expect(notifier.scheduled.first?.1 == "Paid work")
+
+        controller.pause()
+        #expect(notifier.cancelled == [session.id])
+        controller.resume()
+        #expect(notifier.scheduled.count == 2)
+        controller.end(reason: .endedEarly)
+        #expect(notifier.cancelled == [session.id, session.id])
+    }
+
+    @Test("Machine presence stores aggregate active and away time only")
+    func machinePresence() throws {
+        let (controller, _) = try makeController()
+        controller.start(goal: nil, intent: "Work", minutes: 25)
+        let start = Date(timeIntervalSince1970: 20_000)
+        controller.observeMachineIdle(seconds: 0, at: start)
+        controller.observeMachineIdle(seconds: 3, at: start.addingTimeInterval(10))
+        #expect(controller.session?.computerActiveSeconds == 7)
+        #expect(controller.session?.computerAwaySeconds == 3)
     }
 
     @Test("Snapshots carry the session and its distractions into the analytics layer")
@@ -311,5 +414,36 @@ struct FocusControllerTests {
         #expect(records.first?.goalTheme == .building)
         #expect(records.first?.distractions.count == 1)
         #expect(records.first?.distractions.first?.kind == .message)
+    }
+
+    @Test("Projects, saved tags, and entry text survive the full record path")
+    func explicitMetadataRoundTrips() throws {
+        let (controller, context) = try makeController()
+        let project = Project(name: "Anchor", tintIndex: 2)
+        let tag = SavedTag(name: "deep work", tintIndex: 1)
+        context.insert(project)
+        context.insert(tag)
+
+        controller.start(
+            goal: nil,
+            intent: "Build reusable tags",
+            minutes: 25,
+            project: project,
+            notes: "Keep the schema CloudKit-safe.",
+            tagIDStrings: [tag.storageID]
+        )
+        controller.park(
+            note: "Slack about another project",
+            kind: .message,
+            tagIDStrings: [tag.storageID]
+        )
+        controller.end(reason: .endedEarly)
+
+        let record = try #require(context.sessionRecords().first)
+        #expect(record.projectTitle == "Anchor")
+        #expect(record.notes == "Keep the schema CloudKit-safe.")
+        #expect(record.tags == ["deep work"])
+        #expect(record.distractions.first?.note == "Slack about another project")
+        #expect(record.distractions.first?.tags == ["deep work"])
     }
 }

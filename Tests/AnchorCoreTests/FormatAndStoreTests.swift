@@ -56,13 +56,13 @@ struct AnchorStoreTests {
     @Test("An in-memory container is usable and isolated")
     func inMemoryContainer() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)
-        #expect(container.schema.entities.count == 3)
+        #expect(container.schema.entities.count == 6)
     }
 
-    @Test("The schema carries exactly the three models")
+    @Test("The schema carries the complete CloudKit-safe model set")
     func schemaShape() {
         let names = Set(AnchorStore.schema.entities.map(\.name))
-        #expect(names == ["Goal", "FocusSession", "Distraction"])
+        #expect(names == ["Project", "SavedTag", "Goal", "FocusSession", "Distraction", "MachineActivityDay"])
     }
 
     @Test("Identifiers are the Significant Hobbies ones the entitlements declare")
@@ -83,6 +83,28 @@ struct AnchorStoreTests {
         let parent = url.deletingLastPathComponent().path
         #expect(FileManager.default.fileExists(atPath: parent, isDirectory: &isDirectory))
         #expect(isDirectory.boolValue)
+    }
+}
+
+@MainActor
+@Suite("Machine activity")
+struct MachineActivityRecorderTests {
+    @Test("Idle observations become aggregate active and tracked totals")
+    func recordsPresence() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let recorder = MachineActivityRecorder(context: context)
+        let start = Date(timeIntervalSince1970: 30_000)
+
+        recorder.observe(idleSeconds: 0, isTracking: false, at: start)
+        recorder.observe(idleSeconds: 2, isTracking: false, at: start.addingTimeInterval(10))
+        recorder.observe(idleSeconds: 0, isTracking: true, at: start.addingTimeInterval(20))
+        recorder.flush()
+
+        let record = try #require(context.fetch(FetchDescriptor<MachineActivityDay>()).first)
+        #expect(record.activeSeconds == 18)
+        #expect(record.trackedSeconds == 10)
+        #expect(record.untrackedSeconds == 8)
     }
 }
 

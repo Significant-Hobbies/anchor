@@ -33,7 +33,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # Real signing: CloudKit and the shared app group are entitlements, so they
     # only work against a provisioning profile. Automatic + the fleet team.
@@ -83,6 +83,10 @@ targets:
         CFBundleName: Anchor
         CFBundleDisplayName: Anchor
         CFBundlePackageType: APPL
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - anchor
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: "26.0"
@@ -128,6 +132,10 @@ targets:
         CFBundleDisplayName: Anchor
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLSchemes:
+              - anchor
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen:
           UIColorName: ""

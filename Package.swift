@@ -16,9 +16,15 @@ let package = Package(
         .library(name: "AnchorUI", targets: ["AnchorUI"]),
         .executable(name: "anchor-mcp", targets: ["anchor-mcp"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/Significant-Hobbies/personal-platform.git", branch: "main"),
+    ],
     targets: [
         .target(
             name: "AnchorCore",
+            dependencies: [
+                .product(name: "PersonalSyncKit", package: "personal-platform"),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .target(
@@ -33,7 +39,10 @@ let package = Package(
         ),
         .testTarget(
             name: "AnchorCoreTests",
-            dependencies: ["AnchorCore"],
+            dependencies: [
+                "AnchorCore",
+                .product(name: "PersonalSyncKit", package: "personal-platform"),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

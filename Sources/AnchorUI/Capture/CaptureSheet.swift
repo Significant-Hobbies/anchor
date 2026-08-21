@@ -19,6 +19,7 @@ public struct CaptureSheet: View {
 
     @State private var note: String = ""
     @State private var chosenKind: DistractionKind?
+    @State private var selectedTagIDs: [String] = []
     @State private var parked: Parked?
     @FocusState private var fieldFocused: Bool
 
@@ -73,6 +74,7 @@ public struct CaptureSheet: View {
     }
 
     private var composer: some View {
+        ScrollView {
         VStack(spacing: Space.lg) {
             VStack(spacing: Space.xxs) {
                 Image(systemName: isReturningFromPause ? "arrow.uturn.left.circle" : "lock.open.fill")
@@ -132,6 +134,8 @@ public struct CaptureSheet: View {
                 }
             }
 
+            SavedTagPicker(selectedIDs: $selectedTagIDs)
+
             Spacer(minLength: 0)
 
             VStack(spacing: Space.xs) {
@@ -166,6 +170,7 @@ public struct CaptureSheet: View {
             }
         }
         .padding(Space.lg)
+        }
         .onAppear { fieldFocused = true }
     }
 
@@ -232,7 +237,7 @@ public struct CaptureSheet: View {
         guard canPark else { return }
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let session = controller.session
-        controller.park(note: trimmed, kind: chosenKind)
+        controller.park(note: trimmed, kind: chosenKind, tagIDStrings: selectedTagIDs)
         parked = Parked(
             note: trimmed,
             goal: session?.intent.isEmpty == false
@@ -245,7 +250,10 @@ public struct CaptureSheet: View {
 
     private func surrender() {
         guard canPark else { return }
-        controller.surrender(to: note.trimmingCharacters(in: .whitespacesAndNewlines))
+        controller.surrender(
+            to: note.trimmingCharacters(in: .whitespacesAndNewlines),
+            tagIDStrings: selectedTagIDs
+        )
         dismiss()
     }
 }

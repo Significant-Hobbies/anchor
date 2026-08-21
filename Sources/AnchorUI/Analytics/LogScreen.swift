@@ -21,9 +21,11 @@ public struct LogScreen: View {
         sort: \FocusSession.startedAt,
         order: .reverse
     ) private var sessions: [FocusSession]
+    @Query(sort: \SavedTag.createdAt) private var savedTags: [SavedTag]
 
     @State private var tab: Tab = .open
-    @State private var editing: Distraction?
+    @State private var editingDistraction: Distraction?
+    @State private var editingSession: FocusSession?
 
     public init() {}
 
@@ -72,8 +74,11 @@ public struct LogScreen: View {
             .frame(maxWidth: .infinity)
         }
         .background(theme.canvas)
-        .sheet(item: $editing) { distraction in
-            RecategoriseSheet(distraction: distraction) { try? context.save() }
+        .sheet(item: $editingDistraction) { distraction in
+            DistractionEditSheet(distraction: distraction) { try? context.save() }
+        }
+        .sheet(item: $editingSession) { session in
+            SessionEditSheet(session: session) { try? context.save() }
         }
     }
 
@@ -118,29 +123,38 @@ public struct LogScreen: View {
             .buttonStyle(.plain)
             .accessibilityLabel(distraction.isHandled ? "Mark as still open" : "Mark as handled")
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(distraction.note)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(distraction.isHandled ? theme.textTertiary : theme.textPrimary)
-                    .strikethrough(distraction.isHandled, color: theme.textTertiary)
-                    .lineLimit(2)
+            Button {
+                editingDistraction = distraction
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(distraction.note)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(distraction.isHandled ? theme.textTertiary : theme.textPrimary)
+                        .strikethrough(distraction.isHandled, color: theme.textTertiary)
+                        .lineLimit(2)
 
-                HStack(spacing: Space.xxs) {
-                    Text(distraction.capturedAt.formatted(.relative(presentation: .named)))
-                    if let session = distraction.session, let goal = session.goal {
-                        Text("· while: \(goal.title)").lineLimit(1)
+                    HStack(spacing: Space.xxs) {
+                        Text(distraction.capturedAt.formatted(.relative(presentation: .named)))
+                        if let session = distraction.session, let project = session.project {
+                            Text("· \(project.name)").lineLimit(1)
+                        } else if let session = distraction.session, let goal = session.goal {
+                            Text("· while: \(goal.title)").lineLimit(1)
+                        }
                     }
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.textTertiary)
+
+                    tagLine(distraction.tagIDStrings)
                 }
-                .font(.system(size: 11))
-                .foregroundStyle(theme.textTertiary)
             }
+            .buttonStyle(.plain)
 
             Spacer(minLength: Space.xs)
 
             // Tapping the category corrects it — and a user-set category is never
             // overwritten by the model afterwards.
             Button {
-                editing = distraction
+                editingDistraction = distraction
             } label: {
                 HStack(spacing: Space.xxs) {
                     KindGlyph(distraction.displayKind, size: 26)
@@ -183,6 +197,9 @@ public struct LogScreen: View {
     }
 
     private func sessionRow(_ session: FocusSession) -> some View {
+        Button {
+            editingSession = session
+        } label: {
         HStack(spacing: Space.sm) {
             let tint = session.endReason == .completed
                 ? theme.positive
@@ -202,6 +219,18 @@ public struct LogScreen: View {
                 Text("\(session.startedAt.formatted(date: .abbreviated, time: .shortened)) · \(session.endReason?.label ?? "Ended")")
                     .font(.system(size: 11))
                     .foregroundStyle(theme.textTertiary)
+                if !session.notes.isEmpty {
+                    Text(session.notes)
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.textSecondary)
+                        .lineLimit(2)
+                }
+                HStack(spacing: Space.xxs) {
+                    if let project = session.project {
+                        Text(project.name)
+                    }
+                    tagLine(session.tagIDStrings)
+                }
             }
 
             Spacer(minLength: Space.xs)
@@ -219,58 +248,179 @@ public struct LogScreen: View {
             }
         }
         .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func tagLine(_ ids: [String]) -> some View {
+        let names = savedTags.filter { ids.contains($0.storageID) }.map(\.name)
+        if !names.isEmpty {
+            Text(names.map { "#\($0)" }.joined(separator: "  "))
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundStyle(theme.textTertiary)
+                .lineLimit(1)
+        }
     }
 }
 
-/// Correcting a category. Small on purpose.
-struct RecategoriseSheet: View {
+/// Edit the user's exact distraction text, explicit tags, and category lock.
+struct DistractionEditSheet: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.dismiss) private var dismiss
 
     let distraction: Distraction
     let onSave: () -> Void
 
+    @State private var note: String
+    @State private var chosenKind: DistractionKind?
+    @State private var tagIDs: [String]
+    @State private var didChooseKind = false
+
+    init(distraction: Distraction, onSave: @escaping () -> Void) {
+        self.distraction = distraction
+        self.onSave = onSave
+        _note = State(initialValue: distraction.note)
+        _chosenKind = State(initialValue: distraction.kind)
+        _tagIDs = State(initialValue: distraction.tagIDStrings)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
             VStack(alignment: .leading, spacing: Space.xxs) {
-                Text("Category")
+                Text("Edit distraction")
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundStyle(theme.textPrimary)
-                Text(distraction.note)
-                    .font(.system(size: 13))
+                Text("Keep the words you actually used; tagging stays on-device.")
+                    .font(.system(size: 12))
                     .foregroundStyle(theme.textSecondary)
-                    .lineLimit(3)
+            }
+
+            Card(padding: Space.md) {
+                TextField("What pulled at you?", text: $note, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .lineLimit(2...6)
+                    .foregroundStyle(theme.textPrimary)
             }
 
             ScrollView {
-                FlowRow(spacing: Space.xxs) {
-                    ForEach(DistractionKind.allCases, id: \.self) { kind in
-                        Button {
-                            distraction.kind = kind
-                            distraction.kindIsUserSet = true
-                            distraction.kindConfidence = 1
-                            onSave()
-                            dismiss()
-                        } label: {
-                            Chip(
-                                kind.label,
-                                symbol: kind.symbolName,
-                                tint: theme.color(for: kind),
-                                isSelected: distraction.displayKind == kind
-                            )
+                VStack(alignment: .leading, spacing: Space.md) {
+                    FlowRow(spacing: Space.xxs) {
+                        ForEach(DistractionKind.allCases, id: \.self) { kind in
+                            Button {
+                                chosenKind = kind
+                                didChooseKind = true
+                            } label: {
+                                Chip(
+                                    kind.label,
+                                    symbol: kind.symbolName,
+                                    tint: theme.color(for: kind),
+                                    isSelected: chosenKind == kind
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+
+                    SavedTagPicker(selectedIDs: $tagIDs)
                 }
             }
 
-            Button("Done") { dismiss() }
-                .buttonStyle(QuietButtonStyle())
-                .keyboardShortcut(.cancelAction)
+            HStack(spacing: Space.xs) {
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(QuietButtonStyle())
+                    .keyboardShortcut(.cancelAction)
+                Button("Save") { save() }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
         }
         .padding(Space.lg)
-        .frame(minWidth: 360, minHeight: 340)
+        .frame(minWidth: 420, minHeight: 560)
         .background(theme.canvas)
+    }
+
+    private func save() {
+        distraction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        distraction.tagIDStrings = tagIDs
+        if didChooseKind, let chosenKind {
+            distraction.kind = chosenKind
+            distraction.kindIsUserSet = true
+            distraction.kindConfidence = 1
+        }
+        onSave()
+        dismiss()
+    }
+}
+
+/// A finished focus session is an entry, not a read-only statistic.
+struct SessionEditSheet: View {
+    @Environment(\.anchorTheme) private var theme
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
+
+    let session: FocusSession
+    let onSave: () -> Void
+
+    @State private var intent: String
+    @State private var notes: String
+    @State private var projectID: UUID?
+    @State private var tagIDs: [String]
+
+    init(session: FocusSession, onSave: @escaping () -> Void) {
+        self.session = session
+        self.onSave = onSave
+        _intent = State(initialValue: session.intent)
+        _notes = State(initialValue: session.notes)
+        _projectID = State(initialValue: session.project?.id)
+        _tagIDs = State(initialValue: session.tagIDStrings)
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.md) {
+                Text("Edit focus entry")
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(theme.textPrimary)
+
+                Card(padding: Space.md) {
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        TextField("What did you work on?", text: $intent, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 17, weight: .medium, design: .rounded))
+                            .lineLimit(1...3)
+                        Divider().overlay(theme.hairline)
+                        TextField("Notes, context, or outcome", text: $notes, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .lineLimit(3...8)
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                }
+
+                ProjectPicker(selectedID: $projectID)
+                SavedTagPicker(selectedIDs: $tagIDs)
+
+                HStack(spacing: Space.xs) {
+                    Button("Cancel") { dismiss() }
+                        .buttonStyle(QuietButtonStyle())
+                        .keyboardShortcut(.cancelAction)
+                    Button("Save") { save() }
+                        .buttonStyle(PrimaryButtonStyle())
+                }
+            }
+            .padding(Space.lg)
+        }
+        .frame(minWidth: 440, minHeight: 560)
+        .background(theme.canvas)
+    }
+
+    private func save() {
+        session.intent = intent.trimmingCharacters(in: .whitespacesAndNewlines)
+        session.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        session.project = projects.first { $0.id == projectID }
+        session.tagIDStrings = tagIDs
+        onSave()
+        dismiss()
     }
 }
 #endif

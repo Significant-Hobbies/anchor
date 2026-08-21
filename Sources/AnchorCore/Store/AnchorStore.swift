@@ -5,9 +5,12 @@ import SwiftData
 /// MCP server and the tests all agree on what "the database" is.
 public enum AnchorStore {
     public static let schema = Schema([
+        Project.self,
+        SavedTag.self,
         Goal.self,
         FocusSession.self,
         Distraction.self,
+        MachineActivityDay.self,
     ])
 
     /// App group so the Mac app, the iOS app and any future extension all read

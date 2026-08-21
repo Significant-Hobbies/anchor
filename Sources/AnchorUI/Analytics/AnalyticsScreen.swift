@@ -13,6 +13,7 @@ import SwiftUI
 public struct AnalyticsScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \MachineActivityDay.day, order: .reverse) private var machineDays: [MachineActivityDay]
 
     @State private var range: Range = .month
     @State private var summary: String?
@@ -59,6 +60,24 @@ public struct AnalyticsScreen: View {
         return all.filter { $0.startedAt >= cutoff }
     }
 
+    private var previousRecords: [SessionRecord] {
+        guard let days = range.days,
+              let currentStart = Calendar.current.date(byAdding: .day, value: -days, to: Date()),
+              let previousStart = Calendar.current.date(byAdding: .day, value: -days, to: currentStart)
+        else { return [] }
+        return sessions.map { $0.snapshot() }.filter {
+            $0.startedAt >= previousStart && $0.startedAt < currentStart
+        }
+    }
+
+    private var machineRecords: [MachineActivityRecord] {
+        let all = machineDays.map { $0.snapshot() }
+        guard let days = range.days,
+              let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date())
+        else { return all }
+        return all.filter { $0.day >= cutoff }
+    }
+
     public var body: some View {
         ScrollView {
             let records = self.records
@@ -75,11 +94,27 @@ public struct AnalyticsScreen: View {
                     )
                 } else {
                     tiles(overview)
+                    periodComparison(records, previous: previousRecords)
+                    machinePresenceCard(machineRecords)
+                    billingCard(records)
                     summaryCard(records)
+                    sessionPatterns(overview)
                     dailyChart(records)
+                    workTable(
+                        title: "Projects",
+                        subtitle: "Time, completion, and interruption load",
+                        stats: engine.byProject(records)
+                    )
+                    workTable(
+                        title: "Tags",
+                        subtitle: "Compare the contexts you chose across projects",
+                        stats: engine.byTag(records)
+                    )
                     distractionLeaderboard(records)
+                    distractionTiming(records)
                     originSplit(records)
                     hourChart(records)
+                    weekdayChart(records)
                     goalTable(records)
                     exportCard(records)
                 }
@@ -96,6 +131,130 @@ public struct AnalyticsScreen: View {
             defaultFilename: exporting?.defaultFileName()
         ) { _ in
             exporting = nil
+        }
+    }
+
+    private func periodComparison(_ records: [SessionRecord], previous: [SessionRecord]) -> some View {
+        let current = engine.overview(records)
+        let prior = engine.overview(previous)
+        return Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                SectionHeader("Compared with the prior period", subtitle: range == .all ? "Choose 7 or 30 days to compare" : "Same-length period immediately before this one")
+                if range == .all {
+                    Text("Period comparison is available for 7- and 30-day views.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.textSecondary)
+                } else if previous.isEmpty {
+                    Text("No sessions in the prior period yet.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.textSecondary)
+                } else {
+                    comparisonRow("Focused time", current: current.focusedSeconds, previous: prior.focusedSeconds, format: Format.duration)
+                    comparisonRow("Sessions", current: Double(current.sessionCount), previous: Double(prior.sessionCount)) { "\(Int($0.rounded()))" }
+                    comparisonRow("Completion", current: current.completionRate, previous: prior.completionRate, format: Format.percent)
+                    comparisonRow("Interruptions / hour", current: current.interruptionsPerHour, previous: prior.interruptionsPerHour) { String(format: "%.1f", $0) }
+                }
+            }
+        }
+    }
+
+    private func comparisonRow(
+        _ label: String,
+        current: Double,
+        previous: Double,
+        format: (Double) -> String
+    ) -> some View {
+        let delta = previous == 0 ? nil : (current - previous) / abs(previous)
+        return HStack {
+            Text(label).font(.system(size: 12)).foregroundStyle(theme.textSecondary)
+            Spacer()
+            Text(format(current))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(theme.textPrimary)
+            Text(delta.map { String(format: "%+.0f%%", $0 * 100) } ?? "new")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(theme.textTertiary)
+                .frame(width: 48, alignment: .trailing)
+        }
+    }
+
+    @ViewBuilder
+    private func machinePresenceCard(_ records: [MachineActivityRecord]) -> some View {
+        #if os(macOS)
+        let presence = engine.machinePresence(records)
+        Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                SectionHeader("Active versus logged", subtitle: "Keyboard/mouse presence only — no app or window tracking")
+                if presence.activeSeconds < 1 {
+                    Text("Anchor starts collecting privacy-safe activity totals while it runs in the menu bar.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.textSecondary)
+                } else {
+                    HStack(spacing: Space.lg) {
+                        presenceMetric("Machine active", Format.duration(presence.activeSeconds), theme.textPrimary)
+                        presenceMetric("Logged", Format.duration(presence.trackedSeconds), theme.positive)
+                        presenceMetric("Untracked", Format.duration(presence.untrackedSeconds), theme.caution)
+                    }
+                    ProportionBar(fraction: presence.trackedRate, tint: theme.positive)
+                    Text("\(Format.percent(presence.trackedRate)) of active computer time had a running Anchor session.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(theme.textTertiary)
+                }
+            }
+        }
+        #endif
+    }
+
+    private func presenceMetric(_ label: String, _ value: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.system(size: 17, weight: .semibold, design: .rounded)).foregroundStyle(color)
+            Text(label).font(.system(size: 10)).foregroundStyle(theme.textTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func billingCard(_ records: [SessionRecord]) -> some View {
+        let totals = engine.billingTotals(records)
+        return Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                SectionHeader("Tracked value", subtitle: "Focused time × the project rate preserved on each session")
+                if totals.isEmpty {
+                    Text("Set an hourly rate for a project in Settings to turn tracked time into billable value.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.textSecondary)
+                } else {
+                    ForEach(totals) { total in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(Format.money(total.amount, currencyCode: total.currencyCode))
+                                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(theme.positive)
+                                Text("\(Format.duration(total.billableSeconds)) across \(total.sessionCount) sessions")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(theme.textTertiary)
+                            }
+                            Spacer()
+                            Text(total.currencyCode)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .foregroundStyle(theme.textSecondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func sessionPatterns(_ overview: AnalyticsEngine.Overview) -> some View {
+        Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                SectionHeader("Session depth", subtitle: "Whether the time was protected, not merely recorded")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: Space.sm)], spacing: Space.sm) {
+                    presenceMetric("Uninterrupted", Format.percent(overview.uninterruptedRate), theme.positive)
+                    presenceMetric("45m+ sessions", "\(overview.deepSessionCount)", theme.accent)
+                    presenceMetric("Longest", Format.duration(overview.longestSessionSeconds), theme.textPrimary)
+                    presenceMetric("Abandoned", "\(overview.abandonedCount)", theme.negative)
+                }
+            }
         }
     }
 
@@ -471,6 +630,40 @@ public struct AnalyticsScreen: View {
         }
     }
 
+    private func weekdayChart(_ records: [SessionRecord]) -> some View {
+        let buckets = engine.byWeekday(records)
+        return Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                SectionHeader("Weekday rhythm", subtitle: "Which days reliably hold focused work")
+                Chart(buckets) { bucket in
+                    BarMark(
+                        x: .value("Weekday", weekdayLabel(bucket.weekday)),
+                        y: .value("Focused hours", bucket.focusedSeconds / 3600)
+                    )
+                    .foregroundStyle(theme.accent.gradient)
+                    .cornerRadius(3)
+                }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisGridLine().foregroundStyle(theme.hairline)
+                        AxisValueLabel {
+                            if let hours = value.as(Double.self) {
+                                Text("\(Int(hours))h").foregroundStyle(theme.textTertiary)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 150)
+            }
+        }
+    }
+
+    private func weekdayLabel(_ weekday: Int) -> String {
+        let symbols = Calendar.current.shortWeekdaySymbols
+        guard symbols.indices.contains(weekday - 1) else { return "?" }
+        return symbols[weekday - 1]
+    }
+
     private func legendDot(_ color: Color, _ label: String) -> some View {
         HStack(spacing: Space.xxs) {
             Circle().fill(color).frame(width: 7, height: 7)
@@ -517,6 +710,80 @@ public struct AnalyticsScreen: View {
         }
     }
 
+    private func workTable(
+        title: String,
+        subtitle: String,
+        stats: [AnalyticsEngine.WorkStat]
+    ) -> some View {
+        let shown = Array(stats.prefix(8))
+        let maximum = shown.first?.focusedSeconds ?? 1
+        return Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                SectionHeader(title, subtitle: subtitle)
+                if shown.isEmpty {
+                    Text("No \(title.lowercased()) used in this period.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.textSecondary)
+                } else {
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, stat in
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(stat.label)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(theme.textPrimary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(Format.duration(stat.focusedSeconds))
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(theme.textPrimary)
+                            }
+                            ProportionBar(
+                                fraction: stat.focusedSeconds / max(1, maximum),
+                                tint: AnchorTheme.tint(index)
+                            )
+                            Text(
+                                "\(stat.sessionCount) sessions · \(Format.percent(stat.completionRate)) completed · \(String(format: "%.1f", stat.interruptionsPerHour))/h"
+                            )
+                            .font(.system(size: 11))
+                            .foregroundStyle(theme.textTertiary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func distractionTiming(_ records: [SessionRecord]) -> some View {
+        let phases = engine.distractionTiming(records)
+        let maximum = max(1, phases.map(\.count).max() ?? 1)
+        return Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                SectionHeader("When focus breaks", subtitle: "Early, middle, or final third of the planned session")
+                HStack(alignment: .bottom, spacing: Space.sm) {
+                    ForEach(phases) { phase in
+                        VStack(spacing: Space.xxs) {
+                            Text("\(phase.count)")
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .foregroundStyle(theme.textPrimary)
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(theme.caution.gradient)
+                                .frame(height: max(6, 70 * Double(phase.count) / Double(maximum)))
+                            Text(phase.phase.label)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(theme.textSecondary)
+                            if phase.brokeSessionCount > 0 {
+                                Text("\(phase.brokeSessionCount) ended")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(theme.negative)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+    }
+
     private func exportCard(_ records: [SessionRecord]) -> some View {
         Card {
             VStack(alignment: .leading, spacing: Space.sm) {
@@ -534,7 +801,7 @@ public struct AnalyticsScreen: View {
                         .buttonStyle(.plain)
                     }
                 }
-                Text("The MCP server exposes your history to Claude and other clients, read-only and on this machine. See the README for the one-line setup.")
+                Text("The MCP server exposes your history to Codex and other clients, read-only and on this machine. Codex Computer History can add its own activity context without Anchor uploading raw activity.")
                     .font(.system(size: 11))
                     .foregroundStyle(theme.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)

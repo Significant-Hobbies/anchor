@@ -14,15 +14,19 @@ public struct StartComposer: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
+    @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
 
     @State private var intent: String = ""
+    @State private var notes: String = ""
     @State private var selectedGoalID: UUID?
+    @State private var selectedProjectID: UUID?
+    @State private var selectedTagIDs: [String] = []
     @State private var minutes: Int = 25
     @FocusState private var intentFocused: Bool
 
-    private let onStart: (Goal?, String, Int) -> Void
+    private let onStart: (Goal?, String, Int, Project?, String, [String]) -> Void
 
-    public init(onStart: @escaping (Goal?, String, Int) -> Void) {
+    public init(onStart: @escaping (Goal?, String, Int, Project?, String, [String]) -> Void) {
         self.onStart = onStart
     }
 
@@ -32,6 +36,10 @@ public struct StartComposer: View {
 
     private var selectedGoal: Goal? {
         activeGoals.first { $0.id == selectedGoalID }
+    }
+
+    private var selectedProject: Project? {
+        projects.first { $0.id == selectedProjectID && !$0.isArchived }
     }
 
     private var canStart: Bool {
@@ -54,11 +62,27 @@ public struct StartComposer: View {
                             .focused($intentFocused)
                             .onSubmit(start)
 
+                        Divider().overlay(theme.hairline)
+                        fieldLabel("Entry notes — optional")
+                        TextField("Context, plan, or what success looks like", text: $notes, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 14))
+                            .foregroundStyle(theme.textSecondary)
+                            .lineLimit(2...5)
+
                         if !activeGoals.isEmpty {
                             Divider().overlay(theme.hairline)
                             fieldLabel("Against which goal?")
                             goalPicker
                         }
+                    }
+                }
+
+                Card(padding: Space.lg) {
+                    VStack(alignment: .leading, spacing: Space.md) {
+                        ProjectPicker(selectedID: $selectedProjectID)
+                        Divider().overlay(theme.hairline)
+                        SavedTagPicker(selectedIDs: $selectedTagIDs)
                     }
                 }
 
@@ -217,9 +241,12 @@ public struct StartComposer: View {
             goal = created
         }
 
-        onStart(goal, trimmed, minutes)
+        onStart(goal, trimmed, minutes, selectedProject, notes, selectedTagIDs)
         intent = ""
+        notes = ""
         selectedGoalID = nil
+        selectedProjectID = nil
+        selectedTagIDs = []
     }
 }
 #endif

@@ -16,13 +16,16 @@ import UIKit
 /// AI at it. No preferences that change the product's mind for you.
 public struct SettingsScreen: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.modelContext) private var context
+    @Environment(\.anchorPlatformSync) private var platform
     @Query private var goals: [Goal]
+    @Query(sort: \Project.createdAt) private var projects: [Project]
     @State private var didCopy = false
 
     public init() {}
 
     private var mcpCommand: String {
-        "claude mcp add anchor -- \(mcpBinaryPath)"
+        "codex mcp add anchor -- \(mcpBinaryPath)"
     }
 
     /// Ships inside the app bundle, so the path is stable per install.
@@ -55,6 +58,81 @@ public struct SettingsScreen: View {
 
                 Card {
                     VStack(alignment: .leading, spacing: Space.sm) {
+                        SectionHeader(
+                            "Project rates",
+                            subtitle: "New sessions preserve the rate that was active when they started"
+                        )
+                        if projects.isEmpty {
+                            Text("Create a project from the timer, then set its hourly rate here.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(theme.textSecondary)
+                        } else {
+                            ForEach(projects) { project in
+                                ProjectBillingRow(project: project) {
+                                    project.hourlyRate = max(0, project.hourlyRate)
+                                    project.currencyCode = project.currencyCode
+                                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                                        .uppercased()
+                                    if project.currencyCode.isEmpty { project.currencyCode = "USD" }
+                                    try? context.save()
+                                }
+                            }
+                        }
+                    }
+                }
+
+                #if os(macOS)
+                Card {
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        SectionHeader("Computer activity", subtitle: "Reminds you after 5 active minutes without a running timer")
+                        Text("Anchor stores only aggregate active, tracked, and away seconds. It never records app names, windows, websites, keys, or pointer locations.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(theme.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                #endif
+
+                if let platform, let account = platform.account {
+                    Card {
+                        VStack(alignment: .leading, spacing: Space.sm) {
+                            SectionHeader(
+                                "Personal Platform",
+                                subtitle: "Session totals sync; distraction notes stay on this device"
+                            )
+                            if account.isSignedIn {
+                                Label(
+                                    account.session?.email ?? "Personal account",
+                                    systemImage: "checkmark.icloud"
+                                )
+                                .font(.system(size: 12, weight: .medium))
+                                Button(platform.isSyncing ? "Syncing…" : "Sync now") {
+                                    Task { await platform.synchronize(announcing: true) }
+                                }
+                                .buttonStyle(QuietButtonStyle(expands: false))
+                                .disabled(platform.isSyncing)
+                                Button("Sign out") { Task { await account.signOut() } }
+                                    .buttonStyle(QuietButtonStyle(expands: false))
+                            } else {
+                                Button(account.isConnecting ? "Connecting…" : "Connect Significant Hobbies") {
+                                    Task { await platform.connect() }
+                                }
+                                .buttonStyle(QuietButtonStyle(expands: false))
+                                .disabled(account.isConnecting)
+                            }
+                            Text(
+                                platform.message ?? account.errorMessage
+                                    ?? "Anchor remains fully usable offline. Only goal, timing, outcome, and interruption count enter Cloudflare."
+                            )
+                            .font(.system(size: 11))
+                            .foregroundStyle(theme.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+
+                Card {
+                    VStack(alignment: .leading, spacing: Space.sm) {
                         SectionHeader("Storage", subtitle: "SwiftData, synced with iCloud")
                         labelled("Goals", "\(goals.count)")
                         labelled("Database", AnchorStore.storeURL().path)
@@ -64,7 +142,7 @@ public struct SettingsScreen: View {
                 Card {
                     VStack(alignment: .leading, spacing: Space.sm) {
                         SectionHeader("Talk to your data", subtitle: "Anchor ships an MCP server")
-                        Text("Register it once and Claude can answer questions like “what broke my focus most this month?” directly against your history — locally, read-only.")
+                        Text("Register it once and Codex or another MCP client can answer questions like “what broke my focus most this month?” directly against your history — locally, read-only.")
                             .font(.system(size: 12))
                             .foregroundStyle(theme.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -120,6 +198,38 @@ public struct SettingsScreen: View {
             try? await Task.sleep(for: .seconds(2))
             didCopy = false
         }
+    }
+}
+
+private struct ProjectBillingRow: View {
+    @Environment(\.anchorTheme) private var theme
+    @Bindable var project: Project
+    let save: () -> Void
+
+    var body: some View {
+        HStack(spacing: Space.xs) {
+            Image(systemName: project.symbolName)
+                .foregroundStyle(AnchorTheme.tint(project.tintIndex))
+            Text(project.name)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(theme.textPrimary)
+                .lineLimit(1)
+            Spacer(minLength: Space.xs)
+            TextField("USD", text: $project.currencyCode)
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 44)
+                .onSubmit(save)
+            TextField("0", value: $project.hourlyRate, format: .number.precision(.fractionLength(0...2)))
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 70)
+                .onSubmit(save)
+            Text("/ hour")
+                .font(.system(size: 11))
+                .foregroundStyle(theme.textTertiary)
+        }
+        .padding(.vertical, Space.xxs)
     }
 }
 #endif

@@ -2,7 +2,7 @@ import AnchorCore
 import Foundation
 import SwiftData
 
-/// Anchor's MCP server: lets Claude (or any MCP client) ask questions about your
+/// Anchor's MCP server: lets Codex (or any MCP client) ask questions about your
 /// focus history in plain language, without you exporting anything first.
 ///
 /// Transport is stdio with newline-delimited JSON-RPC 2.0, which is what MCP
@@ -10,7 +10,7 @@ import SwiftData
 /// never writes, so running it alongside the app is safe.
 ///
 /// Register it with:
-///   claude mcp add anchor -- /path/to/anchor-mcp
+///   codex mcp add anchor -- /path/to/anchor-mcp
 
 // MARK: - Store access
 
@@ -42,6 +42,9 @@ final class AnchorQueryService {
             "completionRate": .double(stats.completionRate),
             "focusedHours": .double(stats.focusedHours),
             "medianSessionMinutes": .double(stats.medianSessionSeconds / 60),
+            "longestSessionMinutes": .double(stats.longestSessionSeconds / 60),
+            "uninterruptedRate": .double(stats.uninterruptedRate),
+            "deepSessionCount": .int(stats.deepSessionCount),
             "interruptions": .int(stats.distractionCount),
             "interruptionsPerFocusedHour": .double(stats.interruptionsPerHour),
             "recoveryRate": .double(stats.recoveryRate),
@@ -57,8 +60,16 @@ final class AnchorQueryService {
                 "goal": .string(record.goalTitle.isEmpty ? "Unassigned" : record.goalTitle),
                 "theme": record.goalTheme.map { .string($0.label) } ?? .null,
                 "intent": .string(record.intent),
+                "project": record.projectTitle.isEmpty ? .null : .string(record.projectTitle),
+                "notes": .string(record.notes),
+                "tags": .array(record.tags.map(JSONValue.string)),
                 "plannedMinutes": .double(Double(record.plannedSeconds) / 60),
                 "focusedMinutes": .double(record.focusedMinutes),
+                "hourlyRate": .double(record.hourlyRate),
+                "currency": .string(record.currencyCode),
+                "trackedValue": .double(record.earnedAmount),
+                "computerActiveMinutes": .double(record.computerActiveSeconds / 60),
+                "computerAwayMinutes": .double(record.computerAwaySeconds / 60),
                 "outcome": record.endReason.map { .string($0.rawValue) } ?? .string(record.state.rawValue),
                 "interruptions": .int(record.distractions.count),
                 "interruptionNotes": .array(record.distractions.map { .string($0.note) }),
@@ -121,6 +132,56 @@ final class AnchorQueryService {
             }
     }
 
+    func workPatterns(sinceDays days: Int?) throws -> [String: JSONValue] {
+        let rows = try records(sinceDays: days)
+        func encode(_ stats: [AnalyticsEngine.WorkStat]) -> JSONValue {
+            .array(stats.map { stat in
+                .object([
+                    "name": .string(stat.label),
+                    "sessions": .int(stat.sessionCount),
+                    "focusedHours": .double(stat.focusedSeconds / 3600),
+                    "completionRate": .double(stat.completionRate),
+                    "interruptionsPerFocusedHour": .double(stat.interruptionsPerHour),
+                ])
+            })
+        }
+        let billing = engine.billingTotals(rows).map { total in
+            JSONValue.object([
+                "currency": .string(total.currencyCode),
+                "amount": .double(total.amount),
+                "billableHours": .double(total.billableSeconds / 3600),
+                "sessions": .int(total.sessionCount),
+            ])
+        }
+        let timing = engine.distractionTiming(rows).map { phase in
+            JSONValue.object([
+                "phase": .string(phase.phase.label),
+                "count": .int(phase.count),
+                "endedSessions": .int(phase.brokeSessionCount),
+            ])
+        }
+        return [
+            "projects": encode(engine.byProject(rows)),
+            "tags": encode(engine.byTag(rows)),
+            "billing": .array(billing),
+            "distractionTiming": .array(timing),
+        ]
+    }
+
+    func machinePresence(sinceDays days: Int?) throws -> [String: JSONValue] {
+        let since = days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) }
+        var descriptor = FetchDescriptor<MachineActivityDay>(sortBy: [SortDescriptor(\.day, order: .reverse)])
+        if let since { descriptor.predicate = #Predicate { $0.day >= since } }
+        let presence = engine.machinePresence(try context.fetch(descriptor).map { $0.snapshot() })
+        return [
+            "machineActiveHours": .double(presence.activeSeconds / 3600),
+            "loggedActiveHours": .double(presence.trackedSeconds / 3600),
+            "untrackedActiveHours": .double(presence.untrackedSeconds / 3600),
+            "loggedRate": .double(presence.trackedRate),
+            "privacy": .string("Aggregate keyboard/mouse presence only; no apps, windows, websites, keys, or pointer locations."),
+        ]
+    }
+
     func searchDistractions(query: String, limit: Int) throws -> [JSONValue] {
         let needle = query.lowercased()
         return try records(sinceDays: nil)
@@ -128,6 +189,7 @@ final class AnchorQueryService {
             .filter { _, distraction in
                 distraction.note.lowercased().contains(needle)
                     || distraction.keywords.contains { $0.contains(needle) }
+                    || distraction.tags.contains { $0.lowercased().contains(needle) }
                     || distraction.kind.label.lowercased().contains(needle)
             }
             .prefix(limit)
@@ -137,6 +199,8 @@ final class AnchorQueryService {
                     "note": .string(distraction.note),
                     "category": .string(distraction.kind.label),
                     "goal": .string(record.goalTitle),
+                    "project": record.projectTitle.isEmpty ? .null : .string(record.projectTitle),
+                    "tags": .array(distraction.tags.map(JSONValue.string)),
                     "minutesIntoSession": .double(distraction.offsetSeconds / 60),
                     "returnedToFocus": .bool(distraction.didReturnToFocus),
                 ])
@@ -202,6 +266,16 @@ struct MCPServer {
         tool(
             "best_hours",
             "Focused time and interruptions bucketed by hour of day.",
+            ["since_days": intProperty("How many days back to look. Omit for all time.")]
+        ),
+        tool(
+            "work_patterns",
+            "Project and tag performance, billable value, and when distractions land within sessions.",
+            ["since_days": intProperty("How many days back to look. Omit for all time.")]
+        ),
+        tool(
+            "machine_presence",
+            "Privacy-safe active, logged, and untracked computer time recorded by the Mac app.",
             ["since_days": intProperty("How many days back to look. Omit for all time.")]
         ),
         tool(
@@ -306,6 +380,10 @@ struct MCPServer {
                 payload = .array(try service.goalProgress(sinceDays: sinceDays))
             case "best_hours":
                 payload = .array(try service.bestHours(sinceDays: sinceDays))
+            case "work_patterns":
+                payload = .object(try service.workPatterns(sinceDays: sinceDays))
+            case "machine_presence":
+                payload = .object(try service.machinePresence(sinceDays: sinceDays))
             case "search_distractions":
                 guard let query = arguments?["query"]?.stringValue, !query.isEmpty else {
                     return toolResult(id: id, text: "search_distractions needs a query.", isError: true)
@@ -430,5 +508,5 @@ func runServer() {
 if CommandLine.arguments.contains("--diagnose") {
     await runDiagnostics()
 } else {
-    await runServer()
+    runServer()
 }

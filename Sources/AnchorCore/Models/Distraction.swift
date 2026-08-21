@@ -24,6 +24,9 @@ public final class Distraction {
     /// On-device keywords used to cluster near-identical distractions together.
     public var keywords: [String] = []
 
+    /// Stable IDs of reusable tags explicitly selected by the user.
+    public var tagIDStrings: [String] = []
+
     /// How many seconds into the session it landed. Lets analytics answer
     /// "when in a session do I break?" without recomputing from timestamps.
     public var offsetSeconds: Double = 0
@@ -42,7 +45,8 @@ public final class Distraction {
         capturedAt: Date = Date(),
         offsetSeconds: Double = 0,
         session: FocusSession? = nil,
-        didReturnToFocus: Bool = true
+        didReturnToFocus: Bool = true,
+        tagIDStrings: [String] = []
     ) {
         self.id = id
         self.note = note
@@ -50,6 +54,7 @@ public final class Distraction {
         self.offsetSeconds = offsetSeconds
         self.session = session
         self.didReturnToFocus = didReturnToFocus
+        self.tagIDStrings = tagIDStrings
     }
 
     public var kind: DistractionKind? {

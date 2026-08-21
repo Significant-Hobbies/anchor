@@ -8,13 +8,15 @@
 A focus timer for macOS, iOS and watchOS. You name a goal, run a timer, and when
 something distracts you, you park it in one keystroke instead of losing the
 session. It then reports what actually costs you your focus. Storage is SwiftData
-+ CloudKit; grouping and tagging use Apple's on-device foundation model. Ships
++ CloudKit, with optional Personal Platform session summaries; grouping and
+tagging use Apple's on-device foundation model. Ships
 under Significant Hobbies (`com.significanthobbies.anchor`).
 
 ## Critical constraints
 
 - **Distraction notes never leave the device.** No cloud model, no analytics SDK,
-  no telemetry, no account. Tagging and summarising go through
+  no telemetry. Optional account sync may send session timing, goal, outcome,
+  and interruption count, but never the note. Tagging and summarising go through
   `TaggingService`, which uses `FoundationModels` locally or falls back to rules.
   Any change that sends user text off-device is a product violation, not a tradeoff.
 - **On-device intelligence is optional, never required.** Apple Intelligence may be
