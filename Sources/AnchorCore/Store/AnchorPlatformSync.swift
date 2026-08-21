@@ -10,7 +10,7 @@ import SwiftData
 public final class AnchorPlatformSync {
     private let context: ModelContext
     private let connection: PersonalPlatformConnection?
-    public let account: PersonalWebSignInModel?
+    public let account: PersonalAccountModel?
     public private(set) var isSyncing = false
     public private(set) var message: String?
 
@@ -33,7 +33,7 @@ public final class AnchorPlatformSync {
         )
         self.connection = connection
         account = connection.map {
-            PersonalWebSignInModel(identity: $0.identity, callbackScheme: "anchor")
+            PersonalAccountModel(identity: $0.identity, callbackScheme: "anchor")
         }
     }
 
