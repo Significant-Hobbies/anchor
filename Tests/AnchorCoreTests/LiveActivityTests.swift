@@ -77,6 +77,40 @@ struct LiveActivitySnapshotTests {
         #expect(!snapshot.isOpenEnded)
         #expect(snapshot.plannedCompletionDate == nil)
     }
+
+    @Test("A paused planned session freezes on remaining time")
+    func pausedPlannedSessionUsesRemainingTime() {
+        let snapshot = LiveActivitySnapshot(
+            sessionID: UUID(),
+            intent: "Ship the release",
+            state: .paused,
+            startedAt: Date(),
+            plannedSeconds: 1_500,
+            bankedSeconds: 119,
+            runningSince: nil,
+            pausedAt: Date(),
+            interruptionCount: 0
+        )
+
+        #expect(snapshot.frozenDisplaySeconds == 1_381)
+    }
+
+    @Test("A paused open-ended session freezes on elapsed time")
+    func pausedOpenEndedSessionUsesElapsedTime() {
+        let snapshot = LiveActivitySnapshot(
+            sessionID: UUID(),
+            intent: "Explore",
+            state: .paused,
+            startedAt: Date(),
+            plannedSeconds: 0,
+            bankedSeconds: 119,
+            runningSince: nil,
+            pausedAt: Date(),
+            interruptionCount: 0
+        )
+
+        #expect(snapshot.frozenDisplaySeconds == 119)
+    }
 }
 
 // MARK: - Controller lifecycle
