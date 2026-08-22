@@ -18,15 +18,15 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/Significant-Hobbies/personal-platform.git",
-            revision: "55176cac008d3857ef815d9bc5c8e74b68e7c3f3"
+            url: "https://github.com/Significant-Hobbies/significanthobbies.git",
+            revision: "007cc255e75d291d10528ea9b123759d7e050be3"
         ),
     ],
     targets: [
         .target(
             name: "AnchorCore",
             dependencies: [
-                .product(name: "PersonalSyncKit", package: "personal-platform"),
+                .product(name: "PersonalSyncKit", package: "significanthobbies"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
@@ -44,7 +44,7 @@ let package = Package(
             name: "AnchorCoreTests",
             dependencies: [
                 "AnchorCore",
-                .product(name: "PersonalSyncKit", package: "personal-platform"),
+                .product(name: "PersonalSyncKit", package: "significanthobbies"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
