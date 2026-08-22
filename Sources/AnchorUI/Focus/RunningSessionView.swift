@@ -43,6 +43,11 @@ public struct RunningSessionView: View {
                 parkedList
             }
             .padding(Space.lg)
+            #if os(iOS)
+            // Preserve a clear scroll landing above the floating tab bar so the
+            // main distraction action never reads as tucked underneath it.
+            .padding(.bottom, Space.xxl)
+            #endif
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
             .containerRelativeFrame(.vertical, alignment: .center)

@@ -42,7 +42,8 @@ final class AnchorWorld {
         }
         let controller = FocusController(
             context: container.mainContext,
-            completionNotifier: SystemSessionCompletionNotifier()
+            completionNotifier: SystemSessionCompletionNotifier(),
+            liveActivityCoordinator: ActivityKitLiveActivityCoordinator()
         )
         self.controller = controller
     }

@@ -32,6 +32,7 @@ public final class FocusController {
     private let context: ModelContext
     private let tagger: TaggingService
     private let completionNotifier: any SessionCompletionNotifying
+    private let liveActivityCoordinator: any LiveActivityCoordinating
     private var ticker: Task<Void, Never>?
     private var lastMachineObservation: (sessionID: UUID, at: Date)?
     private var unsavedMachineSeconds: Double = 0
@@ -39,11 +40,13 @@ public final class FocusController {
     public init(
         context: ModelContext,
         tagger: TaggingService = TaggingService(),
-        completionNotifier: any SessionCompletionNotifying = NoopSessionCompletionNotifier()
+        completionNotifier: any SessionCompletionNotifying = NoopSessionCompletionNotifier(),
+        liveActivityCoordinator: any LiveActivityCoordinating = NoopLiveActivityCoordinator()
     ) {
         self.context = context
         self.tagger = tagger
         self.completionNotifier = completionNotifier
+        self.liveActivityCoordinator = liveActivityCoordinator
         restoreActiveSession()
     }
 
@@ -73,6 +76,9 @@ public final class FocusController {
             scheduleCompletionNotification()
             refresh(at: Date())
             startTicking()
+            publishLiveActivityStart()
+        } else {
+            publishLiveActivityEnd()
         }
     }
 
@@ -90,6 +96,11 @@ public final class FocusController {
             }
             session = imported
             resetMachineObservation()
+            if imported != nil {
+                publishLiveActivityStart()
+            } else {
+                publishLiveActivityEnd()
+            }
         }
 
         guard let session else {
@@ -106,6 +117,7 @@ public final class FocusController {
             stopTicking()
             refresh(at: Date())
         }
+        publishLiveActivityUpdate()
     }
 
     private func fetchLatestActiveSession() -> FocusSession? {
@@ -150,6 +162,7 @@ public final class FocusController {
         refreshNow()
         scheduleCompletionNotification()
         startTicking()
+        publishLiveActivityStart()
 
         if let goal { tagGoal(goal) }
         return new
@@ -168,6 +181,7 @@ public final class FocusController {
         save()
         refreshNow()
         stopTicking()
+        publishLiveActivityUpdate()
     }
 
     /// Resuming always asks what pulled you away.
@@ -191,6 +205,7 @@ public final class FocusController {
         refreshNow()
         scheduleCompletionNotification()
         startTicking()
+        publishLiveActivityUpdate()
 
         captureReason = .returnedFromPause(awaySeconds: awaySeconds)
         isCapturing = true
@@ -220,6 +235,7 @@ public final class FocusController {
         refreshNow()
         scheduleCompletionNotification()
         startTicking()
+        publishLiveActivityUpdate()
     }
 
     public func end(reason: SessionEndReason = .endedEarly) {
@@ -248,6 +264,7 @@ public final class FocusController {
         self.session = nil
         save()
         stopTicking()
+        publishLiveActivityEnd()
     }
 
     /// Park a distraction and stay in the session. This is the core interaction.
@@ -276,6 +293,7 @@ public final class FocusController {
         }
         context.insert(distraction)
         save()
+        publishLiveActivityUpdate()
 
         if kind == nil { tagDistraction(distraction) }
         return distraction
@@ -413,5 +431,36 @@ public final class FocusController {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    // MARK: - Live Activity
+
+    private func liveActivitySnapshot() -> LiveActivitySnapshot? {
+        guard let session else { return nil }
+        return LiveActivitySnapshot(
+            sessionID: session.id,
+            intent: session.intent,
+            state: session.state,
+            startedAt: session.startedAt,
+            plannedSeconds: session.plannedSeconds,
+            bankedSeconds: session.bankedSeconds,
+            runningSince: session.runningSince,
+            pausedAt: session.pausedAt,
+            interruptionCount: session.distractionCount
+        )
+    }
+
+    private func publishLiveActivityStart() {
+        guard let snapshot = liveActivitySnapshot() else { return }
+        liveActivityCoordinator.start(with: snapshot)
+    }
+
+    private func publishLiveActivityUpdate() {
+        guard let snapshot = liveActivitySnapshot() else { return }
+        liveActivityCoordinator.update(with: snapshot)
+    }
+
+    private func publishLiveActivityEnd() {
+        liveActivityCoordinator.end()
     }
 }

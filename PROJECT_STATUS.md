@@ -31,6 +31,16 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-23** — prepared iOS build `1.0 (5)` with a local ActivityKit Live
+  Activity for the Lock Screen and Dynamic Island. It mirrors the active focus
+  intention, wall-clock remaining or elapsed time, pause state, and parked
+  interruption count; relaunch reconciliation reuses the matching system
+  activity and cleans up stale ones. The primary iPhone start action now sits
+  in a safe-area inset above the floating tab bar. The slice passes 111 shared
+  tests, the tab-bar-clearance UI journey, Xcode 26.6 iPhone builds, and Xcode
+  27 Mac/watch builds. Physical iPhone verification and TestFlight upload remain
+  before the issue can close.
+
 - **2026-08-23** — Removed the `site/` landing fork. Its `wrangler.toml`
   declared `name = "anchor-landing"` — the Cloudflare Pages project the shared
   `ios-landings` factory owns and deploys — so a deploy from this repo would
