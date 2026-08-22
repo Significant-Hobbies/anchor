@@ -32,7 +32,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "4"
+    CURRENT_PROJECT_VERSION: "5"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # Real signing: CloudKit and the shared app group are entitlements, so they
     # only work against a provisioning profile. Automatic + the fleet team.
@@ -109,6 +109,9 @@ targets:
       # Embeds the watch app so a single iPhone install carries both.
       - target: AnchorWatch
         embed: true
+      # Embeds the Live Activity widget extension for Lock Screen + Dynamic Island.
+      - target: AnchorLiveActivity
+        embed: true
     settings:
       base:
         PRODUCT_NAME: Anchor
@@ -136,6 +139,7 @@ targets:
             CFBundleURLSchemes:
               - anchor
         ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
         UILaunchScreen:
           UIColorName: ""
         UIApplicationSceneManifest:
@@ -198,6 +202,40 @@ targets:
         UIBackgroundModes:
           - remote-notification
 
+  AnchorLiveActivity:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LiveActivity
+    dependencies:
+      - package: AnchorPackage
+        product: AnchorUI
+      - package: AnchorPackage
+        product: AnchorCore
+    settings:
+      base:
+        PRODUCT_NAME: Anchor Live Activity
+        PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.live-activity
+        CODE_SIGN_ENTITLEMENTS: ""
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+      configs:
+        DebugLocal:
+          CODE_SIGN_ENTITLEMENTS: ""
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+          DEVELOPMENT_TEAM: ""
+    info:
+      path: LiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: Anchor Live Activity
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
   AnchorIOSUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -237,6 +275,7 @@ schemes:
     build:
       targets:
         AnchorIOS: all
+        AnchorLiveActivity: all
         AnchorIOSUITests: [test]
     test:
       targets:

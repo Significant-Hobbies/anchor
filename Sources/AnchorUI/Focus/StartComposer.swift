@@ -93,12 +93,9 @@ public struct StartComposer: View {
                     }
                 }
 
-                Button(action: start) {
-                    Label("Start focusing", systemImage: "play.fill")
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(!canStart)
-                .keyboardShortcut(.return, modifiers: .command)
+                #if os(macOS)
+                startButton
+                #endif
 
                 // Keyboard-shortcut hint only where there is a keyboard.
                 #if os(macOS)
@@ -115,6 +112,18 @@ public struct StartComposer: View {
             .containerRelativeFrame(.vertical, alignment: .center)
         }
         .scrollDismissesKeyboard(.interactively)
+        #if os(iOS)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // iOS 26's floating tab bar overlaps the scroll edge. A real inset,
+            // rather than padding inside the scroll content, keeps the action
+            // visible even when keyboard dismissal preserves the scroll offset.
+            startButton
+                .padding(.horizontal, Space.lg)
+                .padding(.top, Space.xs)
+                .padding(.bottom, Space.sm)
+                .background(theme.canvas)
+        }
+        #endif
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -131,6 +140,15 @@ public struct StartComposer: View {
             intentFocused = true
             #endif
         }
+    }
+
+    private var startButton: some View {
+        Button(action: start) {
+            Label("Start focusing", systemImage: "play.fill")
+        }
+        .buttonStyle(PrimaryButtonStyle())
+        .disabled(!canStart)
+        .keyboardShortcut(.return, modifiers: .command)
     }
 
     private var header: some View {

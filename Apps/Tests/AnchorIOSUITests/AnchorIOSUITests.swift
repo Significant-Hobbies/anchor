@@ -19,11 +19,17 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Done"].tap()
         let start = app.buttons["Start focusing"]
         XCTAssertTrue(start.waitForExistence(timeout: 3))
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.exists)
+        XCTAssertTrue(start.isHittable)
+        XCTAssertLessThanOrEqual(start.frame.maxY, tabBar.frame.minY - 8)
         start.tap()
         XCTAssertTrue(app.staticTexts["Finish the release"].waitForExistence(timeout: 4))
 
         let capture = app.buttons["Lock a distraction"]
         XCTAssertTrue(capture.waitForExistence(timeout: 3))
+        XCTAssertTrue(capture.isHittable)
+        XCTAssertLessThanOrEqual(capture.frame.maxY, tabBar.frame.minY - 8)
         capture.tap()
 
         let note = app.textFields["Slack from Ravi about the invoice"]
