@@ -31,6 +31,14 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-23** — Removed the `site/` landing fork. Its `wrangler.toml`
+  declared `name = "anchor-landing"` — the Cloudflare Pages project the shared
+  `ios-landings` factory owns and deploys — so a deploy from this repo would
+  have replaced the live factory site. Live HTML is byte-identical to the
+  factory build; the fork differed by 6 lines of inlined CSS reset, i.e. a
+  stale copy of the same engine. This is the second such tree retired from
+  this repo after `landing/`; the factory is now the only landing source.
+
 - **2026-08-22** — added an interruption-first Mac/iPhone onboarding: an
   explicitly ephemeral park-and-return rehearsal, platform-specific capture
   guidance, real-session handoff through `FocusController`, existing-session
