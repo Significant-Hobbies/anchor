@@ -80,6 +80,8 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
 /// case, over one shared set of screens.
 public struct RootView: View {
     @Environment(\.anchorTheme) private var theme
+    @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @AppStorage("anchor.onboarding.completed.v1") private var onboardingCompleted = false
     private let controller: FocusController
     @State private var tab: AnchorTab = .focus
 
@@ -91,6 +93,24 @@ public struct RootView: View {
     }
 
     public var body: some View {
+        if controller.hasSession || shouldSkipOnboarding {
+            appShell
+        } else if shouldForceOnboarding || (!onboardingCompleted && sessions.isEmpty) {
+            AnchorOnboardingView { goal, minutes in
+                onboardingCompleted = true
+                _ = controller.start(goal: nil, intent: goal, minutes: minutes)
+            }
+        } else if onboardingCompleted {
+            appShell
+        } else {
+            AnchorExistingOwnerOrientationView {
+                onboardingCompleted = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var appShell: some View {
         #if os(macOS)
         NavigationSplitView {
             List(AnchorTab.allCases, selection: $tab) { item in
@@ -129,6 +149,14 @@ public struct RootView: View {
         }
         .tint(theme.accent)
         #endif
+    }
+
+    private var shouldForceOnboarding: Bool {
+        ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_DEMO"] == "1"
+    }
+
+    private var shouldSkipOnboarding: Bool {
+        ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_SKIP"] == "1"
     }
 
     @ViewBuilder

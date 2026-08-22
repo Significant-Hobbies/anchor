@@ -1,0 +1,51 @@
+{
+  "$schema": "fleet.design-review.v1",
+  "version": 1,
+  "project": "anchor-onboarding-3",
+  "target": "Anchor interruption-first onboarding",
+  "mode": "preserve",
+  "register": "product",
+  "context": {
+    "product": null,
+    "design": null
+  },
+  "direction": {
+    "references": [],
+    "probes": [],
+    "selected": "existing-design",
+    "approval": "not-required",
+    "before": "artifacts/design/before.png"
+  },
+  "evidence": {
+    "screenshots": [
+      {
+        "width": 390,
+        "path": "artifacts/design/onboarding/welcome-iphone.png"
+      }
+    ],
+    "projectCheck": {
+      "command": "swift build && swift test; macOS UI test; iOS UI tests; unsigned watchOS simulator build",
+      "status": "passed"
+    },
+    "critique": {
+      "score": 36,
+      "maximum": 40
+    },
+    "audit": {
+      "score": 18,
+      "maximum": 20
+    },
+    "unresolved": {
+      "p0": 0,
+      "p1": 0
+    },
+    "detector": {
+      "posture": "advisory",
+      "findings": []
+    }
+  },
+  "ownerFeedback": {
+    "decision": "delegated",
+    "note": "The owner delegated end-to-end issue resolution; the established Anchor visual language and privacy boundary were preserved."
+  }
+}

@@ -9,6 +9,7 @@ final class AnchorIOSUITests: XCTestCase {
     func testFocusInterruptionAndReturnJourneyPersists() {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-ui-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
         let intention = app.textFields["Ship the auth flow"]
@@ -38,7 +39,9 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Check the build status"].waitForExistence(timeout: 3))
 
         app.buttons["Pause"].tap()
-        app.buttons["Resume"].tap()
+        let resume = app.buttons["Resume"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 3))
+        resume.tap()
         let decline = app.buttons["Nothing — just a break"]
         XCTAssertTrue(decline.waitForExistence(timeout: 3))
         decline.tap()
@@ -46,5 +49,34 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["End session"].tap()
         app.tabBars.buttons["Parked"].tap()
         XCTAssertTrue(app.staticTexts["Check the build status"].waitForExistence(timeout: 3))
+    }
+
+    func testInterruptionFirstOnboardingStartsARealSession() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-onboarding-ui-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_DEMO"] = "1"
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 5))
+        let goal = app.textFields["Finish the release"]
+        goal.tap()
+        goal.typeText("Draft the launch note")
+        app.buttons["Done"].tap()
+        app.buttons["Try the park-and-return loop"].tap()
+
+        XCTAssertTrue(app.staticTexts["Draft the launch note"].waitForExistence(timeout: 4))
+        app.buttons["Something pulled me"].tap()
+        let thought = app.textFields["Check the build status"]
+        thought.tap()
+        thought.typeText("Read the incoming message")
+        app.buttons["Done"].tap()
+        app.buttons["Park it — return to focus"].tap()
+
+        XCTAssertTrue(app.staticTexts["Attention recovered."].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["The practice interruption was discarded. Your real captures stay local and appear in Parked."].exists)
+        app.buttons["Begin real focus"].tap()
+
+        XCTAssertTrue(app.staticTexts["Draft the launch note"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["Lock a distraction"].exists)
     }
 }
