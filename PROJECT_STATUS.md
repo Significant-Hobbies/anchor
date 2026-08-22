@@ -31,6 +31,18 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-23** — Anchor `1.0 (6)` is assigned in internal TestFlight and
+  installed on the physical iPhone; its embedded Watch companion is installed
+  and enabled on the paired Apple Watch. The matching Developer ID Mac build is
+  installed in `/Applications`, with build 3 retained recoverably in Trash.
+  Physical checks confirmed the compact iPhone start action clears the tab bar
+  and the local ActivityKit timer appears outside the app. A fresh Mac timer did
+  not reach iPhone, and a fresh iPhone timer did not reach Mac. CloudKit Console
+  confirms why: Production still contains only `Users`; the pending Development
+  schema has timer types but must be expanded to all six Anchor model types and
+  reviewed before deployment. The release passes 114 shared tests plus signed
+  Mac, iPhone, and Watch builds.
+
 - **2026-08-23** — prepared iOS build `1.0 (5)` with a local ActivityKit Live
   Activity for the Lock Screen and Dynamic Island. It mirrors the active focus
   intention, wall-clock remaining or elapsed time, pause state, and parked
@@ -112,19 +124,19 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | Builds and runs; main window, menu-bar panel, floating mini timer |
-| Anchor for iOS | Builds and runs in simulator; full app, embeds the watch app |
-| Anchor for watchOS | Builds and runs in simulator; remote for start/pause/capture |
+| Anchor for macOS | **Installed as 1.0 (6)**; signed Developer ID build with Production CloudKit |
+| Anchor for iOS | **Internal TestFlight 1.0 (6)** installed and physically smoke-tested |
+| Anchor for watchOS | Embedded in TestFlight 1.0 (6), installed and enabled on the paired Watch |
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **Internal TestFlight available** for 1.0 (2); personal-team 1.0 (5), including Watch and Live Activity targets, uploaded and processing |
+| iOS/watchOS IPA | **Internal TestFlight 1.0 (6)** assigned and installed, including Watch and Live Activity targets |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
 Apple-issued provisioning profile that carries the iCloud container and app
-group. **macOS signed builds are blocked on registering this Mac in the developer
-account** — use the `DebugLocal` configuration until then.
+group. The installed macOS Developer ID build carries the same Production
+CloudKit container and app group.
 
 ## Features (shipped)
 
@@ -164,16 +176,18 @@ Open work is tracked in
 
 Known gaps carried forward:
 
-- **macOS App Store distribution remains unverified**: the personal account is
-  now authenticated and the Developer ID build is signed, installed, and
-  running, but an entitlement-complete Mac App Store archive has not been made.
-- **CloudKit sync unverified end-to-end**: the entitlements are confirmed
-  embedded in a signed iOS device build (`iCloud.com.significanthobbies.anchor`,
-  CloudKit service, `group.com.significanthobbies.anchor`, team `8F7LXHTJZR`),
-  but two devices syncing to each other has not been exercised.
-- **DMG is signed but not notarised**. The App Store Connect record exists, the
-  iOS/watchOS icon validation defects are fixed, and build 1.0 (2) is available
-  to the owner through the internal `Personal Testing` group.
-- **The direct-download build has no iCloud sync** — see the release notes in
-  `scripts/release-mac.sh`. The App Store build keeps CloudKit.
+- **Production CloudKit schema is not deployed**: signed build 6 on Mac and
+  iPhone was exercised in both directions on physical hardware and did not
+  converge. Production contains only `Users`; Development must first be seeded
+  with all six Anchor model types, then the complete additive schema must be
+  reviewed and deployed before Mac–iPhone–Watch acceptance can pass.
+- **Physical Watch interaction remains pending**: the build 6 companion is
+  installed and enabled, but watchOS Developer Mode is disabled, so the app must
+  be opened on the Watch itself for final pause/end verification after schema
+  deployment.
+- **macOS App Store distribution remains unverified**: the Developer ID build is
+  signed, installed, and running, but an entitlement-complete Mac App Store
+  archive has not been made.
+- **DMG is signed but not notarised**. Build 1.0 (6) is available to the owner
+  through the internal `Personal Testing` group.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).
