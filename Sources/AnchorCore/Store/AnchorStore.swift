@@ -28,32 +28,45 @@ public enum AnchorStore {
         case localOnly
         /// RAM only. Previews and tests.
         case inMemory
+
+        public var storageDescription: String {
+            switch self {
+            case .persistent: "SwiftData, iCloud sync configured"
+            case .localOnly: "SwiftData, stored only on this device"
+            case .inMemory: "Temporary in-memory storage"
+            }
+        }
+    }
+
+    /// Keep configuration construction inspectable so tests can prove that the
+    /// production path targets Anchor's exact container instead of relying on
+    /// entitlement-order discovery.
+    public static func configuration(
+        kind: StoreKind,
+        url: URL? = nil
+    ) -> ModelConfiguration {
+        switch kind {
+        case .inMemory:
+            ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        case .localOnly:
+            ModelConfiguration(
+                schema: schema,
+                url: url ?? storeURL(),
+                cloudKitDatabase: .none
+            )
+        case .persistent:
+            ModelConfiguration(
+                schema: schema,
+                url: url ?? storeURL(),
+                cloudKitDatabase: .private(cloudKitIdentifier)
+            )
+        }
     }
 
     /// Build a container. Throws rather than trapping so the app can show a real
     /// error instead of dying on launch with a corrupt store.
     public static func makeContainer(kind: StoreKind = .persistent) throws -> ModelContainer {
-        switch kind {
-        case .inMemory:
-            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-            return try ModelContainer(for: schema, configurations: config)
-
-        case .localOnly:
-            let config = ModelConfiguration(
-                schema: schema,
-                url: storeURL(),
-                cloudKitDatabase: .none
-            )
-            return try ModelContainer(for: schema, configurations: config)
-
-        case .persistent:
-            let config = ModelConfiguration(
-                schema: schema,
-                url: storeURL(),
-                cloudKitDatabase: .automatic
-            )
-            return try ModelContainer(for: schema, configurations: config)
-        }
+        try ModelContainer(for: schema, configurations: configuration(kind: kind))
     }
 
     /// Best-effort container: tries CloudKit, falls back to local-only, then to

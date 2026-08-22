@@ -84,10 +84,15 @@ public struct RootView: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @AppStorage("anchor.onboarding.completed.v1") private var onboardingCompleted = false
     private let controller: FocusController
+    private let storeKind: AnchorStore.StoreKind
     @State private var tab: AnchorTab = .focus
 
-    public init(controller: FocusController) {
+    public init(
+        controller: FocusController,
+        storeKind: AnchorStore.StoreKind = .persistent
+    ) {
         self.controller = controller
+        self.storeKind = storeKind
         _tab = State(
             initialValue: DemoData.initialTab.flatMap(AnchorTab.init(rawValue:)) ?? .focus
         )
@@ -181,7 +186,7 @@ public struct RootView: View {
         case .focus: FocusScreen(controller: controller)
         case .log: LogScreen()
         case .insights: AnalyticsScreen()
-        case .settings: SettingsScreen()
+        case .settings: SettingsScreen(storeKind: storeKind)
         }
     }
 

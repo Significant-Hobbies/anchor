@@ -22,8 +22,11 @@ public struct SettingsScreen: View {
     @Query private var goals: [Goal]
     @Query(sort: \Project.createdAt) private var projects: [Project]
     @State private var didCopy = false
+    private let storeKind: AnchorStore.StoreKind
 
-    public init() {}
+    public init(storeKind: AnchorStore.StoreKind = .persistent) {
+        self.storeKind = storeKind
+    }
 
     private var mcpCommand: String {
         "codex mcp add anchor -- \(mcpBinaryPath)"
@@ -147,7 +150,7 @@ public struct SettingsScreen: View {
 
                 Card {
                     VStack(alignment: .leading, spacing: Space.sm) {
-                        SectionHeader("Storage", subtitle: "SwiftData, synced with iCloud")
+                        SectionHeader("Storage", subtitle: storeKind.storageDescription)
                         labelled("Goals", "\(goals.count)")
                         labelled("Database", AnchorStore.storeURL().path)
                     }
