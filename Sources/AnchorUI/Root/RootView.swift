@@ -80,6 +80,7 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
 /// case, over one shared set of screens.
 public struct RootView: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @AppStorage("anchor.onboarding.completed.v1") private var onboardingCompleted = false
     private let controller: FocusController
@@ -110,6 +111,10 @@ public struct RootView: View {
             }
         }
         .onChange(of: activeSessionSignature, initial: true) {
+            controller.synchronizeActiveSessionFromStore()
+        }
+        .onChange(of: scenePhase) {
+            guard scenePhase == .active else { return }
             controller.synchronizeActiveSessionFromStore()
         }
     }

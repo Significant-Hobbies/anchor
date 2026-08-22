@@ -14,6 +14,7 @@ import SwiftUI
 /// the interruption at the moment it happens, without you picking anything up.
 public struct WatchRootView: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
 
@@ -35,6 +36,10 @@ public struct WatchRootView: View {
         .animation(Motion.snappy, value: controller.hasSession)
         .animation(Motion.snappy, value: controller.isCapturing)
         .onChange(of: activeSessionSignature, initial: true) {
+            controller.synchronizeActiveSessionFromStore()
+        }
+        .onChange(of: scenePhase) {
+            guard scenePhase == .active else { return }
             controller.synchronizeActiveSessionFromStore()
         }
     }

@@ -32,7 +32,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "3"
+    CURRENT_PROJECT_VERSION: "4"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # Real signing: CloudKit and the shared app group are entitlements, so they
     # only work against a provisioning profile. Automatic + the fleet team.
@@ -140,6 +140,10 @@ targets:
           UIColorName: ""
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: true
+        # SwiftData's CloudKit mirror uses silent notifications to import
+        # changes while the app is not frontmost.
+        UIBackgroundModes:
+          - remote-notification
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
@@ -190,6 +194,9 @@ targets:
         WKApplication: true
         WKCompanionAppBundleIdentifier: com.significanthobbies.anchor
         WKRunsIndependentlyOfCompanionApp: true
+        # Wake the independent Watch app when CloudKit reports a remote change.
+        UIBackgroundModes:
+          - remote-notification
 
   AnchorIOSUITests:
     type: bundle.ui-testing
