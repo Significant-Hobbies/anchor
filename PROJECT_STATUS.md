@@ -96,7 +96,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | Anchor for iOS | Builds and runs in simulator; full app, embeds the watch app |
 | Anchor for watchOS | Builds and runs in simulator; remote for start/pause/capture |
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
-| Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`) |
+| Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
 | iOS/watchOS IPA | **Processing complete** for 1.0 (2); internal tester assignment remains before it appears in TestFlight |
 

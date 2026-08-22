@@ -34,7 +34,8 @@ distraction text always stays on your device.
 - **Export** — real `.xlsx`, CSV, JSON.
 - **MCP server** — point Codex at your focus history and just ask.
 
-Landing, support and privacy pages: <https://anchor.significanthobbies.com>
+Landing, support and privacy pages: <https://anchor.significanthobbies.com> — built and
+released from the shared `ios-landings` factory (`products/anchor/`), not from this repo.
 
 ## Requirements
 
@@ -135,7 +136,6 @@ Sources/
 Apps/
   Mac/ iOS/ Watch/  thin app shells; project.yml generates the Xcode project
   Shared/          asset catalog (accent colour + app icon)
-landing/           Astro landing, support and privacy pages
 Tests/            87 tests, no Xcode required
 ```
 
