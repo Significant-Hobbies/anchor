@@ -31,6 +31,16 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-23** — Anchor `1.0 (8)` was accepted by App Store Connect and is
+  assigned to the internal `Personal Testing` group. Its iPhone and embedded
+  Watch binaries carry Production APNs, Production CloudKit, and the shared app
+  group. The matching Developer ID Mac build is installed in `/Applications`.
+  Production CloudKit now contains all six Anchor record types. Build 8 registers
+  every native client for remote notifications after launch and explicitly
+  reconciles the active controller after remote-store imports. The release passes
+  all 114 shared tests. Final build-8 phone installation and Watch interaction
+  remain physical-device acceptance steps; the connected phone still has build 7.
+
 - **2026-08-23** — Anchor `1.0 (6)` is assigned in internal TestFlight and
   installed on the physical iPhone; its embedded Watch companion is installed
   and enabled on the paired Apple Watch. The matching Developer ID Mac build is
@@ -124,13 +134,13 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | **Installed as 1.0 (6)**; signed Developer ID build with Production CloudKit |
-| Anchor for iOS | **Internal TestFlight 1.0 (6)** installed and physically smoke-tested |
-| Anchor for watchOS | Embedded in TestFlight 1.0 (6), installed and enabled on the paired Watch |
+| Anchor for macOS | **Installed as 1.0 (8)**; signed Developer ID build with Production CloudKit and APNs |
+| Anchor for iOS | **Internal TestFlight 1.0 (8)** assigned; build 7 remains installed pending an unlocked-device update |
+| Anchor for watchOS | Embedded in TestFlight 1.0 (8) with Production CloudKit and APNs; final physical interaction pending |
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **Internal TestFlight 1.0 (6)** assigned and installed, including Watch and Live Activity targets |
+| iOS/watchOS IPA | **Internal TestFlight 1.0 (8)** valid and assigned, including Watch and Live Activity targets |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -176,18 +186,17 @@ Open work is tracked in
 
 Known gaps carried forward:
 
-- **Production CloudKit schema is not deployed**: signed build 6 on Mac and
-  iPhone was exercised in both directions on physical hardware and did not
-  converge. Production contains only `Users`; Development must first be seeded
-  with all six Anchor model types, then the complete additive schema must be
-  reviewed and deployed before Mac–iPhone–Watch acceptance can pass.
-- **Physical Watch interaction remains pending**: the build 6 companion is
-  installed and enabled, but watchOS Developer Mode is disabled, so the app must
-  be opened on the Watch itself for final pause/end verification after schema
-  deployment.
+- **Final build-8 physical acceptance remains pending**: Production has all six
+  Anchor model types and the release now registers for APNs and reconciles
+  remote imports. Build 8 is assigned in TestFlight, but the connected iPhone is
+  locked and still runs build 7; install build 8 before the last open-app
+  Mac–iPhone pause/end round trip.
+- **Physical Watch interaction remains pending**: watchOS Developer Mode is
+  disabled, so build 8 must be opened on the Watch itself for final pause/end
+  verification.
 - **macOS App Store distribution remains unverified**: the Developer ID build is
   signed, installed, and running, but an entitlement-complete Mac App Store
   archive has not been made.
-- **DMG is signed but not notarised**. Build 1.0 (6) is available to the owner
+- **DMG is signed but not notarised**. Build 1.0 (8) is available to the owner
   through the internal `Personal Testing` group.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).
