@@ -1,3 +1,4 @@
+import CoreData
 import Foundation
 import Observation
 import SwiftData
@@ -34,6 +35,7 @@ public final class FocusController {
     private let completionNotifier: any SessionCompletionNotifying
     private let liveActivityCoordinator: any LiveActivityCoordinating
     private var ticker: Task<Void, Never>?
+    private var remoteChangeTask: Task<Void, Never>?
     private var lastMachineObservation: (sessionID: UUID, at: Date)?
     private var pendingMachineActiveSeconds: Double = 0
     private var pendingMachineAwaySeconds: Double = 0
@@ -49,6 +51,22 @@ public final class FocusController {
         self.completionNotifier = completionNotifier
         self.liveActivityCoordinator = liveActivityCoordinator
         restoreActiveSession()
+        observeRemoteStoreChanges()
+    }
+
+    /// SwiftData imports CloudKit transactions into the store independently of
+    /// this controller's concrete model reference. Re-fetch after every remote
+    /// store change so an already-open Mac, phone, or Watch reflects the state
+    /// written by another device without requiring an app relaunch.
+    private func observeRemoteStoreChanges() {
+        remoteChangeTask = Task { @MainActor [weak self] in
+            for await _ in NotificationCenter.default.notifications(
+                named: .NSPersistentStoreRemoteChange
+            ) {
+                guard !Task.isCancelled else { return }
+                self?.synchronizeActiveSessionFromStore()
+            }
+        }
     }
 
     // MARK: - Derived
