@@ -56,10 +56,9 @@ xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (watchOS)" \
 CloudKit and app-group entitlements — that is the App Store truth and must stay
 the default. `DebugLocal` drops entitlements and signing so the apps build on a
 machine that isn't registered in the developer account. `ReleaseDirect` is the
-Developer ID direct-download build behind `scripts/release-mac.sh`; it drops the
-restricted iCloud/app-group entitlements because Apple will not notarise them
-without a provisioning profile. Never "fix" a signing error by weakening `Debug`
-or `Release`.
+Developer ID direct-download build behind `scripts/release-mac.sh`; its installed
+`Anchor Developer ID` profile carries production CloudKit and app-group
+entitlements. Never "fix" a signing error by weakening `Debug` or `Release`.
 
 `Apps/Anchor.xcodeproj` is **generated** — edit `Apps/project.yml`, never the
 `.xcodeproj`, and never commit build output.

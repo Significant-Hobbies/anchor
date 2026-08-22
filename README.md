@@ -98,14 +98,9 @@ xcrun altool --upload-app -f dist/Anchor-1.0.ipa -t ios \
   --apple-id "<apple-id>" --password "<app-specific-password>"
 ```
 
-**The Mac direct-download build ships without iCloud sync.** iCloud and app
-groups are *restricted* entitlements that Apple requires to be backed by a
-provisioning profile, and minting a macOS Developer ID profile needs this Mac
-registered in the developer account. Without them the app runs against a
-local-only database, which the store was already built to fall back to.
-
-The iOS/watchOS App Store build keeps CloudKit — Store provisioning profiles can
-carry restricted entitlements, so nothing is stripped there.
+The Mac direct-download and iOS/watchOS builds use the same production CloudKit
+container. Each distribution channel has its own provisioning profile, so the
+restricted iCloud and app-group entitlements remain intact.
 
 ## Talking to your data
 

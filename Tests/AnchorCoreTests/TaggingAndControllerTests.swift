@@ -250,6 +250,38 @@ struct FocusControllerTests {
         #expect(second.parked.count == 1)
     }
 
+    @Test("A session imported after launch becomes the active timer")
+    func adoptsImportedActiveSession() throws {
+        let (controller, context) = try makeController()
+        #expect(!controller.hasSession)
+
+        let imported = FocusSession(
+            goal: nil,
+            intent: "Started on the Mac",
+            plannedSeconds: 1_500
+        )
+        context.insert(imported)
+        try context.save()
+
+        controller.synchronizeActiveSessionFromStore()
+
+        #expect(controller.session?.id == imported.id)
+        #expect(controller.isRunning)
+    }
+
+    @Test("A remotely finished session clears the active timer")
+    func clearsImportedFinishedSession() throws {
+        let (controller, context) = try makeController()
+        controller.start(goal: nil, intent: "Started on the Mac", minutes: 25)
+
+        controller.session?.state = .finished
+        controller.session?.endedAt = Date()
+        try context.save()
+        controller.synchronizeActiveSessionFromStore()
+
+        #expect(!controller.hasSession)
+    }
+
     @Test("Resuming always asks what pulled you away")
     func resumeAsksForDistraction() throws {
         let (controller, _) = try makeController()

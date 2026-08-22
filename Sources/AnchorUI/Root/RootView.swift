@@ -93,20 +93,31 @@ public struct RootView: View {
     }
 
     public var body: some View {
-        if controller.hasSession || shouldSkipOnboarding {
-            appShell
-        } else if shouldForceOnboarding || (!onboardingCompleted && sessions.isEmpty) {
-            AnchorOnboardingView { goal, minutes in
-                onboardingCompleted = true
-                _ = controller.start(goal: nil, intent: goal, minutes: minutes)
-            }
-        } else if onboardingCompleted {
-            appShell
-        } else {
-            AnchorExistingOwnerOrientationView {
-                onboardingCompleted = true
+        Group {
+            if controller.hasSession || shouldSkipOnboarding {
+                appShell
+            } else if shouldForceOnboarding || (!onboardingCompleted && sessions.isEmpty) {
+                AnchorOnboardingView { goal, minutes in
+                    onboardingCompleted = true
+                    _ = controller.start(goal: nil, intent: goal, minutes: minutes)
+                }
+            } else if onboardingCompleted {
+                appShell
+            } else {
+                AnchorExistingOwnerOrientationView {
+                    onboardingCompleted = true
+                }
             }
         }
+        .onChange(of: activeSessionSignature, initial: true) {
+            controller.synchronizeActiveSessionFromStore()
+        }
+    }
+
+    private var activeSessionSignature: [String] {
+        sessions
+            .filter(\.isActive)
+            .map { "\($0.id.uuidString):\($0.stateRaw):\($0.runningSince?.timeIntervalSince1970 ?? 0)" }
     }
 
     @ViewBuilder

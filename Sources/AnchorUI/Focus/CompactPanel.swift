@@ -40,20 +40,24 @@ public struct CompactPanel: View {
     private static let presets = [15, 25, 45, 60]
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            if controller.isCapturing {
-                CompactCapture(controller: controller)
-            } else if controller.hasSession {
-                running
-            } else {
-                idle
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                if controller.isCapturing {
+                    CompactCapture(controller: controller)
+                } else if controller.hasSession {
+                    running
+                } else {
+                    idle
+                }
 
-            Divider().overlay(theme.hairline)
-            footer
+                Divider().overlay(theme.hairline)
+                footer
+            }
+            .padding(Space.md)
         }
-        .padding(Space.md)
         .frame(width: 300)
+        .frame(maxHeight: 520)
+        .scrollBounceBehavior(.basedOnSize)
         .background(theme.canvas)
     }
 

@@ -166,18 +166,15 @@ while Pages serves `/privacy`, so the first deploy shipped canonical URLs nobody
 could visit. The layout now strips `.html` and `index.html` before building the
 canonical.
 
-## The direct-download DMG trades sync for shippability
+## The direct-download DMG keeps production CloudKit
 
 `scripts/release-mac.sh` produces a Developer ID signed, hardened-runtime DMG.
 
-It ships **without iCloud sync**, and that is forced rather than chosen: iCloud
-and app groups are *restricted* entitlements, Apple requires them to be backed by
-a provisioning profile, and minting a macOS Developer ID profile needs either this
-Mac registered in the developer account or an App Store Connect API key. Neither
-exists yet. The app falls back to a local-only database — a path `AnchorStore`
-already had — so the build is honest rather than broken. A separate
-`ReleaseDirect` configuration keeps this split explicit instead of quietly
-weakening the App Store build's entitlements.
+CloudKit and app groups are restricted entitlements, so the Developer ID build
+uses the `Anchor Developer ID` provisioning profile created through App Store
+Connect. Its CloudKit environment is Production, matching the iPhone and Watch
+TestFlight builds. `ReleaseDirect` stays separate because its signing identity
+and Sign in with Apple capabilities still differ from the App Store build.
 
 Two things the script guards, both learned by tripping over them:
 

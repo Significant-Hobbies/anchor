@@ -8,9 +8,8 @@
 # certificate and a Store provisioning profile that carries the CloudKit
 # container and the shared app group.
 #
-# Unlike the Mac direct-download build, this one keeps iCloud: App Store
-# provisioning profiles can carry restricted entitlements, so nothing has to be
-# stripped. See scripts/release-mac.sh for why the DMG differs.
+# The Mac direct-download and iPhone/Watch builds both keep iCloud. Each uses the
+# appropriate provisioning profile for its distribution channel.
 #
 # Uploading needs App Store Connect credentials, which this repo does not carry:
 #

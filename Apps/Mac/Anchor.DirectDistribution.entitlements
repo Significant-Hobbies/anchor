@@ -4,13 +4,10 @@
 <!--
   Entitlements for the Developer ID (direct download) build.
 
-  iCloud and app groups are *restricted* entitlements: Apple requires them to be
-  backed by a provisioning profile, and notarisation rejects them otherwise. This
-  build therefore ships without them, which means no cross-device sync — the
-  store falls back to a local-only database, which `AnchorStore` was already
-  built to survive.
-
-  The App Store build uses Anchor.entitlements and keeps CloudKit.
+  iCloud and app groups are restricted entitlements, so this file is paired with
+  the `Anchor Developer ID` provisioning profile. Sign in with Apple remains an
+  App Store-only entitlement; the direct build keeps Google account connection
+  and production CloudKit sync.
 -->
 <dict>
 	<key>com.apple.security.app-sandbox</key>
@@ -19,5 +16,17 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.com.significanthobbies.anchor</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.significanthobbies.anchor</string>
+	</array>
 </dict>
 </plist>

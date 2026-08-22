@@ -16,12 +16,10 @@
 #
 # then re-run with ANCHOR_NOTARY_PROFILE=anchor-notary to notarise and staple.
 #
-# Why this build has no iCloud sync: iCloud and app groups are *restricted*
-# entitlements. Apple requires them to be backed by a provisioning profile, and
-# minting a macOS Developer ID profile needs either this Mac registered in the
-# developer account or an App Store Connect API key. The direct-download build
-# therefore ships without them and runs against a local-only database, which the
-# store was already designed to fall back to. The App Store build keeps CloudKit.
+# iCloud and app groups are restricted entitlements. `ReleaseDirect` pairs them
+# with the installed `Anchor Developer ID` provisioning profile so the normal
+# direct-download app uses the same production CloudKit container as iPhone and
+# Watch.
 
 set -euo pipefail
 
@@ -71,6 +69,10 @@ cat > "$BUILD_DIR/ExportOptions.plist" <<PLIST
 	<key>method</key><string>developer-id</string>
 	<key>signingStyle</key><string>manual</string>
 	<key>teamID</key><string>8F7LXHTJZR</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.significanthobbies.anchor</key><string>Anchor Developer ID</string>
+	</dict>
 </dict>
 </plist>
 PLIST
@@ -109,6 +111,22 @@ sys.exit(1 if entitlements.get("get-task-allow") else 0)
   exit 1
 fi
 echo "   debug entitlements: none"
+
+# Direct distribution must keep production CloudKit; otherwise the Mac and
+# TestFlight Watch silently operate on different stores.
+codesign -d --entitlements :- "$APP" 2>/dev/null | python3 -c '
+import sys, plistlib
+raw = sys.stdin.buffer.read()
+start = raw.find(b"<?xml")
+e = plistlib.loads(raw[start:]) if start >= 0 else {}
+problems = []
+if not e.get("com.apple.developer.icloud-services"): problems.append("iCloud services missing")
+if not e.get("com.apple.developer.icloud-container-identifiers"): problems.append("iCloud container missing")
+if not e.get("com.apple.security.application-groups"): problems.append("app group missing")
+for problem in problems: print("   x", problem)
+if not problems: print("   production CloudKit entitlements: ok")
+sys.exit(1 if problems else 0)
+'
 
 echo "==> Packaging DMG"
 cp -R "$APP" "$STAGE/Anchor.app"

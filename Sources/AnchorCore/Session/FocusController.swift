@@ -68,6 +68,47 @@ public final class FocusController {
     /// running keeps running — wall-clock timing means the elapsed count is
     /// still correct even if the app was closed for an hour.
     private func restoreActiveSession() {
+        session = fetchLatestActiveSession()
+        if session != nil {
+            scheduleCompletionNotification()
+            refresh(at: Date())
+            startTicking()
+        }
+    }
+
+    /// Reconcile the controller after SwiftData imports a change from CloudKit.
+    ///
+    /// A `@Query` sees imported records, but the controller deliberately owns a
+    /// concrete active session. Without this bridge, a session created on another
+    /// device can exist in the store while the timer surface still says idle.
+    public func synchronizeActiveSessionFromStore() {
+        let imported = fetchLatestActiveSession()
+
+        if session?.id != imported?.id {
+            if let previous = session {
+                completionNotifier.cancel(sessionID: previous.id)
+            }
+            session = imported
+            resetMachineObservation()
+        }
+
+        guard let session else {
+            stopTicking()
+            return
+        }
+
+        if session.state == .running {
+            scheduleCompletionNotification()
+            refresh(at: Date())
+            startTicking()
+        } else {
+            completionNotifier.cancel(sessionID: session.id)
+            stopTicking()
+            refresh(at: Date())
+        }
+    }
+
+    private func fetchLatestActiveSession() -> FocusSession? {
         let running = SessionState.running.rawValue
         let paused = SessionState.paused.rawValue
         var descriptor = FetchDescriptor<FocusSession>(
@@ -75,12 +116,7 @@ public final class FocusController {
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
         )
         descriptor.fetchLimit = 1
-        session = (try? context.fetch(descriptor))?.first
-        if session != nil {
-            scheduleCompletionNotification()
-            refresh(at: Date())
-            startTicking()
-        }
+        return (try? context.fetch(descriptor))?.first
     }
 
     // MARK: - Commands
