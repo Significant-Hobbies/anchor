@@ -30,7 +30,7 @@ struct AnchorMacApp: App {
     var body: some Scene {
         // Identified so the menu-bar panel can raise it with `openWindow(id:)`.
         WindowGroup(id: "main") {
-            RootView(controller: world.controller)
+            RootView(controller: world.controller, storeKind: world.storeKind)
                 .anchorTheme()
                 .environment(\.anchorPlatformSync, platform)
                 .task { await platform.restoreAndSynchronize() }

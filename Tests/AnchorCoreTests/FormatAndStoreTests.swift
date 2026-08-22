@@ -73,6 +73,14 @@ struct AnchorStoreTests {
         #expect(AnchorStore.cloudKitIdentifier == "iCloud.com.significanthobbies.anchor")
     }
 
+    @Test("Persistent storage explicitly selects Anchor's CloudKit container")
+    func persistentConfiguration() {
+        let configuration = AnchorStore.configuration(kind: .persistent)
+        #expect(configuration.cloudKitContainerIdentifier == AnchorStore.cloudKitIdentifier)
+        #expect(AnchorStore.StoreKind.persistent.storageDescription == "SwiftData, iCloud sync configured")
+        #expect(AnchorStore.StoreKind.localOnly.storageDescription == "SwiftData, stored only on this device")
+    }
+
     @Test("The store path always lands on a writable directory")
     func storeURLIsWritable() {
         let url = AnchorStore.storeURL()

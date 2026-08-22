@@ -17,7 +17,7 @@ struct AnchorIOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(controller: world.controller)
+            RootView(controller: world.controller, storeKind: world.storeKind)
                 .anchorTheme()
                 .environment(\.anchorPlatformSync, platform)
                 .task { await platform.restoreAndSynchronize() }
