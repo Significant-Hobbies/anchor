@@ -35,7 +35,8 @@ public final class FocusController {
     private let liveActivityCoordinator: any LiveActivityCoordinating
     private var ticker: Task<Void, Never>?
     private var lastMachineObservation: (sessionID: UUID, at: Date)?
-    private var unsavedMachineSeconds: Double = 0
+    private var pendingMachineActiveSeconds: Double = 0
+    private var pendingMachineAwaySeconds: Double = 0
 
     public init(
         context: ModelContext,
@@ -176,7 +177,7 @@ public final class FocusController {
         session.apply(account)
         session.state = .paused
         session.pausedAt = now
-        resetMachineObservation(saving: true)
+        commitMachineObservation(to: session)
         completionNotifier.cancel(sessionID: session.id)
         save()
         refreshNow()
@@ -260,7 +261,7 @@ public final class FocusController {
         if cancelNotification {
             completionNotifier.cancel(sessionID: session.id)
         }
-        resetMachineObservation(saving: true)
+        commitMachineObservation(to: session)
         self.session = nil
         save()
         stopTicking()
@@ -330,13 +331,11 @@ public final class FocusController {
         let interval = timestamp.timeIntervalSince(previous.at)
         guard interval > 0 else { return }
         let away = min(interval, max(0, idleSeconds))
-        session.computerAwaySeconds += away
-        session.computerActiveSeconds += max(0, interval - away)
-        unsavedMachineSeconds += interval
-        if unsavedMachineSeconds >= 60 {
-            save()
-            unsavedMachineSeconds = 0
-        }
+        // Keep presence samples transient while the timer is running. Saving
+        // the whole FocusSession every minute can overwrite a newer pause/end
+        // imported from iPhone or Watch before CloudKit delivers it.
+        pendingMachineAwaySeconds += away
+        pendingMachineActiveSeconds += max(0, interval - away)
     }
 
     // MARK: - Tagging (on-device)
@@ -418,10 +417,16 @@ public final class FocusController {
         )
     }
 
-    private func resetMachineObservation(saving: Bool = false) {
+    private func commitMachineObservation(to session: FocusSession) {
+        session.computerActiveSeconds += pendingMachineActiveSeconds
+        session.computerAwaySeconds += pendingMachineAwaySeconds
+        resetMachineObservation()
+    }
+
+    private func resetMachineObservation() {
         lastMachineObservation = nil
-        if saving, unsavedMachineSeconds > 0 { save() }
-        unsavedMachineSeconds = 0
+        pendingMachineActiveSeconds = 0
+        pendingMachineAwaySeconds = 0
     }
 
     private func save() {
