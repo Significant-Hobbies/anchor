@@ -38,8 +38,10 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
   activity and cleans up stale ones. The primary iPhone start action now sits
   in a safe-area inset above the floating tab bar. The slice passes 111 shared
   tests, the tab-bar-clearance UI journey, Xcode 26.6 iPhone builds, and Xcode
-  27 Mac/watch builds. Physical iPhone verification and TestFlight upload remain
-  before the issue can close.
+  27 Mac/watch builds. Physical iPhone verification covered start, Dynamic
+  Island presentation, deep-link return, pause/resume, matching frozen time,
+  and end. The personal-team App Store archive was accepted by App Store
+  Connect and is processing as `1.0 (5)`; internal TestFlight assignment remains.
 
 - **2026-08-23** — Removed the `site/` landing fork. Its `wrangler.toml`
   declared `name = "anchor-landing"` — the Cloudflare Pages project the shared
@@ -116,7 +118,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **Internal TestFlight available** for 1.0 (2) in `Personal Testing`; owner invited and automatic distribution enabled |
+| iOS/watchOS IPA | **Internal TestFlight available** for 1.0 (2); personal-team 1.0 (5), including Watch and Live Activity targets, uploaded and processing |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
