@@ -46,7 +46,7 @@ struct AnchorLiveActivityWidget: Widget {
 
 /// Renders the live time text from wall-clock dates. Planned sessions count
 /// down to `plannedCompletionDate`; open-ended sessions count up from the run
-/// start; paused sessions freeze at banked time.
+/// start; paused sessions freeze at the same value shown inside Anchor.
 @ViewBuilder
 private func liveTimeText(for state: LiveActivitySnapshot) -> some View {
     if state.isOpenEnded, let start = state.elapsedReferenceDate {
@@ -56,7 +56,7 @@ private func liveTimeText(for state: LiveActivitySnapshot) -> some View {
         Text(timerInterval: Date()...completion, countsDown: true)
             .monospacedDigit()
     } else {
-        Text(Format.clock(state.bankedSeconds))
+        Text(Format.clock(state.frozenDisplaySeconds))
             .monospacedDigit()
     }
 }

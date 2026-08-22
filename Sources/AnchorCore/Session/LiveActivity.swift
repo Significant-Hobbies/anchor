@@ -57,6 +57,14 @@ public struct LiveActivitySnapshot: Equatable, Hashable, Sendable, Codable {
     public var elapsedReferenceDate: Date? {
         runningSince?.addingTimeInterval(-bankedSeconds)
     }
+
+    /// The value a non-running Live Activity should display. Planned sessions
+    /// freeze on remaining time; open-ended sessions freeze on elapsed time.
+    public var frozenDisplaySeconds: Double {
+        isOpenEnded
+            ? bankedSeconds
+            : max(0, Double(plannedSeconds) - bankedSeconds)
+    }
 }
 
 /// Keeps Live Activity lifecycle outside the session state machine, mirroring
