@@ -1,5 +1,0 @@
-# Cloudflare Pages project for anchor.significanthobbies.com.
-# Astro output from this folder. Do not deploy without explicit approval.
-name = "anchor-landing"
-compatibility_date = "2026-08-16"
-pages_build_output_dir = "dist"
