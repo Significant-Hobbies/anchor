@@ -2,6 +2,7 @@ import AnchorCore
 import AnchorUI
 import SwiftData
 import SwiftUI
+import UIKit
 
 /// The iOS app. Same screens, same store, native shell.
 @main
@@ -20,7 +21,10 @@ struct AnchorIOSApp: App {
             RootView(controller: world.controller, storeKind: world.storeKind)
                 .anchorTheme()
                 .environment(\.anchorPlatformSync, platform)
-                .task { await platform.restoreAndSynchronize() }
+                .task {
+                    UIApplication.shared.registerForRemoteNotifications()
+                    await platform.restoreAndSynchronize()
+                }
         }
         .modelContainer(world.container)
     }

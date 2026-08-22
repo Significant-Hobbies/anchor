@@ -33,7 +33,12 @@ struct AnchorMacApp: App {
             RootView(controller: world.controller, storeKind: world.storeKind)
                 .anchorTheme()
                 .environment(\.anchorPlatformSync, platform)
-                .task { await platform.restoreAndSynchronize() }
+                .task {
+                    // Register after launch so SwiftData's CloudKit mirror can
+                    // receive silent pushes while the Mac app stays open.
+                    NSApplication.shared.registerForRemoteNotifications()
+                    await platform.restoreAndSynchronize()
+                }
                 .frame(minWidth: 720, minHeight: 560)
         }
         .modelContainer(world.container)

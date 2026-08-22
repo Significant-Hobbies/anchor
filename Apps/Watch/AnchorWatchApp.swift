@@ -2,17 +2,25 @@ import AnchorCore
 import AnchorUI
 import SwiftData
 import SwiftUI
+import WatchKit
 
 /// The watch app. Shares the same CloudKit-backed store as the phone and Mac,
 /// so a session started anywhere is the session you see here.
 @main
 struct AnchorWatchApp: App {
-    @State private var world = AnchorWatchWorld()
+    @State private var world: AnchorWatchWorld
+
+    init() {
+        _world = State(initialValue: AnchorWatchWorld())
+    }
 
     var body: some Scene {
         WindowGroup {
             WatchRootView(controller: world.controller)
                 .anchorTheme()
+                .task {
+                    WKApplication.shared().registerForRemoteNotifications()
+                }
         }
         .modelContainer(world.container)
     }
