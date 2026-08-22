@@ -31,6 +31,13 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-22** — added an interruption-first Mac/iPhone onboarding: an
+  explicitly ephemeral park-and-return rehearsal, platform-specific capture
+  guidance, real-session handoff through `FocusController`, existing-session
+  precedence, existing-owner orientation, Reduce Motion, and privacy education.
+  The rehearsal has no SwiftData or sync representation, so practice notes
+  cannot enter history, exports, CloudKit, or Personal Platform.
+
 - **2026-08-22** — Apple completed processing Anchor for iOS 1.0 (2) from an
   Xcode 27 Beta 5 personal-team archive. The signed IPA retains CloudKit and the
   shared app group and embeds the Watch app; the build still needs internal

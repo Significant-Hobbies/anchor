@@ -204,11 +204,27 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.ui-tests
         GENERATE_INFOPLIST_FILE: YES
 
+  AnchorMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: Tests/AnchorMacUITests
+    dependencies:
+      - target: AnchorMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.mac-ui-tests
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   Anchor (macOS):
     build:
       targets:
         AnchorMac: all
+        AnchorMacUITests: [test]
+    test:
+      targets:
+        - AnchorMacUITests
     run:
       config: Debug
   Anchor (iOS):
