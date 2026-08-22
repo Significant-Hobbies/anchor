@@ -420,13 +420,18 @@ struct FocusControllerTests {
         #expect(notifier.cancelled == [session.id, session.id])
     }
 
-    @Test("Machine presence stores aggregate active and away time only")
+    @Test("Machine presence stays transient until the local timer changes state")
     func machinePresence() throws {
         let (controller, _) = try makeController()
         controller.start(goal: nil, intent: "Work", minutes: 25)
         let start = Date(timeIntervalSince1970: 20_000)
         controller.observeMachineIdle(seconds: 0, at: start)
         controller.observeMachineIdle(seconds: 3, at: start.addingTimeInterval(10))
+
+        #expect(controller.session?.computerActiveSeconds == 0)
+        #expect(controller.session?.computerAwaySeconds == 0)
+
+        controller.pause()
         #expect(controller.session?.computerActiveSeconds == 7)
         #expect(controller.session?.computerAwaySeconds == 3)
     }
