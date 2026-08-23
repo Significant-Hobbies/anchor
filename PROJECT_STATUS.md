@@ -134,13 +134,13 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | **Installed as 1.0 (8)**; signed Developer ID build with Production CloudKit and APNs |
-| Anchor for iOS | **Internal TestFlight 1.0 (8)** assigned; build 7 remains installed pending an unlocked-device update |
-| Anchor for watchOS | Embedded in TestFlight 1.0 (8) with Production CloudKit and APNs; final physical interaction pending |
+| Anchor for macOS | **Installed as 1.0 (9)**; signed Developer ID build with Production CloudKit and APNs |
+| Anchor for iOS | **App Store Connect 1.0 (9) valid**; internal TestFlight assignment and unlocked-device update pending |
+| Anchor for watchOS | Embedded in valid build 1.0 (9) with Production CloudKit and APNs; TestFlight assignment and final physical interaction pending |
 | `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **Internal TestFlight 1.0 (8)** valid and assigned, including Watch and Live Activity targets |
+| iOS/watchOS IPA | **App Store Connect 1.0 (9) valid**, including Watch and Live Activity targets; internal-group assignment pending |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -186,17 +186,17 @@ Open work is tracked in
 
 Known gaps carried forward:
 
-- **Final build-8 physical acceptance remains pending**: Production has all six
+- **Final build-9 physical acceptance remains pending**: Production has all six
   Anchor model types and the release now registers for APNs and reconciles
-  remote imports. Build 8 is assigned in TestFlight, but the connected iPhone is
-  locked and still runs build 7; install build 8 before the last open-app
+  remote imports. Build 9 is valid in App Store Connect, but TestFlight group
+  assignment is not yet confirmed and the connected iPhone is locked; install build 9 before the last open-app
   Mac–iPhone pause/end round trip.
 - **Physical Watch interaction remains pending**: watchOS Developer Mode is
-  disabled, so build 8 must be opened on the Watch itself for final pause/end
+  disabled, so build 9 must be opened on the Watch itself for final pause/end
   verification.
 - **macOS App Store distribution remains unverified**: the Developer ID build is
   signed, installed, and running, but an entitlement-complete Mac App Store
   archive has not been made.
-- **DMG is signed but not notarised**. Build 1.0 (8) is available to the owner
-  through the internal `Personal Testing` group.
+- **DMG is signed but not notarised**. Build 1.0 (9) is valid in App Store
+  Connect; internal `Personal Testing` assignment remains to be confirmed.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).
