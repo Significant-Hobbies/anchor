@@ -81,6 +81,15 @@ struct AnchorStoreTests {
         #expect(AnchorStore.StoreKind.localOnly.storageDescription == "SwiftData, stored only on this device")
     }
 
+    @Test("Explicit local paths never attempt CloudKit")
+    func explicitStorePathSelection() {
+        #expect(AnchorStore.resilientStoreKinds(hasExplicitStorePath: true) == [.localOnly, .inMemory])
+        #expect(
+            AnchorStore.resilientStoreKinds(hasExplicitStorePath: false)
+                == [.persistent, .localOnly, .inMemory]
+        )
+    }
+
     @Test("The store path always lands on a writable directory")
     func storeURLIsWritable() {
         let url = AnchorStore.storeURL()

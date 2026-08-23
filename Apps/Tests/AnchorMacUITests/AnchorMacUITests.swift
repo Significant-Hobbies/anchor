@@ -27,4 +27,21 @@ final class AnchorMacUITests: XCTestCase {
                 .waitForExistence(timeout: 2)
         )
     }
+
+    @MainActor
+    func testSettingsKeepsLocalMCPSetupOnMac() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] =
+            FileManager.default.temporaryDirectory
+                .appendingPathComponent("anchor-mac-settings-\(UUID().uuidString).store")
+                .path
+        app.launch()
+
+        app.buttons["Settings"].click()
+
+        XCTAssertTrue(app.staticTexts["Private Hub sync"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Talk to your data"].exists)
+        XCTAssertTrue(app.staticTexts["Database"].exists)
+    }
 }
