@@ -21,7 +21,7 @@ public enum AnchorStore {
     /// CloudKit container backing cross-device sync.
     public static let cloudKitIdentifier = "iCloud.com.significanthobbies.anchor"
 
-    public enum StoreKind: Sendable {
+    public enum StoreKind: Equatable, Sendable {
         /// On disk, synced through CloudKit when entitlements allow it.
         case persistent
         /// On disk, never synced. Used when the user turns sync off.
@@ -73,13 +73,26 @@ public enum AnchorStore {
     /// memory. The app stays usable even when iCloud is misconfigured — losing
     /// sync should never mean losing the ability to start a timer.
     public static func makeResilientContainer() -> (container: ModelContainer, kind: StoreKind) {
-        for kind in [StoreKind.persistent, .localOnly, .inMemory] {
+        for kind in resilientStoreKinds(
+            hasExplicitStorePath: ProcessInfo.processInfo.environment["ANCHOR_STORE_PATH"]?.isEmpty == false
+        ) {
             if let container = try? makeContainer(kind: kind) {
                 return (container, kind)
             }
         }
         // If even in-memory fails the process is unrecoverable.
         fatalError("Anchor could not open any model container.")
+    }
+
+    /// An explicit path is used by UI tests and local tools that deliberately
+    /// operate outside the signed app container. Do not ask CloudKit to mirror
+    /// those stores: Core Data can terminate asynchronously when the process
+    /// does not carry the production iCloud entitlement, which cannot be caught
+    /// by the container-construction fallback above.
+    public static func resilientStoreKinds(hasExplicitStorePath: Bool) -> [StoreKind] {
+        hasExplicitStorePath
+            ? [.localOnly, .inMemory]
+            : [.persistent, .localOnly, .inMemory]
     }
 
     /// Where the database lives.

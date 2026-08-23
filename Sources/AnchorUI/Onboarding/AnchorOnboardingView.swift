@@ -95,7 +95,7 @@ public struct AnchorOnboardingView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(trimmedGoal.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
-            Text("This is a labelled rehearsal. It creates no session, history, analytics, export, CloudKit record, or account sync.")
+            Text("This is a labelled rehearsal. It creates no session, history, analytics, export, or synced copy.")
                 .font(.footnote)
                 .foregroundStyle(theme.textTertiary)
                 .multilineTextAlignment(.center)

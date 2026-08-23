@@ -9,8 +9,6 @@ import SwiftUI
 
 #if os(macOS)
 import AppKit
-#else
-import UIKit
 #endif
 
 /// Small on purpose: what the app is doing with your data, and how to point an
@@ -21,13 +19,16 @@ public struct SettingsScreen: View {
     @Environment(\.anchorPlatformSync) private var platform
     @Query private var goals: [Goal]
     @Query(sort: \Project.createdAt) private var projects: [Project]
+    #if os(macOS)
     @State private var didCopy = false
+    #endif
     private let storeKind: AnchorStore.StoreKind
 
     public init(storeKind: AnchorStore.StoreKind = .persistent) {
         self.storeKind = storeKind
     }
 
+    #if os(macOS)
     private var mcpCommand: String {
         "codex mcp add anchor -- \(mcpBinaryPath)"
     }
@@ -37,6 +38,7 @@ public struct SettingsScreen: View {
         Bundle.main.url(forAuxiliaryExecutable: "anchor-mcp")?.path
             ?? Bundle.main.bundleURL.appending(path: "Contents/MacOS/anchor-mcp").path
     }
+    #endif
 
     public var body: some View {
         ScrollView {
@@ -101,8 +103,8 @@ public struct SettingsScreen: View {
                     Card {
                         VStack(alignment: .leading, spacing: Space.sm) {
                             SectionHeader(
-                                "Personal Platform",
-                                subtitle: "Session totals sync; distraction notes stay on this device"
+                                "Private Hub sync",
+                                subtitle: "Finished session totals sync; distraction notes stay on this device"
                             )
                             if account.isSignedIn {
                                 Label(
@@ -139,7 +141,7 @@ public struct SettingsScreen: View {
                             }
                             Text(
                                 platform.message ?? account.errorMessage
-                                    ?? "Anchor remains fully usable offline. Only goal, timing, outcome, and interruption count enter Cloudflare."
+                                    ?? "Anchor remains fully usable offline. When connected, finished session totals appear in your private Significant Hobbies Hub."
                             )
                             .font(.system(size: 11))
                             .foregroundStyle(theme.textTertiary)
@@ -152,10 +154,13 @@ public struct SettingsScreen: View {
                     VStack(alignment: .leading, spacing: Space.sm) {
                         SectionHeader("Storage", subtitle: storeKind.storageDescription)
                         labelled("Goals", "\(goals.count)")
+                        #if os(macOS)
                         labelled("Database", AnchorStore.storeURL().path)
+                        #endif
                     }
                 }
 
+                #if os(macOS)
                 Card {
                     VStack(alignment: .leading, spacing: Space.sm) {
                         SectionHeader("Talk to your data", subtitle: "Anchor ships an MCP server")
@@ -180,6 +185,7 @@ public struct SettingsScreen: View {
                         .buttonStyle(QuietButtonStyle(expands: false))
                     }
                 }
+                #endif
             }
             .padding(Space.lg)
             .frame(maxWidth: 680)
@@ -203,19 +209,17 @@ public struct SettingsScreen: View {
         }
     }
 
+    #if os(macOS)
     private func copy(_ text: String) {
-        #if os(macOS)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        #else
-        UIPasteboard.general.string = text
-        #endif
         didCopy = true
         Task {
             try? await Task.sleep(for: .seconds(2))
             didCopy = false
         }
     }
+    #endif
 }
 
 private struct ProjectBillingRow: View {
