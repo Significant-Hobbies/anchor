@@ -13,7 +13,7 @@ public struct AnchorOnboardingView: View {
     @State private var minutes = 25
     @FocusState private var focusedField: Field?
 
-    private let isReplay: Bool
+    private let isExistingOwnerOrientation: Bool
     private let onStartRealSession: (String, Int) -> Void
     private let onOpenApp: () -> Void
 
@@ -23,11 +23,11 @@ public struct AnchorOnboardingView: View {
     }
 
     public init(
-        isReplay: Bool = false,
+        isExistingOwnerOrientation: Bool = false,
         onStartRealSession: @escaping (String, Int) -> Void,
         onOpenApp: @escaping () -> Void = {}
     ) {
-        self.isReplay = isReplay
+        self.isExistingOwnerOrientation = isExistingOwnerOrientation
         self.onStartRealSession = onStartRealSession
         self.onOpenApp = onOpenApp
     }
@@ -109,7 +109,7 @@ public struct AnchorOnboardingView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(trimmedGoal.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
-            Button(isReplay ? "Return to Anchor" : "Open Anchor first") { onOpenApp() }
+            Button(isExistingOwnerOrientation ? "Return to Anchor" : "Open Anchor first") { onOpenApp() }
                 .buttonStyle(QuietButtonStyle())
             Text("This is a labelled rehearsal. It creates no session, history, analytics, export, or synced copy.")
                 .font(.footnote)
@@ -228,7 +228,7 @@ public struct AnchorOnboardingView: View {
                 Button("Begin real focus") { complete() }
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.return, modifiers: .command)
-                if isReplay {
+                if isExistingOwnerOrientation {
                     Button("Return without starting") { onOpenApp() }
                         .buttonStyle(QuietButtonStyle())
                 }
@@ -314,35 +314,4 @@ public struct AnchorOnboardingView: View {
     }
 }
 
-public struct AnchorExistingOwnerOrientationView: View {
-    @Environment(\.anchorTheme) private var theme
-    private let onContinue: () -> Void
-
-    public init(onContinue: @escaping () -> Void) {
-        self.onContinue = onContinue
-    }
-
-    public var body: some View {
-        VStack(spacing: Space.lg) {
-            Image(systemName: "scope").font(.largeTitle).foregroundStyle(theme.accent)
-            Text("Anchor is ready here.")
-                .font(.largeTitle.weight(.semibold))
-                .foregroundStyle(theme.textPrimary)
-            Text("Your existing sessions take precedence. The same focus, pause, and park controls are available on this device.")
-                .font(.body).foregroundStyle(theme.textSecondary).multilineTextAlignment(.center)
-            #if os(macOS)
-            Text("Press ⌘⇧L to park a distraction. The menu bar keeps the timer reachable.")
-                .font(.footnote).foregroundStyle(theme.textTertiary).multilineTextAlignment(.center)
-            #else
-            Text("Tap Lock a distraction during a session. A paired Watch acts as a remote.")
-                .font(.footnote).foregroundStyle(theme.textTertiary).multilineTextAlignment(.center)
-            #endif
-            Button("Continue") { onContinue() }.buttonStyle(PrimaryButtonStyle())
-        }
-        .padding(Space.xl)
-        .frame(maxWidth: 560, maxHeight: .infinity)
-        .frame(maxWidth: .infinity)
-        .background(theme.canvas)
-    }
-}
 #endif

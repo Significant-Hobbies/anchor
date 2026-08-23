@@ -82,8 +82,7 @@ public struct RootView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
-    @AppStorage("anchor.onboarding.completed.v1") private var onboardingCompleted = false
-    @AppStorage("anchor.onboarding.replay-requested.v1") private var onboardingReplayRequested = false
+    @AppStorage("anchor.illustrated-onboarding.seen.v1") private var illustratedOnboardingSeen = false
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
     @State private var tab: AnchorTab = .focus
@@ -103,21 +102,15 @@ public struct RootView: View {
         Group {
             if controller.hasSession || shouldSkipOnboarding {
                 appShell
-            } else if shouldForceOnboarding || onboardingReplayRequested || (!onboardingCompleted && sessions.isEmpty) {
-                AnchorOnboardingView(isReplay: onboardingReplayRequested) { goal, minutes in
-                    onboardingCompleted = true
-                    onboardingReplayRequested = false
+            } else if shouldForceOnboarding || !illustratedOnboardingSeen {
+                AnchorOnboardingView(isExistingOwnerOrientation: !sessions.isEmpty) { goal, minutes in
+                    illustratedOnboardingSeen = true
                     _ = controller.start(goal: nil, intent: goal, minutes: minutes)
                 } onOpenApp: {
-                    onboardingCompleted = true
-                    onboardingReplayRequested = false
+                    illustratedOnboardingSeen = true
                 }
-            } else if onboardingCompleted {
-                appShell
             } else {
-                AnchorExistingOwnerOrientationView {
-                    onboardingCompleted = true
-                }
+                appShell
             }
         }
         .onChange(of: activeSessionSignature, initial: true) {
