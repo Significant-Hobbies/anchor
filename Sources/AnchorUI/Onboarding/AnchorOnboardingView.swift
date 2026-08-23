@@ -191,7 +191,8 @@ public struct AnchorOnboardingView: View {
 
             VStack(alignment: .leading, spacing: Space.sm) {
                 Label("Apple Intelligence groups locally when available; built-in rules work without it.", systemImage: "apple.intelligence")
-                Label("Optional account sync sends session totals, never distraction notes.", systemImage: "icloud")
+                Label("iCloud keeps your Anchor data available on your Mac, iPhone, and Apple Watch.", systemImage: "icloud")
+                Label("Significant Hobbies Hub is optional and receives only finished session summaries — never distraction notes.", systemImage: "person.crop.circle.badge.checkmark")
                 Label("Apple Watch is a remote for start, pause, and capture — no second setup flow.", systemImage: "applewatch")
             }
             .font(.footnote)

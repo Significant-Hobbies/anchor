@@ -77,8 +77,8 @@ struct AnchorStoreTests {
     func persistentConfiguration() {
         let configuration = AnchorStore.configuration(kind: .persistent)
         #expect(configuration.cloudKitContainerIdentifier == AnchorStore.cloudKitIdentifier)
-        #expect(AnchorStore.StoreKind.persistent.storageDescription == "SwiftData, iCloud sync configured")
-        #expect(AnchorStore.StoreKind.localOnly.storageDescription == "SwiftData, stored only on this device")
+        #expect(AnchorStore.StoreKind.persistent.storageDescription == "On this device, with iCloud continuity")
+        #expect(AnchorStore.StoreKind.localOnly.storageDescription == "Stored only on this device")
     }
 
     @Test("Explicit local paths never attempt CloudKit")

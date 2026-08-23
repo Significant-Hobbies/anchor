@@ -40,7 +40,7 @@ final class AnchorMacUITests: XCTestCase {
 
         app.buttons["Settings"].click()
 
-        XCTAssertTrue(app.staticTexts["Private Hub sync"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Significant Hobbies Hub"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["Talk to your data"].exists)
         XCTAssertTrue(app.staticTexts["Database"].exists)
     }
