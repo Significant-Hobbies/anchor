@@ -13,15 +13,23 @@ public struct AnchorOnboardingView: View {
     @State private var minutes = 25
     @FocusState private var focusedField: Field?
 
+    private let isReplay: Bool
     private let onStartRealSession: (String, Int) -> Void
+    private let onOpenApp: () -> Void
 
     private enum Field: Hashable {
         case goal
         case thought
     }
 
-    public init(onStartRealSession: @escaping (String, Int) -> Void) {
+    public init(
+        isReplay: Bool = false,
+        onStartRealSession: @escaping (String, Int) -> Void,
+        onOpenApp: @escaping () -> Void = {}
+    ) {
+        self.isReplay = isReplay
         self.onStartRealSession = onStartRealSession
+        self.onOpenApp = onOpenApp
     }
 
     public var body: some View {
@@ -65,6 +73,12 @@ public struct AnchorOnboardingView: View {
     private var goalStep: some View {
         VStack(spacing: Space.lg) {
             mark
+            Image("AnchorOnboarding")
+                .resizable()
+                .scaledToFit()
+                .frame(maxHeight: 220)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("A hand-drawn figure anchors a focus clock and parks a ringing interruption.")
             VStack(spacing: Space.xs) {
                 Text("Protect one thing.")
                     .font(.largeTitle.weight(.semibold))
@@ -95,6 +109,8 @@ public struct AnchorOnboardingView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(trimmedGoal.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
+            Button(isReplay ? "Return to Anchor" : "Open Anchor first") { onOpenApp() }
+                .buttonStyle(QuietButtonStyle())
             Text("This is a labelled rehearsal. It creates no session, history, analytics, export, or synced copy.")
                 .font(.footnote)
                 .foregroundStyle(theme.textTertiary)
@@ -212,6 +228,10 @@ public struct AnchorOnboardingView: View {
                 Button("Begin real focus") { complete() }
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.return, modifiers: .command)
+                if isReplay {
+                    Button("Return without starting") { onOpenApp() }
+                        .buttonStyle(QuietButtonStyle())
+                }
                 Button("Practice once more") {
                     thought = ""
                     rehearsal.practiceAgain()

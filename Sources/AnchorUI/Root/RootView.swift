@@ -83,6 +83,7 @@ public struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @AppStorage("anchor.onboarding.completed.v1") private var onboardingCompleted = false
+    @AppStorage("anchor.onboarding.replay-requested.v1") private var onboardingReplayRequested = false
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
     @State private var tab: AnchorTab = .focus
@@ -102,10 +103,14 @@ public struct RootView: View {
         Group {
             if controller.hasSession || shouldSkipOnboarding {
                 appShell
-            } else if shouldForceOnboarding || (!onboardingCompleted && sessions.isEmpty) {
-                AnchorOnboardingView { goal, minutes in
+            } else if shouldForceOnboarding || onboardingReplayRequested || (!onboardingCompleted && sessions.isEmpty) {
+                AnchorOnboardingView(isReplay: onboardingReplayRequested) { goal, minutes in
                     onboardingCompleted = true
+                    onboardingReplayRequested = false
                     _ = controller.start(goal: nil, intent: goal, minutes: minutes)
+                } onOpenApp: {
+                    onboardingCompleted = true
+                    onboardingReplayRequested = false
                 }
             } else if onboardingCompleted {
                 appShell
