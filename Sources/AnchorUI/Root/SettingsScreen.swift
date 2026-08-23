@@ -19,6 +19,7 @@ public struct SettingsScreen: View {
     @Environment(\.anchorPlatformSync) private var platform
     @Query private var goals: [Goal]
     @Query(sort: \Project.createdAt) private var projects: [Project]
+    @AppStorage("anchor.onboarding.replay-requested.v1") private var onboardingReplayRequested = false
     #if os(macOS)
     @State private var didCopy = false
     #endif
@@ -183,6 +184,13 @@ public struct SettingsScreen: View {
                         #endif
                     }
                 }
+
+                Button {
+                    onboardingReplayRequested = true
+                } label: {
+                    Label("Replay onboarding", systemImage: "sparkles")
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
 
                 #if os(macOS)
                 Card {
