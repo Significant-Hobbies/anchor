@@ -31,9 +31,9 @@ public enum AnchorStore {
 
         public var storageDescription: String {
             switch self {
-            case .persistent: "SwiftData, iCloud sync configured"
-            case .localOnly: "SwiftData, stored only on this device"
-            case .inMemory: "Temporary in-memory storage"
+            case .persistent: "On this device, with iCloud continuity"
+            case .localOnly: "Stored only on this device"
+            case .inMemory: "Temporary storage"
             }
         }
     }

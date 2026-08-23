@@ -24,8 +24,8 @@ distraction text always stays on your device.
   (`⌘0`). Start, pause, resume, capture and end without opening the main window.
 - **Apple Watch** as a remote: start, pause, and catch the interruption at the
   moment it happens without picking anything up.
-- **Sync** through your own private iCloud database, plus optional Personal
-  Platform session totals after you connect Significant Hobbies.
+- **Sync** through your own private iCloud database, plus optional Significant
+  Hobbies Hub session summaries after you connect.
 - **On-device tagging** — Apple Intelligence sorts goals into themes and
   distractions into categories, so analytics work without you tagging anything.
 - **Analytics** — where your hours and billable value go, what interrupts you,
@@ -145,5 +145,6 @@ Tests/            87 tests, no Xcode required
 Distraction notes are the most personal thing in the app, so they never leave the
 device. Tagging and summarising run against Apple's on-device model. SwiftData
 and private CloudKit remain local-first storage. If you explicitly connect
-Significant Hobbies, Anchor also sends only the goal, timing, outcome, and
-interruption count to Personal Platform. There is no analytics SDK.
+Significant Hobbies, Anchor also sends only the goal, start and end times,
+focused duration, outcome, and interruption count to your private Significant
+Hobbies Hub. There is no analytics SDK.

@@ -103,21 +103,40 @@ public struct SettingsScreen: View {
                     Card {
                         VStack(alignment: .leading, spacing: Space.sm) {
                             SectionHeader(
-                                "Private Hub sync",
-                                subtitle: "Finished session totals sync; distraction notes stay on this device"
+                                "Significant Hobbies Hub",
+                                subtitle: "Optional visibility for finished session summaries"
                             )
+                            Text("iCloud keeps your full Anchor data available across your Mac, iPhone, and Apple Watch.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("The Hub receives only the goal, start and end times, focused duration, outcome, and interruption count. Distraction notes never leave your Apple devices.")
+                                .font(.system(size: 11))
+                                .foregroundStyle(theme.textTertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            labelled("Hub status", hubStatus(platform: platform, signedIn: account.isSignedIn))
+                            labelled("Waiting locally", "\(platform.pendingCount)")
+                            labelled("Last successful Hub sync", lastSyncText(platform.receipt.lastSuccessfulAt))
+
                             if account.isSignedIn {
                                 Label(
                                     account.session?.email ?? "Personal account",
-                                    systemImage: "checkmark.icloud"
+                                    systemImage: "person.crop.circle.badge.checkmark"
                                 )
                                 .font(.system(size: 12, weight: .medium))
+                                if let failure = platform.receipt.failure {
+                                    Text(failure.explanation(pendingCount: platform.pendingCount))
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(theme.caution)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                                 Button(platform.isSyncing ? "Syncing…" : "Sync now") {
                                     Task { await platform.synchronize(announcing: true) }
                                 }
                                 .buttonStyle(QuietButtonStyle(expands: false))
                                 .disabled(platform.isSyncing)
-                                Button("Sign out") { Task { await account.signOut() } }
+                                Button("Sign out") { Task { await platform.disconnect() } }
                                     .buttonStyle(QuietButtonStyle(expands: false))
                             } else {
                                 SignInWithAppleButton(.continue) { request in
@@ -139,13 +158,18 @@ public struct SettingsScreen: View {
                                 .buttonStyle(QuietButtonStyle(expands: false))
                                 .disabled(account.isConnecting)
                             }
-                            Text(
-                                platform.message ?? account.errorMessage
-                                    ?? "Anchor remains fully usable offline. When connected, finished session totals appear in your private Significant Hobbies Hub."
-                            )
-                            .font(.system(size: 11))
-                            .foregroundStyle(theme.textTertiary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            if let accountError = account.errorMessage,
+                               platform.receipt.failure == nil {
+                                Text(accountError)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(theme.caution)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            } else if !account.isSignedIn {
+                                Text("Anchor stays fully usable without the Hub. Connect only if you want finished session summaries visible there.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(theme.textTertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                 }
@@ -207,6 +231,19 @@ public struct SettingsScreen: View {
                 .textSelection(.enabled)
                 .lineLimit(3)
         }
+    }
+
+    private func hubStatus(platform: AnchorPlatformSync, signedIn: Bool) -> String {
+        if platform.isSyncing { return "Syncing now" }
+        if platform.receipt.failure != nil { return "Needs attention" }
+        guard signedIn else { return "Not connected" }
+        if platform.pendingCount > 0 { return "Waiting to sync" }
+        return "Up to date"
+    }
+
+    private func lastSyncText(_ date: Date?) -> String {
+        guard let date else { return "Never" }
+        return date.formatted(date: .abbreviated, time: .shortened)
     }
 
     #if os(macOS)

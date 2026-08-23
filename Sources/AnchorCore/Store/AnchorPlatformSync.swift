@@ -10,12 +10,20 @@ import SwiftData
 public final class AnchorPlatformSync {
     private let context: ModelContext
     private let connection: PersonalPlatformConnection?
+    private let receiptStore: HubSyncReceiptStore
     public let account: PersonalAccountModel?
     public private(set) var isSyncing = false
-    public private(set) var message: String?
+    public private(set) var pendingCount = 0
+    public private(set) var receipt: HubSyncReceipt
 
-    public init(context: ModelContext, enabled: Bool = true) {
+    public init(
+        context: ModelContext,
+        enabled: Bool = true,
+        receiptStore: HubSyncReceiptStore = HubSyncReceiptStore()
+    ) {
         self.context = context
+        self.receiptStore = receiptStore
+        receipt = receiptStore.load()
         guard enabled else {
             connection = nil
             account = nil
@@ -38,7 +46,16 @@ public final class AnchorPlatformSync {
     }
 
     public func restoreAndSynchronize() async {
+        let hadBearer = await hasBearerToken()
         await account?.restore()
+        await refreshPendingCount()
+        if account?.isSignedIn == false, let errorMessage = account?.errorMessage {
+            let stillHasBearer = await hasBearerToken()
+            let failure: HubSyncFailure = hadBearer && !stillHasBearer
+                ? .signInExpired
+                : .classify(accountMessage: errorMessage)
+            recordFailure(failure)
+        }
         await synchronize()
     }
 
@@ -47,18 +64,51 @@ public final class AnchorPlatformSync {
         await synchronize(announcing: true)
     }
 
-    public func synchronize(announcing: Bool = false) async {
-        guard let connection, account?.isSignedIn == true, !isSyncing else { return }
+    public func disconnect() async {
+        await account?.signOut()
+        receipt.failure = nil
+        receipt.failedAt = nil
+        receiptStore.save(receipt)
+        await refreshPendingCount()
+    }
+
+    public func synchronize(announcing _: Bool = false) async {
+        guard let connection, account?.isSignedIn == true, !isSyncing else {
+            await refreshPendingCount()
+            return
+        }
         isSyncing = true
         defer { isSyncing = false }
         do {
             try await enqueueFinishedSessions(using: connection)
+            pendingCount = await connection.sync.pendingMutationCount()
             let changes = try await connection.sync.synchronize()
             try apply(changes)
-            if announcing { message = "Cloudflare sync complete." }
+            pendingCount = await connection.sync.pendingMutationCount()
+            receipt.recordSuccess(at: Date())
+            receiptStore.save(receipt)
         } catch {
-            if announcing { message = "Cloudflare sync will retry when you are online." }
+            pendingCount = await connection.sync.pendingMutationCount()
+            recordFailure(HubSyncFailure.classify(error))
         }
+    }
+
+    public func refreshPendingCount() async {
+        guard let connection else {
+            pendingCount = 0
+            return
+        }
+        pendingCount = await connection.sync.pendingMutationCount()
+    }
+
+    private func hasBearerToken() async -> Bool {
+        guard let connection else { return false }
+        return (try? await connection.identity.bearerToken()) != nil
+    }
+
+    private func recordFailure(_ failure: HubSyncFailure) {
+        receipt.recordFailure(failure, at: Date())
+        receiptStore.save(receipt)
     }
 
     private func enqueueFinishedSessions(using connection: PersonalPlatformConnection) async throws {
@@ -101,6 +151,7 @@ public enum AnchorPlatformRecord {
             "startedAt": .string(iso(session.startedAt)),
             "endedAt": .string(iso(endedAt)),
             "durationSeconds": .number(Double(max(0, Int(session.focusedSeconds(at: endedAt))))),
+            "outcome": .string(session.endReason?.rawValue ?? "unknown"),
             "interruptionCount": .number(Double(session.distractionCount)),
         ])
     }
@@ -125,7 +176,11 @@ public enum AnchorPlatformRecord {
         session.bankedSeconds = Double(duration)
         session.runningSince = nil
         session.state = SessionState.finished
-        session.endReason = SessionEndReason.completed
+        if case let .string(outcome)? = record["outcome"] {
+            session.endReason = SessionEndReason(rawValue: outcome) ?? .completed
+        } else {
+            session.endReason = .completed
+        }
         return session
     }
 

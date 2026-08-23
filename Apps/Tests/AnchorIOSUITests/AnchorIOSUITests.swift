@@ -94,7 +94,7 @@ final class AnchorIOSUITests: XCTestCase {
 
         app.tabBars.buttons["Settings"].tap()
 
-        XCTAssertTrue(app.staticTexts["Private Hub sync"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Significant Hobbies Hub"].waitForExistence(timeout: 4))
         XCTAssertFalse(app.staticTexts["Talk to your data"].exists)
         XCTAssertFalse(app.staticTexts["Database"].exists)
     }

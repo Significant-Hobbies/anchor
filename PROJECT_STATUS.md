@@ -11,8 +11,9 @@ came from the world or from you.
 macOS, iOS and Apple Watch from one shared Swift package, shipping under
 Significant Hobbies. Local-first: distraction notes never leave the device,
 grouping and tagging run against Apple's on-device model, and sync goes through
-the user's own private CloudKit database. Optional Personal Platform sync sends
-session timing and interruption counts, never distraction text.
+the user's own private CloudKit database. Optional Significant Hobbies Hub sync
+sends only finished-session goal, start and end times, focused duration, outcome,
+and interruption count — never distraction text.
 
 ## Dependencies
 
@@ -30,6 +31,16 @@ the first-party PersonalSyncKit package:
 Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
+
+- **2026-08-23** — Separated customer-facing sync truth into two clear paths:
+  iCloud continuity for full Anchor data across Apple devices, and optional
+  Significant Hobbies Hub visibility for finished-session summaries. Settings
+  now show active syncing, the durable outbox count, last successful Hub sync,
+  and persistent expired-sign-in, offline, or service failure states. The exact
+  Hub payload is contract-tested to exclude both distraction notes and session
+  notes. All 118 shared tests pass, along with iPhone and Watch simulator builds
+  and a local-only Mac build; the default Mac development build still requires
+  the repository's unavailable App Development provisioning profile.
 
 - **2026-08-23** — Anchor `1.0 (8)` was accepted by App Store Connect and is
   assigned to the internal `Personal Testing` group. Its iPhone and embedded
@@ -174,8 +185,9 @@ CloudKit container and app group.
 - Apple Watch app: session ring, start from a recent goal with the Digital Crown,
   pause/resume, and one-tap distraction capture
 - CloudKit sync via a shared app group and private iCloud database
-- Optional Cloudflare synchronization for finished session summaries, with
-  explicit sign-in and no distraction-note egress
+- Optional Significant Hobbies Hub visibility for finished session summaries,
+  with explicit sign-in, durable pending/last-success/failure status, and no
+  distraction-note egress
 - Landing, support and privacy pages for App Store Connect
 - App icon for all three platforms, drawn from the app's own ring mark
 
