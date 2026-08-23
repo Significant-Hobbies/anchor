@@ -32,6 +32,14 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-23** — Anchor `1.0 (10)` completed App Store Connect processing and
+  entered internal beta testing (delivery UUID
+  `1c00ceed-b69e-4db1-955c-b8592f83ac32`). The build is installed on the
+  connected iPhone and includes the embedded Watch app and Live Activity.
+  Apple Distribution signing, production iCloud, the shared app group, and
+  `get-task-allow=false` were verified. Paired-watch interaction remains tracked
+  separately in issue #10 because Watch Developer Mode is disabled.
+
 - **2026-08-23** — Separated customer-facing sync truth into two clear paths:
   iCloud continuity for full Anchor data across Apple devices, and optional
   Significant Hobbies Hub visibility for finished-session summaries. Settings
