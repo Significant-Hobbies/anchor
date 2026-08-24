@@ -47,7 +47,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
   interruption categories and 4/4 goal themes).
 
 - **2026-08-24** — Removed the inherited date browser from Today before build
-  11: Today is permanently the current day, History owns past-day selection,
+  12: Today is permanently the current day, History owns past-day selection,
   and Habits owns recurring future scheduling.
 
 - **2026-08-24** — Merged Indulge's planning and pattern-change loop into Anchor
