@@ -46,6 +46,10 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
   focused iPhone UI journeys, and the live Apple Intelligence diagnostic (8/8
   interruption categories and 4/4 goal themes).
 
+- **2026-08-24** — Removed the inherited date browser from Today before build
+  11: Today is permanently the current day, History owns past-day selection,
+  and Habits owns recurring future scheduling.
+
 - **2026-08-24** — Merged Indulge's planning and pattern-change loop into Anchor
   locally under issue #33. Anchor now has a Day plan/review surface, recurring
   schedule templates, plan-to-session links, explicit divergence evidence, an

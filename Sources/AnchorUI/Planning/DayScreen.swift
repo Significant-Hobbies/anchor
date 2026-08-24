@@ -11,7 +11,7 @@ struct PlanScreen: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
     private let onOpenFocus: () -> Void
-    @State private var selectedDay = Date()
+    @State private var today = Date()
     @State private var showsEditor = false
     @State private var showsRoutines = false
     @State private var editingBlock: PlanBlock?
@@ -24,8 +24,8 @@ struct PlanScreen: View {
     }
 
     private var dayInterval: DateInterval {
-        Calendar.current.dateInterval(of: .day, for: selectedDay)
-            ?? DateInterval(start: selectedDay, duration: 86_400)
+        Calendar.current.dateInterval(of: .day, for: today)
+            ?? DateInterval(start: today, duration: 86_400)
     }
 
     private var blocks: [PlanBlock] {
@@ -106,7 +106,7 @@ struct PlanScreen: View {
             }
         }
         .sheet(isPresented: $showsEditor) {
-            PlanBlockEditor(initialDay: selectedDay) { refresh() }
+            PlanBlockEditor(initialDay: today) { refresh() }
                 .anchorTheme()
         }
         .sheet(isPresented: $showsRoutines) {
@@ -114,7 +114,7 @@ struct PlanScreen: View {
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
-            PlanBlockEditor(initialDay: selectedDay, block: block) { refresh() }
+            PlanBlockEditor(initialDay: today, block: block) { refresh() }
                 .anchorTheme()
         }
         .sheet(item: $explainingBlock) { block in
@@ -139,23 +139,32 @@ struct PlanScreen: View {
             }
             .anchorTheme()
         }
-        .task(id: Calendar.current.startOfDay(for: selectedDay)) { refresh() }
+        .task {
+            refresh()
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(60))
+                } catch {
+                    return
+                }
+                let current = Date()
+                if !Calendar.current.isDate(current, inSameDayAs: today) {
+                    today = current
+                    refresh()
+                }
+            }
+        }
         .onChange(of: controller.hasSession) { reconcileSessions() }
     }
 
     private var dayHeader: some View {
-        HStack(alignment: .center, spacing: Space.sm) {
-            VStack(alignment: .leading, spacing: Space.xxs) {
-                Text(Calendar.current.isDateInToday(selectedDay) ? "Today" : selectedDay.formatted(date: .complete, time: .omitted))
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-                Text("A plan is a hypothesis, not a verdict.")
-                    .font(.subheadline)
-                    .foregroundStyle(theme.textSecondary)
-            }
-            Spacer()
-            DatePicker("Day", selection: $selectedDay, displayedComponents: .date)
-                .labelsHidden()
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            Text("Today")
+                .font(.largeTitle.weight(.semibold))
+                .foregroundStyle(theme.textPrimary)
+            Text("A plan is a hypothesis, not a verdict.")
+                .font(.subheadline)
+                .foregroundStyle(theme.textSecondary)
         }
     }
 
@@ -194,7 +203,7 @@ struct PlanScreen: View {
 
     private func refresh() {
         do {
-            _ = try DayPlanService(context: context).materialize(day: selectedDay)
+            _ = try DayPlanService(context: context).materialize(day: today)
             reconcileSessions()
             loadError = nil
         } catch {

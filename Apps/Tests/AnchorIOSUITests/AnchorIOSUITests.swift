@@ -115,6 +115,7 @@ final class AnchorIOSUITests: XCTestCase {
 
         app.tabBars.buttons["Today"].tap()
         XCTAssertTrue(app.staticTexts["Give the day one anchor"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.datePickers.count, 0, "Today must not browse other dates; History owns that.")
         app.buttons["Add the first block"].tap()
         let title = app.textFields["What will you do?"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
