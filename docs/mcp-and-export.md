@@ -25,10 +25,12 @@ codex mcp add anchor -- "$PWD/.build/release/anchor-mcp"
 | `search_distractions` | Free-text search across notes, saved tags, keywords and categories |
 | `work_patterns` | Project, tag, billing and distraction-timing breakdowns |
 | `machine_presence` | Aggregate active, tracked and untracked computer time |
+| `daily_review` | One day's planned and timed-observed time, untimed completion count, largest gaps, causal evidence, and suggestions — never an adherence score |
 | `export_workbook` | Writes an `.xlsx` to a path you give it |
 
-All take an optional `since_days`. Everything except `export_workbook` is
-read-only; the server never mutates your history.
+History tools take an optional `since_days`; `daily_review` takes `days_ago`.
+Everything except `export_workbook` is read-only; the server never mutates your
+history.
 
 ### Diagnostics
 
@@ -43,17 +45,17 @@ invisible until it has already mislabelled a week of your data. Expect `8/8` and
 
 ## Export formats
 
-`.xlsx`, sessions CSV, distractions CSV, and JSON — all from `ExportBuilder`, all
-built on the same snapshots the analytics screen reads, so no format can disagree
-with the UI.
+`.xlsx`, sessions CSV, distractions CSV, day-plan CSV, schedule-change CSV, and
+JSON — all from `ExportBuilder`, all built on the same snapshots the app reads,
+so no format can disagree with the UI.
 
 Raw session rows include their project, reusable tags, entry notes, snapshotted
 rate and currency, tracked value, and aggregate computer-active/away duration.
 Raw distraction rows include their editable text and reusable tags.
 
-The workbook has six sheets: **Summary**, **Sessions**, **Distractions**, **By
-goal**, **By distraction**, **By day**. Raw rows come first so nothing is hidden
-behind a rollup.
+The workbook has eight sheets: **Summary**, **Day plan**, **Schedule changes**,
+**Sessions**, **Distractions**, **By goal**, **By distraction**, **By day**. Raw
+rows come first so nothing is hidden behind a rollup.
 
 CSV quoting follows RFC 4180 — distraction notes are free text and routinely
 contain commas, quotes and newlines.

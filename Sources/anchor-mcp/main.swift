@@ -182,6 +182,40 @@ final class AnchorQueryService {
         ]
     }
 
+    func dailyReview(daysAgo: Int) throws -> [String: JSONValue] {
+        let calendar = Calendar.current
+        let day = calendar.date(byAdding: .day, value: -max(0, daysAgo), to: Date()) ?? Date()
+        let review = DayReviewEngine(calendar: calendar).review(
+            day: day,
+            blocks: try context.planBlockRecords(on: day, calendar: calendar),
+            sessions: try records(sinceDays: max(1, daysAgo + 1)).filter { calendar.isDate($0.startedAt, inSameDayAs: day) },
+            divergences: try context.divergenceRecords(on: day, calendar: calendar),
+            profile: try context.behaviorProfileRecord()
+        )
+        return [
+            "day": .string(ISO8601DateFormatter().string(from: review.day)),
+            "plannedHours": .double(review.plannedSeconds / 3600),
+            "observedHours": .double(review.actualSeconds / 3600),
+            "untimedCompletedBlocks": .int(review.unobservedCompletedBlocks),
+            "gaps": .array(review.gaps.map { gap in
+                .object([
+                    "block": .string(gap.title),
+                    "plannedMinutes": .double(gap.plannedSeconds / 60),
+                    "observedMinutes": gap.actualDurationKnown ? .double(gap.actualSeconds / 60) : .null,
+                    "differenceMinutes": gap.actualDurationKnown ? .double(gap.varianceSeconds / 60) : .null,
+                    "observedDurationKnown": .bool(gap.actualDurationKnown),
+                    "cause": .string(gap.cause.label),
+                    "evidence": .string(gap.evidence.rawValue),
+                    "evidenceDescription": .string(gap.evidenceDescription),
+                ])
+            }),
+            "suggestions": .array(review.suggestions.map { suggestion in
+                .object(["title": .string(suggestion.title), "detail": .string(suggestion.detail)])
+            }),
+            "interpretation": .string("Anchor reports evidence-linked differences and no adherence score."),
+        ]
+    }
+
     func searchDistractions(query: String, limit: Int) throws -> [JSONValue] {
         let needle = query.lowercased()
         return try records(sinceDays: nil)
@@ -208,13 +242,32 @@ final class AnchorQueryService {
     }
 
     func exportJSON(sinceDays days: Int?) throws -> String {
-        let data = try builder.jsonData(from: records(sinceDays: days))
+        let since = days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) }
+        let plans = try context.fetch(FetchDescriptor<PlanBlock>())
+            .filter { plan in since.map { sinceDate in sinceDate <= plan.plannedStart } ?? true }
+            .map { $0.snapshot() }
+        let divergences = try context.fetch(FetchDescriptor<DivergenceEvent>())
+            .filter { divergence in since.map { sinceDate in sinceDate <= divergence.occurredAt } ?? true }
+            .map { $0.snapshot() }
+        let data = try builder.jsonData(
+            from: records(sinceDays: days),
+            plans: plans,
+            divergences: divergences,
+            profile: try context.behaviorProfileRecord()
+        )
         return String(decoding: data, as: UTF8.self)
     }
 
     func writeWorkbook(to path: String, sinceDays days: Int?) throws -> String {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
-        let data = builder.xlsxData(from: try records(sinceDays: days))
+        let since = days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) }
+        let plans = try context.fetch(FetchDescriptor<PlanBlock>())
+            .filter { plan in since.map { sinceDate in sinceDate <= plan.plannedStart } ?? true }
+            .map { $0.snapshot() }
+        let divergences = try context.fetch(FetchDescriptor<DivergenceEvent>())
+            .filter { divergence in since.map { sinceDate in sinceDate <= divergence.occurredAt } ?? true }
+            .map { $0.snapshot() }
+        let data = builder.xlsxData(from: try records(sinceDays: days), plans: plans, divergences: divergences)
         try data.write(to: url)
         return url.path
     }
@@ -277,6 +330,11 @@ struct MCPServer {
             "machine_presence",
             "Privacy-safe active, logged, and untracked computer time recorded by the Mac app.",
             ["since_days": intProperty("How many days back to look. Omit for all time.")]
+        ),
+        tool(
+            "daily_review",
+            "Compare one day's planned blocks with observed time, captured causes, and evidence-linked suggestions. Returns no adherence score.",
+            ["days_ago": intProperty("Zero for today, one for yesterday. Defaults to zero.")]
         ),
         tool(
             "search_distractions",
@@ -384,6 +442,8 @@ struct MCPServer {
                 payload = .object(try service.workPatterns(sinceDays: sinceDays))
             case "machine_presence":
                 payload = .object(try service.machinePresence(sinceDays: sinceDays))
+            case "daily_review":
+                payload = .object(try service.dailyReview(daysAgo: arguments?["days_ago"]?.intValue ?? 0))
             case "search_distractions":
                 guard let query = arguments?["query"]?.stringValue, !query.isEmpty else {
                     return toolResult(id: id, text: "search_distractions needs a query.", isError: true)

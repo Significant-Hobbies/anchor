@@ -11,6 +11,15 @@ final class AnchorMacUITests: XCTestCase {
                 .path
         app.launch()
 
+        XCTAssertTrue(app.staticTexts["Plan the day. Learn what moved it."].waitForExistence(timeout: 4))
+        app.buttons["Choose what to protect"].click()
+        XCTAssertTrue(app.staticTexts["What tends to take more time than you want?"].waitForExistence(timeout: 4))
+        app.buttons.matching(NSPredicate(format: "label == %@", "Short videos")).firstMatch.click()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Continue with")).firstMatch.click()
+        XCTAssertTrue(app.staticTexts["What do you want that time to make room for?"].waitForExistence(timeout: 4))
+        app.buttons.matching(NSPredicate(format: "label == %@", "More creativity")).firstMatch.click()
+        app.buttons["Show me how Anchor protects it"].click()
+
         XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 4))
 
         let goal = app.textFields.firstMatch

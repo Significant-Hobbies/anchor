@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-24T00:00:00+05:30",
+  "title": "Design System: Anchor",
+  "extensions": {
+    "colorMeta": {
+      "cobalt": { "role": "primary", "displayName": "Anchor Cobalt", "canonical": "#3B82F6", "tonalRamp": ["#102447", "#16356B", "#1D4D9B", "#2563CE", "#3B82F6", "#76A7FA", "#B5D0FC", "#EAF2FF"] },
+      "external-coral": { "role": "secondary", "displayName": "External Coral", "canonical": "#FB7185", "tonalRamp": ["#45151C", "#6B202D", "#9C3143", "#D24D62", "#FB7185", "#FDA3AF", "#FECED4", "#FFF1F3"] },
+      "internal-violet": { "role": "secondary", "displayName": "Internal Violet", "canonical": "#A78BFA", "tonalRamp": ["#271A4B", "#3D286F", "#5B3DA0", "#7D5ED1", "#A78BFA", "#C2B2FC", "#DED6FE", "#F4F1FF"] },
+      "mixed-amber": { "role": "secondary", "displayName": "Mixed Amber", "canonical": "#F5B849", "tonalRamp": ["#3D2A0A", "#60420F", "#8D6218", "#C68A29", "#F5B849", "#F8CE7D", "#FBE3B3", "#FFF7E8"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Current intention and major review conclusion." },
+      "body": { "displayName": "Body", "purpose": "Plain explanations and reflection." },
+      "label": { "displayName": "Instrument Label", "purpose": "Compact planned, actual, and causal metadata." }
+    },
+    "shadows": [
+      { "name": "card-ambient", "value": "0 6pt 18pt rgba(0,0,0,0.28)", "purpose": "One raised content surface on dark canvas." },
+      { "name": "focus-halo", "value": "0 4pt 14pt rgba(59,130,246,0.35)", "purpose": "Active focus action or ring only." }
+    ],
+    "motion": [
+      { "name": "snappy", "value": "spring response 0.32 damping 0.82", "purpose": "Pressed controls and compact state changes." },
+      { "name": "gentle", "value": "spring response 0.55 damping 0.85", "purpose": "Surface and session-state transitions." },
+      { "name": "reduce-motion", "value": "opacity crossfade", "purpose": "Equivalent transition with no scale or parallax." }
+    ],
+    "breakpoints": [
+      { "name": "iphone", "value": "single safe-area column" },
+      { "name": "ipad-mac", "value": "optional plan and evidence split panes" }
+    ],
+    "narrative": {
+      "northStar": "The Anchored Day",
+      "overview": "A quiet native instrument for moving between intention, action, and reflection. Original Indulge illustrations appear only where projection and self-recognition matter.",
+      "keyCharacteristics": ["Native navigation and controls", "One cobalt action hierarchy", "Warm causal colors", "Present intention before analytics", "Behavioral artwork with equal text meaning"],
+      "rules": [
+        { "section": "Colors", "name": "Cool Focus, Warm Interruption", "body": "Nothing that breaks or diverts a session may wear cobalt." },
+        { "section": "Elevation & Depth", "name": "One Raised Surface", "body": "Use spacing and dividers before nesting cards." }
+      ],
+      "dos": ["Keep the current intention and next action more prominent than metrics.", "Use original Indulge art at behavioral decision points."],
+      "donts": ["Do not turn the day into an adherence score.", "Do not infer a cause from artwork or model prose alone."]
+    }
+  },
+  "components": []
+}

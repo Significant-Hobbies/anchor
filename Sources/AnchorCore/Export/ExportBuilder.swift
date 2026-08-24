@@ -10,10 +10,17 @@ public struct ExportBuilder: Sendable {
 
     // MARK: - Workbook
 
-    /// Six sheets: the raw rows first so nothing is hidden, then the rollups.
-    public func workbook(from records: [SessionRecord], now: Date = Date()) -> Spreadsheet {
+    /// Raw rows come first so nothing is hidden, followed by focus rollups.
+    public func workbook(
+        from records: [SessionRecord],
+        plans: [PlanBlockRecord] = [],
+        divergences: [DivergenceRecord] = [],
+        now: Date = Date()
+    ) -> Spreadsheet {
         Spreadsheet(sheets: [
             summarySheet(records, now: now),
+            plansSheet(plans),
+            divergencesSheet(divergences),
             sessionsSheet(records),
             distractionsSheet(records),
             goalsSheet(records),
@@ -22,8 +29,58 @@ public struct ExportBuilder: Sendable {
         ])
     }
 
-    public func xlsxData(from records: [SessionRecord], now: Date = Date()) -> Data {
-        workbook(from: records, now: now).xlsxData(modified: now)
+    public func xlsxData(
+        from records: [SessionRecord],
+        plans: [PlanBlockRecord] = [],
+        divergences: [DivergenceRecord] = [],
+        now: Date = Date()
+    ) -> Data {
+        workbook(from: records, plans: plans, divergences: divergences, now: now).xlsxData(modified: now)
+    }
+
+    private func plansSheet(_ records: [PlanBlockRecord]) -> Spreadsheet.Sheet {
+        Spreadsheet.Sheet(
+            name: "Day plan",
+            columns: [
+                .init("Planned start", width: 20), .init("Title", width: 34),
+                .init("Kind", width: 14), .init("Flexibility", width: 14),
+                .init("Planned (min)", width: 14), .init("Actual start", width: 20),
+                .init("Actual end", width: 20), .init("State", width: 14),
+                .init("Pattern", width: 20), .init("Direction", width: 20),
+                .init("Block ID", width: 38), .init("Session ID", width: 38),
+            ],
+            rows: records.map { record in
+                [
+                    .date(record.plannedStart), .text(record.title), .text(record.kind.label),
+                    .text(record.flexibility.label), .number(Double(record.plannedSeconds) / 60),
+                    record.actualStartedAt.map(Spreadsheet.Cell.date) ?? .blank,
+                    record.actualEndedAt.map(Spreadsheet.Cell.date) ?? .blank,
+                    .text(record.state.rawValue), .optionalText(record.behaviorPattern?.label),
+                    .optionalText(record.lifeDirection?.label), .text(record.id.uuidString),
+                    .optionalText(record.sessionID?.uuidString),
+                ]
+            }
+        )
+    }
+
+    private func divergencesSheet(_ records: [DivergenceRecord]) -> Spreadsheet.Sheet {
+        Spreadsheet.Sheet(
+            name: "Schedule changes",
+            columns: [
+                .init("When", width: 20), .init("Cause", width: 28),
+                .init("Evidence", width: 22), .init("User confirmed", width: 16),
+                .init("Note", width: 44), .init("Block ID", width: 38),
+                .init("Session ID", width: 38), .init("Distraction ID", width: 38),
+            ],
+            rows: records.map { record in
+                [
+                    .date(record.occurredAt), .text(record.kind.label), .text(record.evidence.rawValue),
+                    .text(record.userConfirmed ? "Yes" : "No"), .text(record.note),
+                    .text(record.blockID.uuidString), .optionalText(record.sessionID?.uuidString),
+                    .optionalText(record.distractionID?.uuidString),
+                ]
+            }
+        )
     }
 
     private func summarySheet(_ records: [SessionRecord], now: Date) -> Spreadsheet.Sheet {
@@ -249,6 +306,35 @@ public struct ExportBuilder: Sendable {
         return lines.joined(separator: "\n") + "\n"
     }
 
+    public func plansCSV(from records: [PlanBlockRecord]) -> String {
+        let formatter = ISO8601DateFormatter()
+        var lines = ["planned_start,title,kind,flexibility,planned_minutes,actual_start,actual_end,state,pattern,direction,block_id,session_id"]
+        for record in records {
+            lines.append(Self.csvRow([
+                formatter.string(from: record.plannedStart), record.title, record.kind.rawValue,
+                record.flexibility.rawValue, String(format: "%.2f", Double(record.plannedSeconds) / 60),
+                record.actualStartedAt.map(formatter.string(from:)) ?? "",
+                record.actualEndedAt.map(formatter.string(from:)) ?? "", record.state.rawValue,
+                record.behaviorPattern?.rawValue ?? "", record.lifeDirection?.rawValue ?? "",
+                record.id.uuidString, record.sessionID?.uuidString ?? "",
+            ]))
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    public func divergencesCSV(from records: [DivergenceRecord]) -> String {
+        let formatter = ISO8601DateFormatter()
+        var lines = ["occurred_at,cause,evidence,user_confirmed,note,block_id,session_id,distraction_id"]
+        for record in records {
+            lines.append(Self.csvRow([
+                formatter.string(from: record.occurredAt), record.kind.rawValue, record.evidence.rawValue,
+                record.userConfirmed ? "true" : "false", record.note, record.blockID.uuidString,
+                record.sessionID?.uuidString ?? "", record.distractionID?.uuidString ?? "",
+            ]))
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
     /// RFC 4180 quoting: wrap anything containing a comma, quote or newline, and
     /// double any embedded quotes. Distraction notes are free text, so this matters.
     static func csvRow(_ fields: [String]) -> String {
@@ -263,7 +349,13 @@ public struct ExportBuilder: Sendable {
 
     // MARK: - JSON (what the MCP server and any other agent reads)
 
-    public func jsonData(from records: [SessionRecord], now: Date = Date()) throws -> Data {
+    public func jsonData(
+        from records: [SessionRecord],
+        plans: [PlanBlockRecord] = [],
+        divergences: [DivergenceRecord] = [],
+        profile: BehaviorProfileRecord = BehaviorProfileRecord(),
+        now: Date = Date()
+    ) throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -271,7 +363,10 @@ public struct ExportBuilder: Sendable {
             ExportBundle(
                 exportedAt: now,
                 overview: engine.overview(records, now: now),
-                sessions: records
+                sessions: records,
+                plans: plans,
+                divergences: divergences,
+                profile: profile
             )
         )
     }
@@ -281,4 +376,7 @@ public struct ExportBundle: Codable, Sendable {
     public var exportedAt: Date
     public var overview: AnalyticsEngine.Overview
     public var sessions: [SessionRecord]
+    public var plans: [PlanBlockRecord]
+    public var divergences: [DivergenceRecord]
+    public var profile: BehaviorProfileRecord
 }

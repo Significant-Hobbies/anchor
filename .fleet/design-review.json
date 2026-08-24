@@ -1,31 +1,30 @@
 {
   "$schema": "fleet.design-review.v1",
   "version": 1,
-  "project": "anchor-onboarding-3",
-  "target": "Anchor interruption-first onboarding",
+  "project": "anchor-unified-day-33",
+  "target": "Merged behavioral onboarding, day plan, and daily review",
   "mode": "preserve",
   "register": "product",
   "context": {
-    "product": null,
-    "design": null
+    "product": "PRODUCT.md",
+    "design": "DESIGN.md"
   },
   "direction": {
     "references": [],
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": "artifacts/design/before.png"
+    "before": "artifacts/design/onboarding/welcome-iphone.png"
   },
   "evidence": {
     "screenshots": [
-      {
-        "width": 390,
-        "path": "artifacts/design/onboarding/welcome-iphone.png"
-      }
+      { "width": 390, "path": "artifacts/design/unified-day/onboarding-iphone.png" },
+      { "width": 768, "path": "artifacts/design/unified-day/onboarding-ipad.png" },
+      { "width": 1440, "path": "artifacts/design/unified-day/day-macos-wide.jpeg" }
     ],
     "projectCheck": {
-      "command": "swift build && swift test; macOS UI test; iOS UI tests; unsigned watchOS simulator build",
-      "status": "passed"
+      "command": "swift build && swift test (131 tests); xcodegen generate; iOS build with embedded watchOS and Live Activity; macOS build; 4 iOS UI journeys plus signed focused Day and onboarding reruns",
+      "status": "pass"
     },
     "critique": {
       "score": 36,
@@ -41,11 +40,15 @@
     },
     "detector": {
       "posture": "advisory",
-      "findings": []
+      "findings": [
+        "Automated web-interface detector is not applicable to native SwiftUI; manual audit found no raw colors, fixed text fonts, missing image labels, or Reduce Motion regressions.",
+        "Primary and quiet actions now enforce a 44-point minimum target; weekday controls use an adaptive grid instead of a forced seven-item row.",
+        "The required 768 class is represented by an 834-point iPad capture; the 1440 class is a genuine full-screen macOS capture compressed by the Computer Use screenshot service."
+      ]
     }
   },
   "ownerFeedback": {
     "decision": "delegated",
-    "note": "The owner delegated end-to-end issue resolution; the established Anchor visual language and privacy boundary were preserved."
+    "note": "The owner explicitly directed the merge into Anchor and selected the original Indulge onboarding graphics as a preserved product asset."
   }
 }

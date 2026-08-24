@@ -12,6 +12,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
+        app.tabBars.buttons["Focus"].tap()
         let intention = app.textFields["Ship the auth flow"]
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
         intention.tap()
@@ -63,6 +64,15 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_DEMO"] = "1"
         app.launch()
 
+        XCTAssertTrue(app.staticTexts["Plan the day. Learn what moved it."].waitForExistence(timeout: 5))
+        app.buttons["Choose what to protect"].tap()
+        XCTAssertTrue(app.staticTexts["What tends to take more time than you want?"].waitForExistence(timeout: 4))
+        app.buttons.matching(NSPredicate(format: "label == %@", "Short videos")).firstMatch.tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Continue with")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["What do you want that time to make room for?"].waitForExistence(timeout: 4))
+        app.buttons.matching(NSPredicate(format: "label == %@", "More creativity")).firstMatch.tap()
+        app.buttons["Show me how Anchor protects it"].tap()
+
         XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 5))
         let goal = app.textFields["Finish the release"]
         goal.tap()
@@ -78,12 +88,31 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Done"].tap()
         app.buttons["Park it — return to focus"].tap()
 
-        XCTAssertTrue(app.staticTexts["Attention recovered."].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Thought parked."].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["The practice interruption was discarded. Your real captures stay local and appear in Parked."].exists)
         app.buttons["Begin real focus"].tap()
 
         XCTAssertTrue(app.staticTexts["Draft the launch note"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["Lock a distraction"].exists)
+        app.buttons["End session"].tap()
+    }
+
+    func testDayPlanCreatesABlockAndOffersRecurringSchedule() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-plan-ui-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Give the day one anchor"].waitForExistence(timeout: 5))
+        app.buttons["Add the first block"].tap()
+        let title = app.textFields["What will you do?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        title.tap()
+        title.typeText("Morning walk")
+        XCTAssertTrue(app.switches["Repeat weekly"].exists)
+        app.buttons["Save"].tap()
+
+        XCTAssertTrue(app.staticTexts["Morning walk"].waitForExistence(timeout: 4))
     }
 
     func testSettingsKeepsMacOnlyDiagnosticsOffIPhone() {

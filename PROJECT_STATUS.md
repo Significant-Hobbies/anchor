@@ -2,11 +2,12 @@
 
 ## Why / What
 
-A focus timer that treats distractions as the main event rather than an
-afterthought. You name a goal and start a timer; when something pulls at you, one
-keystroke parks it and hands you back your goal and your remaining time. Anchor
-then reports what actually costs you your focus — and, crucially, whether the pull
-came from the world or from you.
+A private day planner and focus timer that treats divergence as the main event.
+You schedule work, commitments, recurring routines, rest, and enjoyment; Anchor
+turns focus-capable blocks into its wall-clock timer, captures what pulls you
+away, and compares the day you planned with the day it observed. It distinguishes
+deliberate changes, internal pulls, external interruptions, human needs,
+estimation errors, and honestly unknown gaps without an adherence score.
 
 macOS, iOS and Apple Watch from one shared Swift package, shipping under
 Significant Hobbies. Local-first: distraction notes never leave the device,
@@ -31,6 +32,24 @@ the first-party PersonalSyncKit package:
 Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
+
+- **2026-08-24** — Merged Indulge's planning and pattern-change loop into Anchor
+  locally under issue #33. Anchor now has a Day plan/review surface, recurring
+  schedule templates, plan-to-session links, explicit divergence evidence, an
+  editable private behavior profile, and Indulge's original onboarding,
+  activity, and life-direction artwork with provenance. Export and MCP include
+  plan/review data. All 131 shared tests pass; DebugLocal Mac, iPhone (including
+  embedded Watch and Live Activity), and Watch simulator builds pass. This work
+  is not committed, released, or migrated into either app's production store.
+
+- **2026-08-24** — Declared Anchor the sole maintained successor to
+  Indulge/Habits. The original hero, 24 behavior illustrations, eight life
+  directions, and non-moralizing replacement framing are now locally owned by
+  Anchor with self-contained provenance. The separate Life/Trade/History shell,
+  long identity questionnaire, scene-room system, and duplicate Focus journal
+  are intentionally retired. Existing bundle IDs, stores, provider resources,
+  and Hub `habits` contracts remain compatibility data; no deletion or data
+  migration was performed.
 
 - **2026-08-23** — Anchor `1.0 (10)` completed App Store Connect processing and
   entered internal beta testing (delivery UUID
@@ -159,7 +178,7 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 | Anchor for macOS | **Installed as 1.0 (9)**; signed Developer ID build with Production CloudKit and APNs |
 | Anchor for iOS | **App Store Connect 1.0 (9) valid**; internal TestFlight assignment and unlocked-device update pending |
 | Anchor for watchOS | Embedded in valid build 1.0 (9) with Production CloudKit and APNs; TestFlight assignment and final physical interaction pending |
-| `anchor-mcp` | Working stdio MCP server, 7 tools, verified against a live store |
+| `anchor-mcp` | Working stdio MCP server, 10 tools; merged daily review is covered by local tests |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
 | macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
 | iOS/watchOS IPA | **App Store Connect 1.0 (9) valid**, including Watch and Live Activity targets; internal-group assignment pending |
@@ -170,8 +189,16 @@ Apple-issued provisioning profile that carries the iCloud container and app
 group. The installed macOS Developer ID build carries the same Production
 CloudKit container and app group.
 
-## Features (shipped)
+## Features (current source)
 
+- Local day planning with one-off blocks and recurring weekly routines for work,
+  commitments, rest, and intentional enjoyment
+- Evidence-first daily review of planned versus observed time, with deliberate
+  replans, internal pulls, external interruptions, human needs, estimation
+  errors, and Unknown kept distinct — never collapsed into an adherence score
+- Optional private behavior-pattern and life-direction onboarding using the
+  original Indulge artwork; selections remain editable in Settings and excluded
+  from Hub summaries
 - Focus sessions against a goal, with wall-clock timing that survives relaunch,
   sleep and cross-device sync
 - Automated iPhone coverage for the start, interruption, return, pause/resume,

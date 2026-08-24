@@ -141,6 +141,44 @@ struct ExportTests {
         #expect(bundle.sessions.count == 2)
         #expect(bundle.overview.sessionCount == 2)
         #expect(bundle.sessions.first?.distractions.count == 2)
+        #expect(bundle.plans.isEmpty)
+        #expect(bundle.divergences.isEmpty)
+    }
+
+    @Test("Unified export carries plans, causes, and private profile selections")
+    func unifiedJSONExport() throws {
+        let blockID = UUID()
+        let plan = PlanBlockRecord(
+            id: blockID,
+            title: "Walk",
+            plannedStart: Fixture.day0,
+            plannedSeconds: 1_800,
+            kind: .routine,
+            lifeDirection: .movement
+        )
+        let divergence = DivergenceRecord(
+            id: UUID(),
+            blockID: blockID,
+            occurredAt: Fixture.day0,
+            kind: .deliberateReplan,
+            evidence: .userConfirmed,
+            note: "Rain changed the route."
+        )
+        let data = try builder.jsonData(
+            from: records,
+            plans: [plan],
+            divergences: [divergence],
+            profile: BehaviorProfileRecord(selectedPatterns: [.shortVideo], desiredDirections: [.movement]),
+            now: Fixture.day0
+        )
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let bundle = try decoder.decode(ExportBundle.self, from: data)
+        #expect(bundle.plans.first?.title == "Walk")
+        #expect(bundle.divergences.first?.note == "Rain changed the route.")
+        #expect(bundle.profile.selectedPatterns == [.shortVideo])
+        #expect(builder.plansCSV(from: [plan]).contains("Walk"))
+        #expect(builder.divergencesCSV(from: [divergence]).contains("deliberateReplan"))
     }
 }
 

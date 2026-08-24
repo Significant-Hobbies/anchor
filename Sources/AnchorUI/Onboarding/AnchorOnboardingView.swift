@@ -1,16 +1,24 @@
 #if !os(watchOS)
 import AnchorCore
+import SwiftData
 import SwiftUI
 
 public struct AnchorOnboardingView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.modelContext) private var context
+    @Query private var profiles: [BehaviorProfile]
+    @AppStorage("anchor.onboarding.unified-step.v1") private var savedUnifiedStep = 0
     @AppStorage("anchor.onboarding.goal.v1") private var savedGoal = ""
     @AppStorage("anchor.onboarding.step.v1") private var savedStep = 0
+    @State private var unifiedStep: UnifiedStep = .welcome
+    @State private var selectedPatterns: Set<BehaviorPattern> = []
+    @State private var desiredDirections: Set<LifeDirection> = []
     @State private var rehearsal = OnboardingRehearsal()
     @State private var goal = ""
     @State private var thought = ""
     @State private var minutes = 25
+    @State private var profileSaveError: String?
     @FocusState private var focusedField: Field?
 
     private let isExistingOwnerOrientation: Bool
@@ -20,6 +28,13 @@ public struct AnchorOnboardingView: View {
     private enum Field: Hashable {
         case goal
         case thought
+    }
+
+    private enum UnifiedStep: Int, CaseIterable {
+        case welcome
+        case patterns
+        case directions
+        case rehearsal
     }
 
     public init(
@@ -37,11 +52,17 @@ public struct AnchorOnboardingView: View {
             theme.canvas.ignoresSafeArea()
             ScrollView {
                 Group {
-                    switch rehearsal.step {
-                    case .goal: goalStep
-                    case .focusing: focusStep
-                    case .capture: captureStep
-                    case .returned: returnStep
+                    switch unifiedStep {
+                    case .welcome: mergedWelcomeStep
+                    case .patterns: patternsStep
+                    case .directions: directionsStep
+                    case .rehearsal:
+                        switch rehearsal.step {
+                        case .goal: goalStep
+                        case .focusing: focusStep
+                        case .capture: captureStep
+                        case .returned: returnStep
+                        }
                     }
                 }
                 .frame(maxWidth: 620)
@@ -51,6 +72,7 @@ public struct AnchorOnboardingView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
+        .animation(reduceMotion ? nil : Motion.gentle, value: unifiedStep)
         .animation(reduceMotion ? nil : Motion.gentle, value: rehearsal.step)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
@@ -60,19 +82,147 @@ public struct AnchorOnboardingView: View {
         }
         .onAppear {
             if ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_DEMO"] == "1" {
+                savedUnifiedStep = 0
                 savedGoal = ""
                 savedStep = 0
+                unifiedStep = .welcome
                 goal = ""
                 rehearsal = OnboardingRehearsal()
             } else {
+                restoreProfile()
+                unifiedStep = UnifiedStep(rawValue: savedUnifiedStep) ?? .welcome
                 restore()
+            }
+        }
+    }
+
+    private var mergedWelcomeStep: some View {
+        VStack(spacing: Space.lg) {
+            Image("HabitsOnboarding")
+                .resizable()
+                .scaledToFit()
+                .frame(maxHeight: 260)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("A person balances time that slips away against time deliberately chosen for movement and growth.")
+
+            VStack(spacing: Space.xs) {
+                Text("Plan the day. Learn what moved it.")
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+                    .multilineTextAlignment(.center)
+                Text("Anchor compares the day you meant to live with the one you actually lived — without treating every change as failure.")
+                    .font(.body)
+                    .foregroundStyle(theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Card(padding: Space.lg) {
+                VStack(alignment: .leading, spacing: Space.sm) {
+                    mergedPromise("Build a realistic schedule", symbol: "calendar")
+                    mergedPromise("Catch interruptions while they happen", symbol: "bell.badge")
+                    mergedPromise("Separate your choices from what came to you", symbol: "arrow.triangle.branch")
+                }
+            }
+
+            Button("Choose what to protect") { moveUnified(to: .patterns) }
+                .buttonStyle(PrimaryButtonStyle())
+            Button(isExistingOwnerOrientation ? "Return to Anchor" : "I’ll explore first") { onOpenApp() }
+                .buttonStyle(QuietButtonStyle())
+            Text("About two minutes · everything is editable later")
+                .font(.footnote)
+                .foregroundStyle(theme.textTertiary)
+        }
+    }
+
+    private var patternsStep: some View {
+        VStack(spacing: Space.lg) {
+            onboardingProgress("1 OF 3 · OPTIONAL")
+            VStack(spacing: Space.xs) {
+                Text("What tends to take more time than you want?")
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+                    .multilineTextAlignment(.center)
+                Text("Choose anything you still enjoy but sometimes do on automatic. Anchor will never call intentional time a failure.")
+                    .font(.body)
+                    .foregroundStyle(theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 138, maximum: 190), spacing: Space.sm)], spacing: Space.sm) {
+                ForEach(BehaviorPattern.allCases, id: \.self) { pattern in
+                    BehavioralArtworkTile(
+                        imageName: pattern.artworkName,
+                        title: pattern.label,
+                        isSelected: selectedPatterns.contains(pattern)
+                    ) {
+                        if selectedPatterns.contains(pattern) {
+                            selectedPatterns.remove(pattern)
+                        } else {
+                            selectedPatterns.insert(pattern)
+                        }
+                        persistProfile()
+                    }
+                }
+            }
+
+            VStack(spacing: Space.sm) {
+                profileSaveFailure
+                Button(selectedPatterns.isEmpty ? "Continue without choosing" : "Continue with \(selectedPatterns.count) selected") {
+                    if persistProfile() { moveUnified(to: .directions) }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                Button("Back") { moveUnified(to: .welcome) }
+                    .buttonStyle(QuietButtonStyle())
+            }
+        }
+    }
+
+    private var directionsStep: some View {
+        VStack(spacing: Space.lg) {
+            onboardingProgress("2 OF 3 · OPTIONAL")
+            VStack(spacing: Space.xs) {
+                Text("What do you want that time to make room for?")
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+                    .multilineTextAlignment(.center)
+                Text("These are directions, not prescriptions. Anchor will use only the ones you choose when a replacement could genuinely help.")
+                    .font(.body)
+                    .foregroundStyle(theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: Space.sm)], spacing: Space.sm) {
+                ForEach(LifeDirection.allCases, id: \.self) { direction in
+                    BehavioralArtworkTile(
+                        imageName: direction.artworkName,
+                        title: direction.label,
+                        isSelected: desiredDirections.contains(direction)
+                    ) {
+                        if desiredDirections.contains(direction) {
+                            desiredDirections.remove(direction)
+                        } else {
+                            desiredDirections.insert(direction)
+                        }
+                        persistProfile()
+                    }
+                }
+            }
+
+            VStack(spacing: Space.sm) {
+                profileSaveFailure
+                Button(desiredDirections.isEmpty ? "Continue without choosing" : "Show me how Anchor protects it") {
+                    if persistProfile() { moveUnified(to: .rehearsal) }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                Button("Back") { moveUnified(to: .patterns) }
+                    .buttonStyle(QuietButtonStyle())
             }
         }
     }
 
     private var goalStep: some View {
         VStack(spacing: Space.lg) {
-            mark
+            onboardingProgress("3 OF 3 · QUICK REHEARSAL")
             Image("AnchorOnboarding")
                 .resizable()
                 .scaledToFit()
@@ -143,6 +293,8 @@ public struct AnchorOnboardingView: View {
             .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut("l", modifiers: [.command, .shift])
             platformCaptureHint
+            Button("Leave rehearsal") { onOpenApp() }
+                .buttonStyle(QuietButtonStyle())
         }
     }
 
@@ -175,6 +327,8 @@ public struct AnchorOnboardingView: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(trimmedThought.isEmpty)
                 .keyboardShortcut(.return, modifiers: [])
+            Button("Leave rehearsal") { onOpenApp() }
+                .buttonStyle(QuietButtonStyle())
         }
     }
 
@@ -187,7 +341,7 @@ public struct AnchorOnboardingView: View {
                     .font(.system(size: 34, weight: .medium))
                     .foregroundStyle(theme.accent)
             }
-            Text("Attention recovered.")
+            Text("Thought parked.")
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
             Card(padding: Space.lg) {
@@ -215,12 +369,14 @@ public struct AnchorOnboardingView: View {
             .foregroundStyle(theme.textSecondary)
 
             VStack(spacing: Space.sm) {
+                profileSaveFailure
                 Text("START A REAL SESSION").font(.caption2.weight(.semibold)).tracking(1.1)
                     .foregroundStyle(theme.textTertiary)
                 HStack(spacing: Space.xs) {
                     ForEach([15, 25, 45], id: \.self) { option in
                         Button("\(option)m") { minutes = option }
                             .buttonStyle(.bordered)
+                            .frame(minWidth: 44, minHeight: 44)
                             .tint(minutes == option ? theme.accent : theme.textTertiary)
                             .accessibilityAddTraits(minutes == option ? .isSelected : [])
                     }
@@ -228,10 +384,8 @@ public struct AnchorOnboardingView: View {
                 Button("Begin real focus") { complete() }
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.return, modifiers: .command)
-                if isExistingOwnerOrientation {
-                    Button("Return without starting") { onOpenApp() }
-                        .buttonStyle(QuietButtonStyle())
-                }
+                Button(isExistingOwnerOrientation ? "Return without starting" : "Open Anchor without starting") { onOpenApp() }
+                    .buttonStyle(QuietButtonStyle())
                 Button("Practice once more") {
                     thought = ""
                     rehearsal.practiceAgain()
@@ -247,6 +401,19 @@ public struct AnchorOnboardingView: View {
             .font(.system(size: 34, weight: .light))
             .foregroundStyle(theme.accent)
             .accessibilityHidden(true)
+    }
+
+    private func mergedPromise(_ text: String, symbol: String) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.body.weight(.medium))
+            .foregroundStyle(theme.textSecondary)
+    }
+
+    private func onboardingProgress(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .tracking(1.1)
+            .foregroundStyle(theme.textTertiary)
     }
 
     private var rehearsalLabel: some View {
@@ -288,9 +455,59 @@ public struct AnchorOnboardingView: View {
     }
 
     private func complete() {
+        guard persistProfile() else { return }
+        savedUnifiedStep = 0
         savedGoal = ""
         savedStep = 0
         onStartRealSession(rehearsal.goal, minutes)
+    }
+
+    private func moveUnified(to step: UnifiedStep) {
+        focusedField = nil
+        savedUnifiedStep = step.rawValue
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.16) : Motion.gentle) {
+            unifiedStep = step
+        }
+    }
+
+    private func restoreProfile() {
+        guard let profile = profiles.first else { return }
+        selectedPatterns = profile.selectedPatterns
+        desiredDirections = profile.desiredDirections
+    }
+
+    @discardableResult
+    private func persistProfile() -> Bool {
+        do {
+            let profile: BehaviorProfile
+            if let existing = try context.fetch(FetchDescriptor<BehaviorProfile>()).first {
+                profile = existing
+            } else {
+                profile = BehaviorProfile()
+                context.insert(profile)
+            }
+            profile.selectedPatterns = selectedPatterns
+            profile.desiredDirections = desiredDirections
+            profile.updatedAt = Date()
+            try context.save()
+            profileSaveError = nil
+            return true
+        } catch {
+            context.rollback()
+            profileSaveError = "Anchor couldn’t save these choices. They’re still selected here; try again."
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private var profileSaveFailure: some View {
+        if let profileSaveError {
+            Label(profileSaveError, systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(theme.negative)
+                .multilineTextAlignment(.center)
+                .accessibilityIdentifier("anchor.onboarding.profile-save-error")
+        }
     }
 
     private func persist(step: OnboardingRehearsal.Step) {
@@ -311,6 +528,50 @@ public struct AnchorOnboardingView: View {
             _ = restored.parkAndReturn()
         }
         rehearsal = restored
+    }
+}
+
+struct BehavioralArtworkTile: View {
+    @Environment(\.anchorTheme) private var theme
+    let imageName: String
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: Space.xs) {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 112)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .accessibilityHidden(true)
+                HStack(spacing: Space.xxs) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(theme.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? theme.accent : theme.textTertiary)
+                }
+                .padding(.horizontal, Space.sm)
+                .padding(.bottom, Space.sm)
+            }
+            .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.lg)
+                    .strokeBorder(isSelected ? theme.accent : theme.hairline, lineWidth: isSelected ? 2 : 1)
+            )
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

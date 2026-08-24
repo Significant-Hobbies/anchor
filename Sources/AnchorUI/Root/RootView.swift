@@ -51,12 +51,13 @@ public struct FocusScreen: View {
 
 /// Tabs, shared by both platforms so the two apps stay conceptually identical.
 public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
-    case focus, log, insights, settings
+    case day, focus, log, insights, settings
 
     public var id: String { rawValue }
 
     public var label: String {
         switch self {
+        case .day: "Day"
         case .focus: "Focus"
         case .log: "Parked"
         case .insights: "Insights"
@@ -66,6 +67,7 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
 
     public var symbolName: String {
         switch self {
+        case .day: "calendar"
         case .focus: "scope"
         case .log: "tray.full"
         case .insights: "chart.bar.xaxis"
@@ -82,10 +84,10 @@ public struct RootView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
-    @AppStorage("anchor.illustrated-onboarding.seen.v1") private var illustratedOnboardingSeen = false
+    @AppStorage("anchor.unified-day-onboarding.seen.v1") private var unifiedOnboardingSeen = false
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
-    @State private var tab: AnchorTab = .focus
+    @State private var tab: AnchorTab = .day
 
     public init(
         controller: FocusController,
@@ -94,7 +96,8 @@ public struct RootView: View {
         self.controller = controller
         self.storeKind = storeKind
         _tab = State(
-            initialValue: DemoData.initialTab.flatMap(AnchorTab.init(rawValue:)) ?? .focus
+            initialValue: DemoData.initialTab.flatMap(AnchorTab.init(rawValue:))
+                ?? (controller.hasSession ? .focus : .day)
         )
     }
 
@@ -102,12 +105,13 @@ public struct RootView: View {
         Group {
             if controller.hasSession || shouldSkipOnboarding {
                 appShell
-            } else if shouldForceOnboarding || !illustratedOnboardingSeen {
+            } else if shouldForceOnboarding || !unifiedOnboardingSeen {
                 AnchorOnboardingView(isExistingOwnerOrientation: !sessions.isEmpty) { goal, minutes in
-                    illustratedOnboardingSeen = true
+                    unifiedOnboardingSeen = true
+                    tab = .focus
                     _ = controller.start(goal: nil, intent: goal, minutes: minutes)
                 } onOpenApp: {
-                    illustratedOnboardingSeen = true
+                    unifiedOnboardingSeen = true
                 }
             } else {
                 appShell
@@ -181,6 +185,8 @@ public struct RootView: View {
     @ViewBuilder
     private func screen(for tab: AnchorTab) -> some View {
         switch tab {
+        case .day:
+            DayScreen(controller: controller) { self.tab = .focus }
         case .focus: FocusScreen(controller: controller)
         case .log: LogScreen()
         case .insights: AnalyticsScreen()

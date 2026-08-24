@@ -11,6 +11,10 @@ public enum AnchorStore {
         FocusSession.self,
         Distraction.self,
         MachineActivityDay.self,
+        BehaviorProfile.self,
+        ScheduleTemplate.self,
+        PlanBlock.self,
+        DivergenceEvent.self,
     ])
 
     /// App group so the Mac app, the iOS app and any future extension all read

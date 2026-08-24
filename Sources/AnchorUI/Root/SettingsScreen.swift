@@ -19,6 +19,8 @@ public struct SettingsScreen: View {
     @Environment(\.anchorPlatformSync) private var platform
     @Query private var goals: [Goal]
     @Query(sort: \Project.createdAt) private var projects: [Project]
+    @Query private var behaviorProfiles: [BehaviorProfile]
+    @State private var showsBehaviorProfile = false
     #if os(macOS)
     @State private var didCopy = false
     #endif
@@ -43,6 +45,25 @@ public struct SettingsScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.md) {
+                Card {
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        SectionHeader(
+                            "Patterns and alternatives",
+                            subtitle: "Private inputs for schedule reflection"
+                        )
+                        let profile = behaviorProfiles.first
+                        Text("\(profile?.selectedPatterns.count ?? 0) patterns to notice · \(profile?.desiredDirections.count ?? 0) directions to make room for")
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.textSecondary)
+                        Text("Intentional enjoyment is never treated as failure. These selections do not enter Hub summaries.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(theme.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Edit selections") { showsBehaviorProfile = true }
+                            .buttonStyle(QuietButtonStyle(expands: false))
+                    }
+                }
+
                 Card {
                     VStack(alignment: .leading, spacing: Space.sm) {
                         SectionHeader("On-device intelligence")
@@ -216,6 +237,9 @@ public struct SettingsScreen: View {
             .frame(maxWidth: .infinity)
         }
         .background(theme.canvas)
+        .sheet(isPresented: $showsBehaviorProfile) {
+            BehaviorProfileEditor().anchorTheme()
+        }
     }
 
     private func labelled(_ label: String, _ value: String) -> some View {

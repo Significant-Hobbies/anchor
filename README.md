@@ -1,11 +1,12 @@
 # Anchor
 
-A focus timer that takes distractions seriously.
+Plan the day, protect the present, and learn what moved it.
 
-You set an anchor — the thing you're actually trying to do — and start a timer.
-When something pulls at you, one keystroke parks it: you name it in a sentence,
-it's filed, and you're handed back your goal and the time remaining. Afterwards
-Anchor tells you what actually costs you your focus.
+You give Anchor a schedule made of work, commitments, recurring routines, rest,
+and intentional enjoyment. A focus block becomes the same wall-clock timer
+Anchor has always used. When something pulls at you, one keystroke parks it;
+the end-of-day review then compares what you planned with what was observed and
+keeps deliberate changes, internal pulls, and external interruptions distinct.
 
 Runs on macOS, iOS and Apple Watch from one shared codebase. The app is local-first;
 distraction text always stays on your device.
@@ -14,6 +15,12 @@ distraction text always stays on your device.
 
 ## What it does
 
+- **Day plan and review** — one-off blocks and recurring weekly routines,
+  linked directly to the focus timer, followed by an evidence-first comparison
+  of planned and observed time. There is no adherence score.
+- **Private pattern profile** — Indulge's original behavioral artwork helps you
+  choose which automatic activities to notice and what you want to make room
+  for. Intentional enjoyment is never classified as failure.
 - **Focus timer** with a goal, wall-clock accurate across relaunch, sleep and sync.
   Planned sessions end automatically and post a local notification.
 - **Lock a distraction** (`⌘⇧L`) — name it, park it, keep working. Or record
@@ -112,8 +119,8 @@ swift build -c release
 codex mcp add anchor -- "$PWD/.build/release/anchor-mcp"
 ```
 
-Then ask things like *"what broke my focus most this month?"* or *"which goal do I
-protect best?"*. Nine read-only tools; see [`docs/mcp-and-export.md`](docs/mcp-and-export.md).
+Then ask things like *"what broke my focus most this month?"* or *"why did today's
+plan move?"*. Ten tools; see [`docs/mcp-and-export.md`](docs/mcp-and-export.md).
 
 Check that on-device tagging is working on your machine:
 
@@ -131,13 +138,17 @@ Sources/
 Apps/
   Mac/ iOS/ Watch/  thin app shells; project.yml generates the Xcode project
   Shared/          asset catalog (accent colour + app icon)
-Tests/            87 tests, no Xcode required
+Tests/            shared tests, no Xcode required
 ```
 
 ## Documentation
 
 - [Architecture](docs/architecture.md) — how the pieces fit and why
 - [MCP and export](docs/mcp-and-export.md) — tools, formats, the hand-written xlsx writer
+- [Indulge/Habits consolidation](docs/INDULGE_RETIREMENT.md) — what Anchor carries,
+  what it replaces, and which compatibility resources remain
+- [Asset provenance](docs/ASSET_PROVENANCE.md) — self-contained origin records
+  for the merged onboarding artwork
 - [Decisions](docs/decisions.md) — the calls made along the way, and what they cost
 
 ## Privacy
