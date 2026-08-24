@@ -33,6 +33,15 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-24** — Released the unified four-surface source as Anchor `1.0
+  (12)`. The Apple Distribution iPhone archive, embedded Watch app, Production
+  CloudKit, shared app group, and non-debug entitlements were verified; App
+  Store Connect accepted delivery `50f8d0a9-d1c5-4e94-8c49-8979854a8092`
+  and began processing it. The matching Developer ID macOS build is installed
+  and running from `/Applications`; build 11 is recoverable in Trash. The DMG
+  is signed and hardened but not notarized because the local notary credential
+  profile is not installed.
+
 - **2026-08-24** — Reshaped Anchor around the final four-surface loop in issue
   #34: Focus resolves the current/next scheduled block and records explicit
   actual-activity overrides; Today shows the full chronological schedule and a
@@ -191,13 +200,13 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | **Installed as 1.0 (9)**; signed Developer ID build with Production CloudKit and APNs |
-| Anchor for iOS | **App Store Connect 1.0 (9) valid**; internal TestFlight assignment and unlocked-device update pending |
-| Anchor for watchOS | Embedded in valid build 1.0 (9) with Production CloudKit and APNs; TestFlight assignment and final physical interaction pending |
+| Anchor for macOS | **Installed and running as 1.0 (12)**; signed Developer ID build with Production CloudKit and APNs |
+| Anchor for iOS | **App Store Connect 1.0 (12) uploaded and processing**; internal TestFlight assignment pending |
+| Anchor for watchOS | Embedded in uploaded build 1.0 (12) with Production CloudKit and APNs; processing and final physical interaction pending |
 | `anchor-mcp` | Working stdio MCP server, 10 tools; merged daily review is covered by local tests |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
-| macOS DMG | **Signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **App Store Connect 1.0 (9) valid**, including Watch and Live Activity targets; internal-group assignment pending |
+| macOS DMG | **Build 12 signed** Developer ID, hardened runtime — not notarised |
+| iOS/watchOS IPA | **App Store Connect 1.0 (12) uploaded**, including Watch and Live Activity targets; processing/internal-group assignment pending |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -255,11 +264,11 @@ Open work is tracked in
 
 Known gaps carried forward:
 
-- **Final build-9 physical acceptance remains pending**: Production has all six
-  Anchor model types and the release now registers for APNs and reconciles
-  remote imports. Build 9 is valid in App Store Connect, but TestFlight group
-  assignment is not yet confirmed and the connected iPhone is locked; install build 9 before the last open-app
-  Mac–iPhone pause/end round trip.
+- **Final build-12 physical acceptance remains pending**: Production has all six
+  Anchor model types and the release registers for APNs and reconciles remote
+  imports. Build 12 is processing in App Store Connect; confirm internal-group
+  assignment and install it before the last open-app Mac–iPhone pause/end round
+  trip.
 - **Physical Watch interaction remains pending**: watchOS Developer Mode is
   disabled, so build 9 must be opened on the Watch itself for final pause/end
   verification.
