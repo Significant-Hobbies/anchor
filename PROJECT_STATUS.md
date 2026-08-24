@@ -33,14 +33,26 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-24** — Reshaped Anchor around the final four-surface loop in issue
+  #34: Focus resolves the current/next scheduled block and records explicit
+  actual-activity overrides; Today shows the full chronological schedule and a
+  neutral completion percentage; Habits owns behavior patterns, concrete
+  replacements, and recurring templates; History owns selectable planned-versus-
+  actual review with interruptions and trends behind it. Onboarding now carries
+  the original Indulge artwork through replacement selection, editable weekly
+  scheduling, and the interruption rehearsal. Settings moved behind the gear.
+  Verification on the final source: 134 shared tests across 19 suites, DebugLocal
+  macOS/iOS Simulator/watchOS Simulator builds, both Mac UI journeys, all four
+  focused iPhone UI journeys, and the live Apple Intelligence diagnostic (8/8
+  interruption categories and 4/4 goal themes).
+
 - **2026-08-24** — Merged Indulge's planning and pattern-change loop into Anchor
   locally under issue #33. Anchor now has a Day plan/review surface, recurring
   schedule templates, plan-to-session links, explicit divergence evidence, an
   editable private behavior profile, and Indulge's original onboarding,
   activity, and life-direction artwork with provenance. Export and MCP include
-  plan/review data. All 131 shared tests pass; DebugLocal Mac, iPhone (including
-  embedded Watch and Live Activity), and Watch simulator builds pass. This work
-  is not committed, released, or migrated into either app's production store.
+  plan/review data. The consolidation was committed to Anchor as `c842c8c`;
+  no production-store migration was performed.
 
 - **2026-08-24** — Declared Anchor the sole maintained successor to
   Indulge/Habits. The original hero, 24 behavior illustrations, eight life
@@ -196,11 +208,14 @@ CloudKit container and app group.
 - Evidence-first daily review of planned versus observed time, with deliberate
   replans, internal pulls, external interruptions, human needs, estimation
   errors, and Unknown kept distinct — never collapsed into an adherence score
-- Optional private behavior-pattern and life-direction onboarding using the
-  original Indulge artwork; selections remain editable in Settings and excluded
-  from Hub summaries
-- Focus sessions against a goal, with wall-clock timing that survives relaunch,
-  sleep and cross-device sync
+- Five-stage private onboarding using the original Indulge artwork: automatic
+  patterns, desired directions, concrete replacement habits, editable weekly
+  scheduling, and an interruption rehearsal
+- Four primary pages only: schedule-led Focus, Today, Habits, and History;
+  Settings is available from the gear action
+- Focus sessions against the current/next schedule block, with an explicit
+  actual-activity override and wall-clock timing that survives relaunch, sleep,
+  and cross-device sync
 - Automated iPhone coverage for the start, interruption, return, pause/resume,
   end, and persisted Parked-item journey, with explicit keyboard dismissal for
   both multiline entry forms
@@ -212,7 +227,7 @@ CloudKit container and app group.
   decline — turns the ordinary pause habit into data
 - Compact version in the menu bar and as a floating mini timer (`⌘0`): start,
   pause, resume, capture and end without the main window
-- Parked-item list with follow-up tracking and category correction
+- Parked-item list with follow-up tracking and category correction inside History
 - On-device tagging of goals into themes and distractions into 14 categories, with
   a deterministic rule-based fallback
 - Analytics: focus by day, distraction leaderboard, internal/external origin split,

@@ -14,7 +14,8 @@ a retired predecessor, not a second product competing for the same time.
 - The distinction between intentional enjoyment and time that ran on automatic.
 - Private, optional pattern and life-direction selections with no diagnosis,
   streak, score, or moral judgment.
-- Evidence-linked replacement suggestions after a real schedule gap.
+- Concrete replacement-habit suggestions during onboarding, plus evidence-linked
+  refinements after a real schedule gap.
 
 The assets and their provenance live in Anchor. The first-run experience also
 includes a real park-and-return rehearsal, so it reaches Anchor's core value
@@ -27,7 +28,7 @@ without reproducing Indulge's entire questionnaire.
 | recurring practices | schedule templates and recurring plan blocks |
 | one conscious trade | a planned block linked to a behavior pattern and life direction |
 | focus/interruption journal | focus sessions, captured distractions, and divergence events |
-| completed-trade history | Day Review, export, and local MCP queries |
+| completed-trade history | History day review, export, and local MCP queries |
 | pattern reflection | private behavior profile and evidence-linked suggestions |
 
 ## Intentionally retired
@@ -53,8 +54,9 @@ No migration or destructive cleanup is part of this consolidation. Preserve:
 - Personal Platform's `habits` domain, records, callbacks, and typed contracts;
 - `habits.significanthobbies.com` and `indulge.significanthobbies.com` as
   compatibility resources until a separately approved redirect or retirement;
-- the Indulge repository and local checkout as recoverable source history.
+- the Indulge Git repository and archived local checkout as recoverable source
+  history.
 
-The Indulge checkout is therefore unnecessary for ongoing Anchor development,
-but it should not be deleted until these uncommitted changes are safely retained
-in Git or another backup.
+The archived checkout at `fleet-inactive-projects/indulge` is unnecessary for
+ongoing Anchor development. Anchor owns the maintained implementation and its
+self-contained asset provenance.

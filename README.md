@@ -15,14 +15,16 @@ distraction text always stays on your device.
 
 ## What it does
 
-- **Day plan and review** — one-off blocks and recurring weekly routines,
-  linked directly to the focus timer, followed by an evidence-first comparison
-  of planned and observed time. There is no adherence score.
-- **Private pattern profile** — Indulge's original behavioral artwork helps you
-  choose which automatic activities to notice and what you want to make room
-  for. Intentional enjoyment is never classified as failure.
-- **Focus timer** with a goal, wall-clock accurate across relaunch, sleep and sync.
-  Planned sessions end automatically and post a local notification.
+- **Focus** automatically offers the current or next scheduled block, lets you
+  name what you are actually doing when reality changes, and keeps interruption
+  capture on top of the live wall-clock timer.
+- **Today** shows the complete chronological schedule and a neutral percentage
+  of scheduled blocks completed. It is a snapshot, never an adherence score.
+- **Habits** carries Indulge's original behavioral artwork from automatic-pattern
+  selection into concrete replacement suggestions and editable recurring blocks.
+- **History** compares the planned and lived day, with interruption evidence,
+  internal choices, external causes, and Unknown kept distinct. Parked items and
+  longer-term analytics live here as secondary views.
 - **Lock a distraction** (`⌘⇧L`) — name it, park it, keep working. Or record
   honestly that it won.
 - **Resuming asks what pulled you away.** A pause is usually an interruption, so
@@ -79,6 +81,10 @@ To explore with three weeks of plausible history instead of an empty database:
 ```bash
 ANCHOR_DEMO_DATA=1 ./path/to/Anchor.app/Contents/MacOS/Anchor
 ```
+
+Set `ANCHOR_INITIAL_TAB` to `focus`, `today`, `habits`, or `history` in demo
+mode. The old `day`, `log`, and `insights` values remain accepted as aliases for
+repeatable screenshot workflows.
 
 Demo data is only ever written into an empty store.
 

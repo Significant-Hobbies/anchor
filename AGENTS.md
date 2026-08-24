@@ -5,11 +5,11 @@
 
 ## What Anchor is
 
-A focus timer for macOS, iOS and watchOS. You name a goal, run a timer, and when
-something distracts you, you park it in one keystroke instead of losing the
-session. It then reports what actually costs you your focus. Storage is SwiftData
-+ CloudKit, with optional Personal Platform session summaries; grouping and
-tagging use Apple's on-device foundation model. Ships
+A private day planner and focus timer for macOS, iOS and watchOS. Its four primary
+surfaces are Focus, Today, Habits, and History: schedule the day, execute the
+current block, capture interruptions, and compare the planned day with the lived
+one. Storage is SwiftData + CloudKit, with optional Personal Platform session
+summaries; grouping and tagging use Apple's on-device foundation model. Ships
 under Significant Hobbies (`com.significanthobbies.anchor`).
 
 ## Critical constraints
@@ -43,7 +43,7 @@ under Significant Hobbies (`com.significanthobbies.anchor`).
 ## Build, test, run
 
 ```bash
-swift build && swift test          # shared package — 77 tests, no Xcode needed
+swift build && swift test          # shared package — no Xcode needed
 cd Apps && xcodegen generate       # regenerate the Xcode project after editing project.yml
 xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (macOS)" build
 xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (iOS)" \
@@ -70,7 +70,7 @@ Verify on-device tagging actually works before trusting it:
 ```
 
 Screenshots and manual QA: `ANCHOR_DEMO_DATA=1` seeds three weeks of history into
-an empty store, and `ANCHOR_INITIAL_TAB=insights` opens on a given tab. Both are
+an empty store, and `ANCHOR_INITIAL_TAB=history` opens on a given tab. Both are
 ignored outside demo mode. `ANCHOR_STORE_PATH` redirects the database, which is how
 to avoid touching real data while testing.
 

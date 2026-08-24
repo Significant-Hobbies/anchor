@@ -33,7 +33,11 @@ final class AnchorWatchWorld {
     let controller: FocusController
 
     init() {
+        #if ANCHOR_LOCAL_ONLY
+        let (container, _) = AnchorStore.makeLocalResilientContainer()
+        #else
         let (container, _) = AnchorStore.makeResilientContainer()
+        #endif
         self.container = container
         if DemoData.isRequested {
             DemoData.seedIfNeeded(into: container.mainContext)

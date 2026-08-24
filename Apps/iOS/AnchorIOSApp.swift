@@ -38,7 +38,11 @@ final class AnchorWorld {
     let storeKind: AnchorStore.StoreKind
 
     init() {
+        #if ANCHOR_LOCAL_ONLY
+        let (container, kind) = AnchorStore.makeLocalResilientContainer()
+        #else
         let (container, kind) = AnchorStore.makeResilientContainer()
+        #endif
         self.container = container
         self.storeKind = kind
         if DemoData.isRequested {

@@ -20,6 +20,11 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label == %@", "More creativity")).firstMatch.click()
         app.buttons["Show me how Anchor protects it"].click()
 
+        XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
+        app.buttons["Schedule these habits"].click()
+        XCTAssertTrue(app.staticTexts["Give each habit a real place."].waitForExistence(timeout: 4))
+        app.buttons["Save schedule and learn interruptions"].click()
+
         XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 4))
 
         let goal = app.textFields.firstMatch

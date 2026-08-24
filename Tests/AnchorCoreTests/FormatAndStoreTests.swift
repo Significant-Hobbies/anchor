@@ -93,6 +93,16 @@ struct AnchorStoreTests {
         )
     }
 
+    @MainActor
+    @Test("Unsigned app builds open a local-only container")
+    func localResilientContainerNeverUsesCloudKit() {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "anchor-local-\(UUID().uuidString).store")
+        let result = AnchorStore.makeLocalResilientContainer(url: url)
+        #expect(result.kind == .localOnly)
+        #expect(result.container.configurations.first?.cloudKitContainerIdentifier == nil)
+    }
+
     @Test("The store path always lands on a writable directory")
     func storeURLIsWritable() {
         let url = AnchorStore.storeURL()

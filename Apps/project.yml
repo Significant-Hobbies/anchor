@@ -40,6 +40,9 @@ settings:
     CODE_SIGN_STYLE: Automatic
     ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+  configs:
+    DebugLocal:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) ANCHOR_LOCAL_ONLY"
 
 targets:
   AnchorMac:

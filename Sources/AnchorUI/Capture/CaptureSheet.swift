@@ -96,17 +96,24 @@ public struct CaptureSheet: View {
             }
 
             Card(padding: Space.md) {
-                TextField(
-                    isReturningFromPause ? "Ravi came over about the invoice" : "Slack from Ravi about the invoice",
-                    text: $note,
-                    axis: .vertical
-                )
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 17, weight: .medium, design: .rounded))
-                    .foregroundStyle(theme.textPrimary)
-                    .lineLimit(1...4)
-                    .focused($fieldFocused)
-                    .onSubmit(park)
+                VStack(alignment: .trailing, spacing: Space.xs) {
+                    TextField(
+                        isReturningFromPause ? "Ravi came over about the invoice" : "Slack from Ravi about the invoice",
+                        text: $note,
+                        axis: .vertical
+                    )
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 17, weight: .medium, design: .rounded))
+                        .foregroundStyle(theme.textPrimary)
+                        .lineLimit(1...4)
+                        .focused($fieldFocused)
+                        .onSubmit(park)
+                    if fieldFocused {
+                        Button("Done") { fieldFocused = false }
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(theme.accent)
+                    }
+                }
             }
 
             VStack(alignment: .leading, spacing: Space.xs) {

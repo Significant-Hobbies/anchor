@@ -164,6 +164,37 @@ struct DayPlanTests {
         #expect(profile.desiredDirections == [.creativity, .sleep])
         #expect(BehaviorPattern.allCases.allSatisfy { !$0.label.isEmpty && !$0.artworkName.isEmpty })
     }
+
+    @Test("Every life direction has an actionable habit suggestion")
+    func habitSuggestionsAreComplete() {
+        for direction in LifeDirection.allCases {
+            let suggestion = direction.habitSuggestion
+            #expect(suggestion.direction == direction)
+            #expect(!suggestion.title.isEmpty)
+            #expect(suggestion.plannedMinutes >= 5)
+            #expect((0..<1_440).contains(suggestion.startMinutesFromMidnight))
+        }
+    }
+
+    @Test("Focus resolves the active, current, upcoming, then last unfinished block")
+    func scheduledFocusResolution() {
+        let resolver = ScheduledFocusResolver()
+        let now = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: Date(timeIntervalSince1970: 1_704_067_200))!
+        let early = PlanBlockRecord(id: UUID(), title: "Walk", plannedStart: now.addingTimeInterval(-7_200), plannedSeconds: 1_800)
+        let current = PlanBlockRecord(id: UUID(), title: "Write", plannedStart: now.addingTimeInterval(-600), plannedSeconds: 1_800)
+        let upcoming = PlanBlockRecord(id: UUID(), title: "Call", plannedStart: now.addingTimeInterval(3_600), plannedSeconds: 1_800)
+
+        #expect(resolver.nextBlock(from: [upcoming, early, current], now: now, calendar: calendar)?.id == current.id)
+
+        var active = upcoming
+        active.state = .inProgress
+        #expect(resolver.nextBlock(from: [current, active], now: now, calendar: calendar)?.id == active.id)
+
+        var completedCurrent = current
+        completedCurrent.state = .completed
+        #expect(resolver.nextBlock(from: [early, completedCurrent, upcoming], now: now, calendar: calendar)?.id == upcoming.id)
+        #expect(resolver.nextBlock(from: [early], now: now, calendar: calendar)?.id == early.id)
+    }
 }
 
 @Suite("Day review")

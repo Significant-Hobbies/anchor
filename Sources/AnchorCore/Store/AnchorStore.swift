@@ -88,6 +88,23 @@ public enum AnchorStore {
         fatalError("Anchor could not open any model container.")
     }
 
+    /// DebugLocal and other explicitly unsigned shells must never start a
+    /// CloudKit mirror. Container construction can appear to succeed before
+    /// Core Data discovers the missing entitlement on its background queue, so
+    /// this boundary cannot rely on the catch-and-fallback path above.
+    public static func makeLocalResilientContainer(url: URL? = nil) -> (container: ModelContainer, kind: StoreKind) {
+        if let container = try? ModelContainer(
+            for: schema,
+            configurations: configuration(kind: .localOnly, url: url)
+        ) {
+            return (container, .localOnly)
+        }
+        if let container = try? makeContainer(kind: .inMemory) {
+            return (container, .inMemory)
+        }
+        fatalError("Anchor could not open a local model container.")
+    }
+
     /// An explicit path is used by UI tests and local tools that deliberately
     /// operate outside the signed app container. Do not ask CloudKit to mirror
     /// those stores: Core Data can terminate asynchronously when the process

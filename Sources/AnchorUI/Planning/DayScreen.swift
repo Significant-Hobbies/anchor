@@ -3,46 +3,7 @@ import AnchorCore
 import SwiftData
 import SwiftUI
 
-public struct DayScreen: View {
-    @Environment(\.anchorTheme) private var theme
-    private let controller: FocusController
-    private let onOpenFocus: () -> Void
-    @State private var section: Section = .plan
-
-    private enum Section: String, CaseIterable, Identifiable {
-        case plan = "Plan"
-        case review = "Review"
-        var id: String { rawValue }
-    }
-
-    public init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
-        self.controller = controller
-        self.onOpenFocus = onOpenFocus
-    }
-
-    public var body: some View {
-        VStack(spacing: 0) {
-            Picker("Day section", selection: $section) {
-                ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, Space.lg)
-            .padding(.top, Space.sm)
-            .padding(.bottom, Space.xs)
-            .frame(maxWidth: 680)
-
-            switch section {
-            case .plan:
-                PlanScreen(controller: controller, onOpenFocus: onOpenFocus)
-            case .review:
-                DayReviewScreen()
-            }
-        }
-        .background(theme.canvas)
-    }
-}
-
-private struct PlanScreen: View {
+struct PlanScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
@@ -75,6 +36,8 @@ private struct PlanScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
                 dayHeader
+
+                completionCard
 
                 if let loadError {
                     Label(loadError, systemImage: "exclamationmark.triangle")
@@ -194,6 +157,39 @@ private struct PlanScreen: View {
             DatePicker("Day", selection: $selectedDay, displayedComponents: .date)
                 .labelsHidden()
         }
+    }
+
+    private var completionCard: some View {
+        let completed = blocks.filter { $0.state == .completed }.count
+        let percent = Int((Double(completed) / Double(max(1, blocks.count)) * 100).rounded())
+        return Card(padding: Space.lg) {
+            HStack(spacing: Space.md) {
+                ZStack {
+                    Circle()
+                        .stroke(theme.hairline, lineWidth: 7)
+                    Circle()
+                        .trim(from: 0, to: Double(percent) / 100)
+                        .stroke(theme.accent, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(percent)%")
+                        .font(.title3.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(theme.textPrimary)
+                }
+                .frame(width: 72, height: 72)
+
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Text(blocks.isEmpty ? "No blocks scheduled yet" : "\(completed) of \(blocks.count) scheduled blocks complete")
+                        .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
+                    Text("A neutral snapshot of the schedule so far — not a score.")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.textSecondary)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("anchor.today.completion")
     }
 
     private func refresh() {
@@ -374,7 +370,7 @@ private struct PlanBlockRow: View {
     }
 }
 
-private struct PlanBlockEditor: View {
+struct PlanBlockEditor: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -387,6 +383,7 @@ private struct PlanBlockEditor: View {
     @State private var repeats = false
     @State private var weekdays: Set<ScheduleWeekday>
     @State private var direction: LifeDirection?
+    @State private var behaviorPattern: BehaviorPattern?
     @State private var saveError: String?
     private let block: PlanBlock?
     private let template: ScheduleTemplate?
@@ -396,6 +393,7 @@ private struct PlanBlockEditor: View {
         initialDay: Date,
         block: PlanBlock? = nil,
         template: ScheduleTemplate? = nil,
+        startsRecurring: Bool = false,
         onSave: @escaping () -> Void
     ) {
         let calendar = Calendar.current
@@ -420,9 +418,10 @@ private struct PlanBlockEditor: View {
         _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? template?.plannedSeconds ?? 1_800) / 60))
         _kind = State(initialValue: block?.kind ?? template?.kind ?? .focus)
         _flexibility = State(initialValue: block?.flexibility ?? template?.flexibility ?? .flexible)
-        _repeats = State(initialValue: template != nil)
+        _repeats = State(initialValue: template != nil || startsRecurring)
         _weekdays = State(initialValue: template?.weekdays ?? [ScheduleWeekday(day: suggested)])
         _direction = State(initialValue: block?.lifeDirection ?? template?.lifeDirection)
+        _behaviorPattern = State(initialValue: block?.behaviorPattern ?? template?.behaviorPattern)
         self.block = block
         self.template = template
         self.onSave = onSave
@@ -475,6 +474,10 @@ private struct PlanBlockEditor: View {
                             Text("No linked direction").tag(LifeDirection?.none)
                             ForEach(LifeDirection.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
                         }
+                        Picker("Helps replace", selection: $behaviorPattern) {
+                            Text("No linked pattern").tag(BehaviorPattern?.none)
+                            ForEach(BehaviorPattern.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
+                        }
                     }
                 }
             }
@@ -508,6 +511,7 @@ private struct PlanBlockEditor: View {
                 block.kind = kind
                 block.flexibility = flexibility
                 block.lifeDirection = direction
+                block.behaviorPattern = behaviorPattern
                 if block.templateID != nil && occurrenceChanged {
                     block.isTemplateOverride = true
                 }
@@ -532,6 +536,7 @@ private struct PlanBlockEditor: View {
                 template.kind = kind
                 template.flexibility = flexibility
                 template.lifeDirection = direction
+                template.behaviorPattern = behaviorPattern
                 try DayPlanService(context: context).reconcileFutureBlocks(for: template)
             } else if repeats {
                 let template = ScheduleTemplate(
@@ -542,6 +547,7 @@ private struct PlanBlockEditor: View {
                     weekdays: weekdays,
                     kind: kind,
                     flexibility: flexibility,
+                    behaviorPattern: behaviorPattern,
                     lifeDirection: direction
                 )
                 context.insert(template)
@@ -555,6 +561,7 @@ private struct PlanBlockEditor: View {
                     plannedSeconds: minutes * 60,
                     kind: kind,
                     flexibility: flexibility,
+                    behaviorPattern: behaviorPattern,
                     lifeDirection: direction
                 ))
                 try context.save()
@@ -569,7 +576,7 @@ private struct PlanBlockEditor: View {
     }
 }
 
-private struct RoutineManager: View {
+struct RoutineManager: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -741,7 +748,7 @@ struct DivergenceEditor: View {
     }
 }
 
-private struct DayReviewScreen: View {
+struct DayReviewScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
