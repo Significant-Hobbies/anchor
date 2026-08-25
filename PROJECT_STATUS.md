@@ -43,9 +43,13 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
   and 4/4 goal themes). The App Store archive and exported IPA pass Apple
   Distribution inspection with the embedded Watch and Live Activity binaries,
   Production APNs and CloudKit, the shared app group, Sign in with Apple, and
-  `get-task-allow=false`; App Store Connect delivery is the remaining release
-  gate. macOS XCUITest on the Xcode 27 beta host currently fails to foreground
-  the app before its first assertion and is not counted as passing.
+  `get-task-allow=false`. The verified IPA is preserved locally as
+  `dist/Anchor-1.0-13.ipa` (SHA-256 `7e770abc7ac1b46ba8b6b3934bb47dc9c281efe353417e80b06f522487f49c3a`).
+  Automated App Store Connect delivery is blocked only by Xcode's missing valid
+  account session for team `8F7LXHTJZR`; re-authentication or Transporter upload
+  is the remaining release gate. macOS XCUITest on the Xcode 27 beta host
+  currently fails to foreground the app before its first assertion and is not
+  counted as passing.
 
 - **2026-08-24** — Released the unified four-surface source as Anchor `1.0
   (12)`. The Apple Distribution iPhone archive, embedded Watch app, Production
