@@ -92,23 +92,25 @@ Demo data is only ever written into an empty store.
 
 ```bash
 ./scripts/release-mac.sh    # Developer ID signed, hardened Anchor-<v>.dmg
-./scripts/release-ios.sh    # App Store signed Anchor-<v>.ipa, watch app embedded
+./scripts/release-ios.sh    # App Store signed Anchor-<v>-<build>.ipa
+./scripts/release-ios.sh --upload       # build, verify, and deliver to Apple
+./scripts/release-ios.sh --upload-only  # deliver the existing build
 ```
 
 Both write to `dist/` and verify what they produced — signature, hardened
 runtime, entitlements, and (for iOS) that the watch app is really in the payload.
 
-Finishing each one needs your Apple credentials:
+Credentials stay in the macOS login Keychain. Configure or refresh the iOS
+upload credential once using a hidden prompt; the password never enters the
+repository, command arguments, logs, or shell history:
 
 ```bash
+./scripts/release-ios.sh --configure-upload
+
 # Notarise the DMG (once: store an app-specific password from appleid.apple.com)
 xcrun notarytool store-credentials "anchor-notary" \
   --apple-id "<apple-id>" --team-id 8F7LXHTJZR --password "<app-specific-password>"
 ANCHOR_NOTARY_PROFILE=anchor-notary ./scripts/release-mac.sh
-
-# Upload the IPA — or just drag it into Transporter
-xcrun altool --upload-app -f dist/Anchor-1.0.ipa -t ios \
-  --apple-id "<apple-id>" --password "<app-specific-password>"
 ```
 
 The Mac direct-download and iOS/watchOS builds use the same production CloudKit
