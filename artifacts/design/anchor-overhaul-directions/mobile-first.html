@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Anchor mobile-first directions</title>
+    <style>
+      * { box-sizing: border-box; }
+      :root { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; color-scheme: light; }
+      html, body { margin: 0; width: 100%; min-height: 100%; }
+      button { font: inherit; }
+      .screen { width: 100%; min-height: 100vh; overflow: hidden; position: relative; }
+      .status { height: 46px; padding: 14px 21px 0; display: flex; justify-content: space-between; align-items: start; font-size: 12px; font-weight: 700; position: relative; z-index: 5; }
+      .signal { letter-spacing: 1px; }
+      .head { padding: 8px 20px 10px; }
+      .head-row { display: flex; align-items: center; justify-content: space-between; }
+      h1 { font-size: 34px; line-height: 1; letter-spacing: -.04em; margin: 0; }
+      .head p { margin: 6px 0 0; font-size: 13px; }
+      .week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; padding: 8px 18px 14px; }
+      .day { min-width: 0; height: 50px; border-radius: 13px; display: grid; place-items: center; align-content: center; gap: 3px; font-size: 10px; border: 0; background: transparent; }
+      .day b { font-size: 14px; }
+      .timeline { position: relative; margin: 0 12px 94px; border-radius: 18px; padding: 12px 10px 12px 54px; }
+      .slot { position: relative; min-height: 84px; border-top: 1px solid; padding: 7px 0 6px; }
+      .slot time { position: absolute; right: calc(100% + 10px); top: 8px; width: 40px; text-align: right; font-size: 10px; }
+      .block { min-height: 68px; border-radius: 13px; padding: 10px 12px; display: flex; justify-content: space-between; gap: 8px; }
+      .block b { display: block; font-size: 14px; line-height: 1.2; }
+      .block small { display: block; margin-top: 4px; font-size: 10px; line-height: 1.2; }
+      .block .state { font-size: 10px; white-space: nowrap; }
+      .open-slot { width: 100%; min-height: 52px; border: 1px dashed; border-radius: 12px; background: transparent; text-align: left; padding: 0 12px; font-weight: 650; }
+      .now-line { position: absolute; z-index: 3; left: 46px; right: 11px; top: 178px; border-top: 2px solid; }
+      .now-line::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; left: -3px; top: -5px; background: currentColor; }
+      .fab { position: fixed; right: 20px; bottom: 88px; z-index: 8; width: 54px; height: 54px; border-radius: 50%; border: 0; color: white; font-size: 25px; box-shadow: 0 12px 26px rgba(0,0,0,.24); }
+      .tabs { position: fixed; z-index: 7; left: 12px; right: 12px; bottom: 11px; min-height: 64px; border-radius: 22px; padding: 8px 7px; display: grid; grid-template-columns: repeat(4, 1fr); box-shadow: 0 10px 34px rgba(14,22,38,.18); backdrop-filter: blur(24px); }
+      .tab { border: 0; background: transparent; border-radius: 15px; font-size: 9px; display: grid; place-items: center; gap: 3px; }
+      .tab i { font-style: normal; font-size: 19px; line-height: 1; }
+      .study { display: none; }
+      .zoom { display: none; }
+
+      /* Day Overlay — the timeline is the interaction, not a modal result. */
+      .trace { background: #f4f7fc; color: #112044; }
+      .trace::before { content: ""; position: absolute; inset: 0; opacity: .09; background-image: linear-gradient(#2469ed 1px, transparent 1px), linear-gradient(90deg, #2469ed 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; }
+      .trace .head p, .trace .slot time { color: #75829d; }
+      .trace .day { color: #68758e; }
+      .trace .day.on { background: #2469ed; color: white; box-shadow: 0 8px 18px rgba(36,105,237,.24); }
+      .trace .timeline { background: rgba(255,255,255,.84); border: 1px solid #d5dff2; box-shadow: 0 18px 38px rgba(31,58,112,.09); }
+      .trace .slot { border-color: #e0e6f2; }
+      .trace .block { background: #e3ecff; border: 1px solid #9bbafa; color: #174eae; }
+      .trace .block.lunch { background: #fff1d8; border-color: #edc16e; color: #754d08; }
+      .trace .block.next { background: #f0e8ff; border-color: #c0a4f0; color: #61399a; }
+      .trace .open-slot { border-color: #98add8; color: #52698f; }
+      .trace .now-line { color: #ef6877; border-color: #ef6877; }
+      .trace .fab { background: #2469ed; }
+      .trace .tabs { background: rgba(255,255,255,.88); }
+      .trace .tab { color: #77839a; }
+      .trace .tab.on { color: #2469ed; background: #e9f0ff; }
+
+      /* Departure Lines — each row is a touch-sized operating strip. */
+      .departure { background: #12372e; color: #fff2c8; font-family: "Arial Narrow", Arial, sans-serif; }
+      .departure .head { text-transform: uppercase; }
+      .departure h1 { font-family: Impact, "Arial Narrow", sans-serif; font-size: 46px; letter-spacing: -.015em; }
+      .departure .head p, .departure .slot time { color: #9ebdb3; }
+      .departure .day { color: #afc9c1; border-radius: 2px; }
+      .departure .day.on { background: #ffd95b; color: #12372e; }
+      .departure .timeline { border-radius: 0; background: #0d2a23; padding-top: 8px; padding-bottom: 8px; box-shadow: 0 18px 38px #071d18; }
+      .departure .slot { border-color: #315e52; min-height: 92px; }
+      .departure .block { border-radius: 1px; min-height: 76px; background: #1a4a3e; color: #fff2c8; text-transform: uppercase; align-items: center; }
+      .departure .block b { font-size: 19px; }
+      .departure .block small { color: #b9d0c9; }
+      .departure .block.active { background: #ffde74; color: #12372e; }
+      .departure .block.active small { color: #45665d; }
+      .departure .block.interrupted { background: #ef9199; color: #401218; }
+      .departure .open-slot { border-radius: 1px; border-color: #ffd95b; color: #ffd95b; text-transform: uppercase; }
+      .departure .fab { background: #ffd95b; color: #12372e; border-radius: 3px; }
+      .departure .tabs { background: rgba(8,29,24,.9); border-radius: 4px; border: 1px solid #315e52; }
+      .departure .tab { color: #91b0a7; border-radius: 2px; text-transform: uppercase; }
+      .departure .tab.on { background: #ffd95b; color: #12372e; }
+      .departure .now-line { color: #ef9199; border-color: #ef9199; }
+
+      /* Focus Viewfinder — thumb zoom changes the level of schedule context. */
+      .viewfinder { background: #080a0e; color: #f5f7fb; }
+      .viewfinder::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 38%, rgba(36,105,237,.3), transparent 34%); }
+      .viewfinder .status, .viewfinder .head, .viewfinder .week, .viewfinder .timeline { position: relative; z-index: 2; }
+      .viewfinder .head p, .viewfinder .slot time { color: #8794aa; }
+      .viewfinder .day { color: #7f8ba0; border-radius: 4px; }
+      .viewfinder .day.on { color: #ffb13b; outline: 1px solid #ffb13b; }
+      .viewfinder .timeline { background: transparent; border-radius: 0; padding-left: 52px; }
+      .viewfinder .slot { border-color: #252d3a; min-height: 91px; }
+      .viewfinder .block { background: #121722; border: 1px solid #343e50; color: #e9edf5; border-radius: 8px; }
+      .viewfinder .block.active { outline: 2px solid #74a0ff; outline-offset: 4px; background: #18243a; }
+      .viewfinder .block.active::before, .viewfinder .block.active::after { content: ""; position: absolute; width: 16px; height: 16px; border-color: #ffb13b; border-style: solid; }
+      .viewfinder .block.active::before { left: 4px; top: 3px; border-width: 2px 0 0 2px; }
+      .viewfinder .block.active::after { right: 4px; bottom: 3px; border-width: 0 2px 2px 0; }
+      .viewfinder .open-slot { border-color: #525f73; color: #9aa5b6; }
+      .viewfinder .now-line { color: #ffb13b; border-color: #ffb13b; }
+      .viewfinder .fab { background: #ffb13b; color: #0b0d11; border-radius: 6px; }
+      .viewfinder .tabs { background: rgba(16,20,27,.88); border: 1px solid #303746; border-radius: 8px; }
+      .viewfinder .tab { color: #758197; border-radius: 5px; }
+      .viewfinder .tab.on { color: #ffb13b; outline: 1px solid #ffb13b; }
+      .viewfinder .zoom { display: block; position: fixed; z-index: 8; left: 20px; bottom: 89px; color: #ffb13b; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+
+      @media (min-width: 600px) {
+        body { display: grid; place-items: center; background: #dfe4eb; padding: 24px; }
+        .screen { width: 390px; min-height: 844px; max-height: 844px; border-radius: 44px; box-shadow: 0 30px 80px rgba(17,25,39,.26); }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="screen" class="screen trace">
+      <span class="study">Mobile-first direction study · illustrative data</span>
+      <div class="status"><span>9:41</span><span class="signal">●●● ᯤ 100%</span></div>
+      <header class="head"><div class="head-row"><div><h1>Today</h1><p>A plan is a hypothesis.</p></div><button aria-label="More" style="border:0;background:transparent;font-size:22px;color:inherit">•••</button></div></header>
+      <div class="week"><button class="day"><span>M</span><b>24</b></button><button class="day on"><span>T</span><b>25</b></button><button class="day"><span>W</span><b>26</b></button><button class="day"><span>T</span><b>27</b></button><button class="day"><span>F</span><b>28</b></button><button class="day"><span>S</span><b>29</b></button><button class="day"><span>S</span><b>30</b></button></div>
+      <section class="timeline" aria-label="Today's schedule">
+        <div class="now-line"></div>
+        <div class="slot"><time>8 AM</time><article class="block"><div><b>Plan the launch</b><small>8:10–9:25 · Focus</small></div><span class="state">Done</span></article></div>
+        <div class="slot"><time>9:30</time><article class="block active"><div><b>Build the schedule view</b><small>9:40–11:10 · 38 min left</small></div><span class="state">Now</span></article></div>
+        <div class="slot"><time>11:30</time><article class="block lunch"><div><b>Lunch outside</b><small>11:30–12:15 · Enjoyment</small></div><span class="state">Next</span></article></div>
+        <div class="slot"><time>12:20</time><button class="open-slot">＋ Use this open time</button></div>
+        <div class="slot"><time>1 PM</time><article class="block next"><div><b>Release checks</b><small>1:00–2:25 · Focus</small></div><span class="state">Later</span></article></div>
+      </section>
+      <span class="zoom">DAY ━━━━━●━━ NOW</span>
+      <button class="fab" aria-label="Add block">＋</button>
+      <nav class="tabs"><button class="tab"><i>◎</i>Focus</button><button class="tab on"><i>▤</i>Today</button><button class="tab"><i>↻</i>Habits</button><button class="tab"><i>◴</i>History</button></nav>
+    </main>
+    <script>
+      const direction = new URLSearchParams(location.search).get('direction') || 'trace';
+      const screen = document.querySelector('#screen');
+      screen.className = `screen ${direction}`;
+      if (direction === 'departure') {
+        screen.querySelector('h1').textContent = 'TODAY’S BOARD';
+        screen.querySelector('.head p').textContent = 'EVERY BLOCK HAS A STATE.';
+        screen.querySelectorAll('.state')[0].textContent = 'ARRIVED';
+        screen.querySelectorAll('.state')[1].textContent = 'NOW · 38 MIN';
+        screen.querySelectorAll('.state')[2].textContent = 'ON TIME';
+        screen.querySelectorAll('.state')[3].textContent = 'NEXT';
+      }
+      if (direction === 'viewfinder') {
+        screen.querySelector('h1').textContent = 'Frame the day';
+        screen.querySelector('.head p').textContent = 'Wide plan. Clear now.';
+      }
+    </script>
+  </body>
+</html>

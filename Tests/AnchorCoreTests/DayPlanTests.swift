@@ -154,6 +154,96 @@ struct DayPlanTests {
         #expect(try DayPlanService(context: context, calendar: calendar).materialize(day: monday).isEmpty)
     }
 
+    @Test("Daily confirmation keeps the usual week separate from a today-only choice")
+    func dailyConfirmationRecordsBaselineRevision() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let monday = Date(timeIntervalSince1970: 1_704_067_200)
+        let template = ScheduleTemplate(
+            title: "Write",
+            startMinutesFromMidnight: 9 * 60,
+            plannedSeconds: 60 * 60,
+            weekdays: [.monday]
+        )
+        context.insert(template)
+        try context.save()
+
+        let service = DailyPlanService(context: context, calendar: calendar)
+        let first = try service.record(.later, for: monday, at: monday.addingTimeInterval(60))
+        #expect(first.decision == .later)
+        #expect(first.confirmedAt == nil)
+        #expect(!first.baselineRevision.isEmpty)
+
+        let confirmed = try service.record(.adjusted, for: monday, at: monday.addingTimeInterval(120))
+        #expect(confirmed.id == first.id)
+        #expect(confirmed.decision == .adjusted)
+        #expect(confirmed.confirmedAt != nil)
+        #expect(try context.fetch(FetchDescriptor<DayPlanConfirmation>()).count == 1)
+    }
+
+    @Test("Habit slots never include ordinary recurring schedule items")
+    func habitSlotsAreExplicit() {
+        let routine = ScheduleTemplate(
+            title: "Lunch",
+            startMinutesFromMidnight: 13 * 60,
+            plannedSeconds: 45 * 60,
+            kind: .routine
+        )
+        let habit = ScheduleTemplate(
+            title: "Walk",
+            startMinutesFromMidnight: 18 * 60,
+            plannedSeconds: 20 * 60,
+            kind: .routine,
+            isBehaviorHabit: true
+        )
+
+        #expect(!routine.isActiveBehaviorHabit)
+        #expect(habit.isActiveBehaviorHabit)
+        #expect(HabitPolicy().canAdd(activeHabitCount: 4))
+        #expect(!HabitPolicy().canAdd(activeHabitCount: 5))
+    }
+
+    @Test("Habit streak follows the actual weekly schedule and ignores off-days")
+    func habitStreakCountsScheduledOccurrences() {
+        let templateID = UUID()
+        let monday = Date(timeIntervalSince1970: 1_704_067_200)
+        let offsets = [0, 2, 4, 7, 9, 11, 14]
+        let records = offsets.map { offset in
+            let occurrenceDay = calendar.date(byAdding: .day, value: offset, to: monday)!
+            return PlanBlockRecord(
+                id: UUID(),
+                templateID: templateID,
+                templateOccurrenceDay: occurrenceDay,
+                title: "Walk",
+                plannedStart: calendar.date(byAdding: .hour, value: 8, to: occurrenceDay)!,
+                plannedSeconds: 20 * 60,
+                state: .completed,
+                kind: .routine
+            )
+        }
+        let schedule = HabitPolicy.Schedule(
+            templateID: templateID,
+            levelStartedAt: monday,
+            startMinutesFromMidnight: 8 * 60,
+            plannedSeconds: 20 * 60,
+            weekdays: [.monday, .wednesday, .friday]
+        )
+        let now = calendar.date(byAdding: .hour, value: 9, to: calendar.date(byAdding: .day, value: 14, to: monday)!)!
+
+        #expect(HabitPolicy().streak(for: schedule, blocks: records, now: now, calendar: calendar) == 7)
+        #expect(HabitPolicy().canUpgrade(schedule: schedule, blocks: records, now: now, calendar: calendar))
+
+        #expect(HabitPolicy().streak(for: schedule, blocks: Array(records.dropLast()), now: now, calendar: calendar) == 0)
+
+        var moved = records
+        moved[moved.count - 1].plannedStart = calendar.date(byAdding: .day, value: 1, to: moved.last!.plannedStart)!
+        moved[moved.count - 1].state = .moved
+        #expect(HabitPolicy().streak(for: schedule, blocks: moved, now: now, calendar: calendar) == 0)
+
+        let beforeTodayIsDue = calendar.date(byAdding: .minute, value: 10, to: records.last!.plannedStart)!
+        #expect(HabitPolicy().streak(for: schedule, blocks: Array(records.dropLast()), now: beforeTodayIsDue, calendar: calendar) == 6)
+    }
+
     @Test("Behavior profile round-trips typed selections")
     func behaviorProfileRoundTrip() {
         let profile = BehaviorProfile(

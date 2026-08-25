@@ -7,6 +7,7 @@ public struct AnchorOnboardingView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var context
+    @Environment(\.anchorPlatformSync) private var platform
     @Query private var profiles: [BehaviorProfile]
     @AppStorage("anchor.onboarding.unified-step.v1") private var savedUnifiedStep = 0
     @AppStorage("anchor.onboarding.goal.v1") private var savedGoal = ""
@@ -31,12 +32,15 @@ public struct AnchorOnboardingView: View {
     }
 
     private enum UnifiedStep: Int, CaseIterable {
-        case welcome
-        case patterns
-        case directions
-        case replacements
-        case schedule
-        case rehearsal
+        case welcome = 0
+        case patterns = 1
+        case directions = 2
+        case replacements = 3
+        case schedule = 4
+        // Keep rehearsal at 5 so an owner who paused the previous onboarding
+        // build does not resume on a different screen after this new stage ships.
+        case rehearsal = 5
+        case account = 6
     }
 
     private struct HabitDraft: Identifiable {
@@ -65,29 +69,36 @@ public struct AnchorOnboardingView: View {
     public var body: some View {
         ZStack {
             theme.canvas.ignoresSafeArea()
-            ScrollView {
-                Group {
-                    switch unifiedStep {
-                    case .welcome: mergedWelcomeStep
-                    case .patterns: patternsStep
-                    case .directions: directionsStep
-                    case .replacements: replacementsStep
-                    case .schedule: scheduleStep
-                    case .rehearsal:
-                        switch rehearsal.step {
-                        case .goal: goalStep
-                        case .focusing: focusStep
-                        case .capture: captureStep
-                        case .returned: returnStep
+            GeometryReader { proxy in
+                ScrollView {
+                    Group {
+                        switch unifiedStep {
+                        case .welcome: mergedWelcomeStep
+                        case .patterns: patternsStep
+                        case .directions: directionsStep
+                        case .replacements: replacementsStep
+                        case .schedule: scheduleStep
+                        case .account: accountStep
+                        case .rehearsal:
+                            switch rehearsal.step {
+                            case .goal: goalStep
+                            case .focusing: focusStep
+                            case .capture: captureStep
+                            case .returned: returnStep
+                            }
                         }
                     }
+                    .frame(maxWidth: unifiedStep == .account ? 900 : 620)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: max(0, proxy.size.height - Space.xxl),
+                        alignment: .center
+                    )
+                    .padding(Space.lg)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
                 }
-                .frame(maxWidth: 620)
-                .frame(maxWidth: .infinity)
-                .padding(Space.lg)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
+                .scrollDismissesKeyboard(.interactively)
             }
-            .scrollDismissesKeyboard(.interactively)
         }
         .animation(reduceMotion ? nil : Motion.gentle, value: unifiedStep)
         .animation(reduceMotion ? nil : Motion.gentle, value: rehearsal.step)
@@ -99,10 +110,11 @@ public struct AnchorOnboardingView: View {
         }
         .onAppear {
             if ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_DEMO"] == "1" {
-                savedUnifiedStep = 0
+                let demoStep = demoInitialStep
+                savedUnifiedStep = demoStep.rawValue
                 savedGoal = ""
                 savedStep = 0
-                unifiedStep = .welcome
+                unifiedStep = demoStep
                 goal = ""
                 rehearsal = OnboardingRehearsal()
             } else {
@@ -115,7 +127,7 @@ public struct AnchorOnboardingView: View {
 
     private var mergedWelcomeStep: some View {
         VStack(spacing: Space.lg) {
-            Image("HabitsOnboarding")
+            Image("HabitsDoodle")
                 .resizable()
                 .scaledToFit()
                 .frame(maxHeight: 260)
@@ -153,7 +165,7 @@ public struct AnchorOnboardingView: View {
 
     private var patternsStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("1 OF 5 · OPTIONAL")
+            onboardingProgress("1 OF 6 · OPTIONAL")
             VStack(spacing: Space.xs) {
                 Text("What tends to take more time than you want?")
                     .font(.largeTitle.weight(.semibold))
@@ -168,7 +180,7 @@ public struct AnchorOnboardingView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 138, maximum: 190), spacing: Space.sm)], spacing: Space.sm) {
                 ForEach(BehaviorPattern.allCases, id: \.self) { pattern in
                     BehavioralArtworkTile(
-                        imageName: pattern.artworkName,
+                        pattern: pattern,
                         title: pattern.label,
                         isSelected: selectedPatterns.contains(pattern)
                     ) {
@@ -196,7 +208,7 @@ public struct AnchorOnboardingView: View {
 
     private var directionsStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("2 OF 5 · OPTIONAL")
+            onboardingProgress("2 OF 6 · OPTIONAL")
             VStack(spacing: Space.xs) {
                 Text("What do you want that time to make room for?")
                     .font(.largeTitle.weight(.semibold))
@@ -211,7 +223,7 @@ public struct AnchorOnboardingView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: Space.sm)], spacing: Space.sm) {
                 ForEach(LifeDirection.allCases, id: \.self) { direction in
                     BehavioralArtworkTile(
-                        imageName: direction.artworkName,
+                        direction: direction,
                         title: direction.label,
                         isSelected: desiredDirections.contains(direction)
                     ) {
@@ -242,13 +254,13 @@ public struct AnchorOnboardingView: View {
 
     private var replacementsStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("3 OF 5 · SUGGESTIONS")
+            onboardingProgress("3 OF 6 · SUGGESTIONS")
             VStack(spacing: Space.xs) {
                 Text("Turn that time into something concrete.")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
-                Text("Anchor suggests a small replacement for every direction you chose. Keep, edit, or skip each one — these are starting points, not prescriptions.")
+                Text("Anchor suggests a small replacement for every direction you chose. Keep up to five; the rest of your schedule stays unlimited.")
                     .font(.body)
                     .foregroundStyle(theme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -263,14 +275,11 @@ public struct AnchorOnboardingView: View {
             } else {
                 VStack(spacing: Space.sm) {
                     ForEach($habitDrafts) { $draft in
-                        Button { draft.isSelected.toggle() } label: {
+                        Button { toggleHabitDraft(draft.id) } label: {
                             Card(padding: Space.md) {
                                 HStack(spacing: Space.md) {
-                                    Image(draft.direction.artworkName)
-                                        .resizable()
-                                        .scaledToFill()
+                                    BehavioralDoodleArtwork(direction: draft.direction)
                                         .frame(width: 86, height: 72)
-                                        .clipShape(.rect(cornerRadius: Radius.md))
                                         .accessibilityHidden(true)
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(draft.title)
@@ -310,7 +319,7 @@ public struct AnchorOnboardingView: View {
 
     private var scheduleStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("4 OF 5 · YOUR WEEK")
+            onboardingProgress("4 OF 6 · YOUR WEEK")
             VStack(spacing: Space.xs) {
                 Text("Give each habit a real place.")
                     .font(.largeTitle.weight(.semibold))
@@ -375,8 +384,8 @@ public struct AnchorOnboardingView: View {
 
             VStack(spacing: Space.sm) {
                 profileSaveFailure
-                Button("Save schedule and learn interruptions") {
-                    if persistHabitSchedule() { moveUnified(to: .rehearsal) }
+                Button("Save week and continue") {
+                    if persistHabitSchedule() { moveUnified(to: .account) }
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(habitDrafts.contains { $0.isSelected && ($0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || $0.weekdays.isEmpty) })
@@ -386,9 +395,86 @@ public struct AnchorOnboardingView: View {
         }
     }
 
+    private var accountStep: some View {
+        VStack(spacing: Space.lg) {
+            onboardingProgress("5 OF 6 · OPTIONAL ACCOUNT")
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: Space.xxl) {
+                    accountHero
+                        .frame(maxWidth: 350)
+                    accountDecision
+                        .frame(maxWidth: 440)
+                }
+                .frame(minWidth: 760)
+
+                VStack(spacing: Space.lg) {
+                    accountHero
+                    accountDecision
+                }
+            }
+        }
+    }
+
+    private var accountHero: some View {
+        VStack(spacing: Space.lg) {
+            Image("TodayDoodle")
+                .resizable()
+                .scaledToFit()
+                .frame(maxHeight: 142)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("A hand-drawn day moves through a connected sequence of plans.")
+
+            VStack(spacing: Space.xs) {
+                Text("One account for your Significant Hobbies.")
+                    .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Hub is the private home for your Significant Hobbies. Connect so finished work from Anchor appears there — or keep everything local and decide later.")
+                    .font(.body)
+                    .foregroundStyle(theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var accountDecision: some View {
+        VStack(spacing: Space.sm) {
+            Card(padding: Space.lg) {
+                HubAccountPanel(platform: platform, presentation: .onboarding)
+            }
+
+            if platform?.account?.isSignedIn == true {
+                Button("Continue to interruption practice") {
+                    moveUnified(to: .rehearsal)
+                }
+                .buttonStyle(PrimaryButtonStyle(expands: false))
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("anchor.onboarding.hub-continue-connected")
+            } else {
+                Button("Continue locally") {
+                    moveUnified(to: .rehearsal)
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("anchor.onboarding.hub-continue-locally")
+
+                Text("No account is required. You can connect from Settings whenever you want.")
+                    .font(.footnote)
+                    .foregroundStyle(theme.textTertiary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button("Back") { moveUnified(to: .schedule) }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .frame(maxWidth: .infinity)
+        }
+    }
+
     private var goalStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("5 OF 5 · QUICK REHEARSAL")
+            onboardingProgress("6 OF 6 · QUICK REHEARSAL")
             Image("AnchorOnboarding")
                 .resizable()
                 .scaledToFit()
@@ -600,6 +686,18 @@ public struct AnchorOnboardingView: View {
     private var trimmedGoal: String { goal.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var trimmedThought: String { thought.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    private var demoInitialStep: UnifiedStep {
+        switch ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_INITIAL_STEP"] {
+        case "patterns": .patterns
+        case "directions": .directions
+        case "replacements": .replacements
+        case "schedule": .schedule
+        case "account": .account
+        case "rehearsal": .rehearsal
+        default: .welcome
+        }
+    }
+
     private func beginRehearsal() {
         guard rehearsal.begin(goal: trimmedGoal) else { return }
         savedGoal = rehearsal.goal
@@ -641,17 +739,22 @@ public struct AnchorOnboardingView: View {
                     minutes: suggestion.plannedMinutes,
                     weekdays: Set(ScheduleWeekday.allCases),
                     flexibility: .flexible,
-                    isSelected: true
+                    isSelected: index < HabitPolicy.maximumActiveHabits
                 )
             }
     }
 
     private func persistHabitSchedule() -> Bool {
         guard persistProfile() else { return false }
+        let selectedDrafts = habitDrafts.filter(\.isSelected)
+        guard selectedDrafts.count <= HabitPolicy.maximumActiveHabits else {
+            profileSaveError = "Choose at most five habits to practice at once."
+            return false
+        }
         do {
             let existing = try context.fetch(FetchDescriptor<ScheduleTemplate>())
             let calendar = Calendar.current
-            for draft in habitDrafts where draft.isSelected {
+            for draft in selectedDrafts {
                 let template: ScheduleTemplate
                 if let saved = existing.first(where: { !$0.isArchived && $0.lifeDirection == draft.direction }) {
                     template = saved
@@ -673,6 +776,9 @@ public struct AnchorOnboardingView: View {
                 template.flexibility = draft.flexibility
                 template.behaviorPattern = draft.pattern
                 template.lifeDirection = draft.direction
+                template.isBehaviorHabit = true
+                template.habitLevelStartedAt = template.habitLevelStartedAt ?? Date()
+                template.updatedAt = Date()
             }
             try context.save()
             _ = try DayPlanService(context: context).materialize(day: Date())
@@ -683,6 +789,20 @@ public struct AnchorOnboardingView: View {
             profileSaveError = "Anchor couldn’t save this schedule. Your choices are still here; try again."
             return false
         }
+    }
+
+    private func toggleHabitDraft(_ id: LifeDirection) {
+        guard let index = habitDrafts.firstIndex(where: { $0.id == id }) else { return }
+        if habitDrafts[index].isSelected {
+            habitDrafts[index].isSelected = false
+            return
+        }
+        guard habitDrafts.filter(\.isSelected).count < HabitPolicy.maximumActiveHabits else {
+            profileSaveError = "Five habits is the limit. Skip one before choosing another."
+            return
+        }
+        habitDrafts[index].isSelected = true
+        profileSaveError = nil
     }
 
     private func moveUnified(to step: UnifiedStep) {
@@ -756,20 +876,31 @@ public struct AnchorOnboardingView: View {
 
 struct BehavioralArtworkTile: View {
     @Environment(\.anchorTheme) private var theme
-    let imageName: String
+    private let artwork: BehavioralDoodleArtwork.Subject
     let title: String
     let isSelected: Bool
     let action: () -> Void
 
+    init(pattern: BehaviorPattern, title: String, isSelected: Bool, action: @escaping () -> Void) {
+        artwork = .pattern(pattern)
+        self.title = title
+        self.isSelected = isSelected
+        self.action = action
+    }
+
+    init(direction: LifeDirection, title: String, isSelected: Bool, action: @escaping () -> Void) {
+        artwork = .direction(direction)
+        self.title = title
+        self.isSelected = isSelected
+        self.action = action
+    }
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: Space.xs) {
-                Image(imageName)
-                    .resizable()
-                    .scaledToFill()
+                BehavioralDoodleArtwork(subject: artwork)
                     .frame(height: 112)
                     .frame(maxWidth: .infinity)
-                    .clipped()
                     .accessibilityHidden(true)
                 HStack(spacing: Space.xxs) {
                     Text(title)
@@ -795,6 +926,75 @@ struct BehavioralArtworkTile: View {
         .accessibilityLabel(title)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+struct BehavioralDoodleArtwork: View {
+    struct Sprite {
+        let assetName: String
+        let index: Int
+        let columns: Int
+        let rows: Int
+
+        var column: Int { index % columns }
+        var row: Int { index / columns }
+    }
+
+    enum Subject {
+        case pattern(BehaviorPattern)
+        case direction(LifeDirection)
+
+        var sprite: Sprite {
+            switch self {
+            case let .pattern(pattern):
+                let index = BehaviorPattern.allCases.firstIndex(of: pattern) ?? 0
+                if index < 12 {
+                    return Sprite(assetName: "PatternDoodlesA", index: index, columns: 4, rows: 3)
+                }
+                return Sprite(assetName: "PatternDoodlesB", index: index - 12, columns: 4, rows: 3)
+            case let .direction(direction):
+                let index = LifeDirection.allCases.firstIndex(of: direction) ?? 0
+                return Sprite(assetName: "DirectionDoodles", index: index, columns: 4, rows: 2)
+            }
+        }
+    }
+
+    let subject: Subject
+
+    init(subject: Subject) {
+        self.subject = subject
+    }
+
+    init(pattern: BehaviorPattern) {
+        subject = .pattern(pattern)
+    }
+
+    init(direction: LifeDirection) {
+        subject = .direction(direction)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let sprite = subject.sprite
+            let side = min(proxy.size.width, proxy.size.height)
+            ZStack {
+                Image(sprite.assetName)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(
+                        width: side * CGFloat(sprite.columns),
+                        height: side * CGFloat(sprite.rows)
+                    )
+                    .offset(
+                        x: (CGFloat(sprite.columns) / 2 - CGFloat(sprite.column) - 0.5) * side,
+                        y: (CGFloat(sprite.rows) / 2 - CGFloat(sprite.row) - 0.5) * side
+                    )
+            }
+            .frame(width: side, height: side)
+            .clipped()
+            .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+        }
+        .clipped()
     }
 }
 

@@ -4,6 +4,7 @@ import SwiftData
 public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public var id: UUID
     public var templateID: UUID?
+    public var templateOccurrenceDay: Date?
     public var sessionID: UUID?
     public var title: String
     public var plannedStart: Date
@@ -19,6 +20,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public init(
         id: UUID,
         templateID: UUID? = nil,
+        templateOccurrenceDay: Date? = nil,
         sessionID: UUID? = nil,
         title: String,
         plannedStart: Date,
@@ -33,6 +35,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     ) {
         self.id = id
         self.templateID = templateID
+        self.templateOccurrenceDay = templateOccurrenceDay
         self.sessionID = sessionID
         self.title = title
         self.plannedStart = plannedStart
@@ -99,6 +102,7 @@ public extension PlanBlock {
         PlanBlockRecord(
             id: id,
             templateID: templateID,
+            templateOccurrenceDay: templateOccurrenceDay,
             sessionID: sessionID,
             title: title,
             plannedStart: plannedStart,

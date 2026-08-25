@@ -17,7 +17,7 @@ struct AnchorWatchApp: App {
     var body: some Scene {
         WindowGroup {
             WatchRootView(controller: world.controller)
-                .anchorTheme()
+                .anchorAppearance()
                 .task {
                     WKApplication.shared().registerForRemoteNotifications()
                 }

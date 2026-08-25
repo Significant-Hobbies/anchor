@@ -16,6 +16,8 @@ public struct FocusRing<Center: View>: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isBreathing = false
+    @State private var arrivalProgress: CGFloat = 0
+    @State private var arrivalOpacity: Double = 1
 
     public init(
         fraction: Double,
@@ -39,6 +41,7 @@ public struct FocusRing<Center: View>: View {
             ZStack {
                 halo(side: side)
                 track(lineWidth: lineWidth)
+                arrival(lineWidth: lineWidth)
                 ticks(side: side, lineWidth: lineWidth)
                 progress(lineWidth: lineWidth)
                 head(side: side, lineWidth: lineWidth)
@@ -62,6 +65,7 @@ public struct FocusRing<Center: View>: View {
                 withAnimation(Motion.gentle) { isBreathing = false }
             }
         }
+        .task { await revealArrival() }
         .accessibilityElement(children: .combine)
     }
 
@@ -78,6 +82,32 @@ public struct FocusRing<Center: View>: View {
     private func track(lineWidth: CGFloat) -> some View {
         Circle()
             .stroke(theme.isDark ? Color.white.opacity(0.07) : Color.black.opacity(0.06), lineWidth: lineWidth)
+    }
+
+    /// Starting Focus draws one complete line around the intention before it
+    /// settles into the ordinary progress track. It explains the transition
+    /// without delaying the timer or adding celebration to routine controls.
+    private func arrival(lineWidth: CGFloat) -> some View {
+        Circle()
+            .trim(from: 0, to: arrivalProgress)
+            .stroke(
+                theme.accentSoft,
+                style: StrokeStyle(lineWidth: max(2, lineWidth * 0.16), lineCap: .round)
+            )
+            .rotationEffect(.degrees(-90))
+            .opacity(arrivalOpacity)
+    }
+
+    @MainActor
+    private func revealArrival() async {
+        if reduceMotion {
+            arrivalProgress = 1
+            arrivalOpacity = 0
+            return
+        }
+        withAnimation(.easeOut(duration: 0.62)) { arrivalProgress = 1 }
+        try? await Task.sleep(for: .milliseconds(520))
+        withAnimation(.easeOut(duration: 0.28)) { arrivalOpacity = 0 }
     }
 
     /// Sixty ticks, one per minute of a clock face. Consumed ticks dim, so the

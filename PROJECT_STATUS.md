@@ -33,6 +33,20 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-25** — Prepared Anchor `1.0 (13)` as the doodle-first product
+  overhaul release candidate. Mac and iPhone remain thin shells over the same
+  `AnchorUI` product root, with the same four surfaces, onboarding, Settings,
+  appearance preference, tactile controls, and Significant Hobbies Hub account
+  panel. Release verification passes all 153 shared tests, the design-review
+  contract, all four iPhone UI journeys on a fresh iPhone 17 Pro simulator, and
+  the release-mode Apple Intelligence diagnostic (8/8 interruption categories
+  and 4/4 goal themes). The App Store archive and exported IPA pass Apple
+  Distribution inspection with the embedded Watch and Live Activity binaries,
+  Production APNs and CloudKit, the shared app group, Sign in with Apple, and
+  `get-task-allow=false`; App Store Connect delivery is the remaining release
+  gate. macOS XCUITest on the Xcode 27 beta host currently fails to foreground
+  the app before its first assertion and is not counted as passing.
+
 - **2026-08-24** — Released the unified four-surface source as Anchor `1.0
   (12)`. The Apple Distribution iPhone archive, embedded Watch app, Production
   CloudKit, shared app group, and non-debug entitlements were verified; App
@@ -221,9 +235,10 @@ CloudKit container and app group.
 - Evidence-first daily review of planned versus observed time, with deliberate
   replans, internal pulls, external interruptions, human needs, estimation
   errors, and Unknown kept distinct — never collapsed into an adherence score
-- Five-stage private onboarding using the original Indulge artwork: automatic
+- Six-stage private onboarding using Anchor's doodle language: automatic
   patterns, desired directions, concrete replacement habits, editable weekly
-  scheduling, and an interruption rehearsal
+  scheduling, an optional Significant Hobbies Hub account, and an interruption
+  rehearsal
 - Four primary pages only: schedule-led Focus, Today, Habits, and History;
   Settings is available from the gear action
 - Focus sessions against the current/next schedule block, with an explicit

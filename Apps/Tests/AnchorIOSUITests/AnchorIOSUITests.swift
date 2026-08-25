@@ -13,7 +13,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.launch()
 
         app.tabBars.buttons["Focus"].tap()
-        let adHoc = app.buttons["Start something else"]
+        let adHoc = app.buttons["anchor.focus.start-unplanned"]
         XCTAssertTrue(adHoc.waitForExistence(timeout: 5))
         adHoc.tap()
         let intention = app.textFields["Ship the auth flow"]
@@ -80,7 +80,12 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
         app.buttons["Schedule these habits"].tap()
         XCTAssertTrue(app.staticTexts["Give each habit a real place."].waitForExistence(timeout: 4))
-        app.buttons["Save schedule and learn interruptions"].tap()
+        app.buttons["Save week and continue"].tap()
+
+        XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
+        XCTAssertTrue(app.buttons["anchor.hub.sign-in-google"].exists)
+        app.buttons["anchor.onboarding.hub-continue-locally"].tap()
 
         XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 5))
         let goal = app.textFields["Finish the release"]
@@ -133,9 +138,29 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
-        app.buttons["Settings"].tap()
+        for tab in ["Today", "Habits", "History", "Focus"] {
+            app.tabBars.buttons[tab].tap()
+            let toolbarButton = app.buttons["anchor.toolbar.settings"]
+            XCTAssertTrue(toolbarButton.waitForExistence(timeout: 3), "Settings toolbar action is missing on \(tab)")
+            XCTAssertTrue(toolbarButton.isHittable, "Settings toolbar action is not reachable on \(tab)")
+        }
+
+        let settingsButton = app.buttons["anchor.toolbar.settings"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 4))
+        XCTAssertTrue(settingsButton.isHittable)
+        settingsButton.tap()
 
         XCTAssertTrue(app.staticTexts["Significant Hobbies Hub"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Bring Anchor into your Hub"].exists)
+        XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
+        let appearance = app.segmentedControls["anchor.settings.appearance"]
+        XCTAssertTrue(appearance.exists)
+        appearance.buttons["Dark"].tap()
+        XCTAssertTrue(
+            app.staticTexts["Uses the charcoal focus canvas on this device."]
+                .waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(app.staticTexts["This build stores appearance on this device only"].exists)
         XCTAssertFalse(app.staticTexts["Talk to your data"].exists)
         XCTAssertFalse(app.staticTexts["Database"].exists)
     }

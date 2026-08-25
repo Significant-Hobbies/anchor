@@ -73,6 +73,35 @@ public enum BehaviorPattern: String, CaseIterable, Codable, Hashable, Sendable {
 
     /// Matches the original Indulge asset filename and asset-catalog name.
     public var artworkName: String { "Pattern-\(rawValue)" }
+
+    public var symbolName: String {
+        switch self {
+        case .television: "tv"
+        case .streaming: "play.rectangle.on.rectangle"
+        case .films: "film"
+        case .shortVideo: "play.square.stack"
+        case .socialFeeds: "person.2.wave.2"
+        case .newsScroll: "newspaper"
+        case .webBrowsing: "globe"
+        case .rabbitHoles: "arrow.down.to.line.compact"
+        case .consoleGaming: "gamecontroller"
+        case .handheldGaming: "arcade.stick.console"
+        case .music: "music.note"
+        case .podcasts: "waveform"
+        case .snacking: "takeoutbag.and.cup.and.straw"
+        case .takeaway: "scooter"
+        case .sweets: "birthday.cake"
+        case .coffee: "cup.and.saucer"
+        case .alcohol: "wineglass"
+        case .onlineShopping: "cart"
+        case .windowShopping: "bag"
+        case .napping: "bed.double"
+        case .lyingIn: "zzz"
+        case .texting: "message"
+        case .videoCalls: "video"
+        case .hangingOut: "person.3"
+        }
+    }
 }
 
 public enum LifeDirection: String, CaseIterable, Codable, Hashable, Sendable {
@@ -116,6 +145,7 @@ public final class ScheduleTemplate {
     public var title: String = ""
     public var details: String = ""
     public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
     public var archivedAt: Date?
     public var startMinutesFromMidnight: Int = 540
     public var plannedSeconds: Int = 1_500
@@ -125,24 +155,38 @@ public final class ScheduleTemplate {
     public var flexibilityRaw: String = ScheduleFlexibility.flexible.rawValue
     public var behaviorPatternRaw: String?
     public var lifeDirectionRaw: String?
+    /// Behavior-change habits are intentionally separate from ordinary recurring
+    /// schedule items. Only these templates participate in the five-slot policy.
+    public var isBehaviorHabit: Bool = false
+    public var habitVersion: Int = 1
+    public var graduatedAt: Date?
+    public var habitLevelStartedAt: Date?
+    public var lastProgressPromptedAt: Date?
 
     public init(
         id: UUID = UUID(),
         title: String,
         details: String = "",
         createdAt: Date = Date(),
+        updatedAt: Date = Date(),
         startMinutesFromMidnight: Int,
         plannedSeconds: Int,
         weekdays: Set<ScheduleWeekday> = [],
         kind: PlanBlockKind = .focus,
         flexibility: ScheduleFlexibility = .flexible,
         behaviorPattern: BehaviorPattern? = nil,
-        lifeDirection: LifeDirection? = nil
+        lifeDirection: LifeDirection? = nil,
+        isBehaviorHabit: Bool = false,
+        habitVersion: Int = 1,
+        graduatedAt: Date? = nil,
+        habitLevelStartedAt: Date? = nil,
+        lastProgressPromptedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
         self.details = details
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.startMinutesFromMidnight = min(1_439, max(0, startMinutesFromMidnight))
         self.plannedSeconds = max(60, plannedSeconds)
         self.weekdays = weekdays
@@ -150,6 +194,11 @@ public final class ScheduleTemplate {
         self.flexibility = flexibility
         self.behaviorPattern = behaviorPattern
         self.lifeDirection = lifeDirection
+        self.isBehaviorHabit = isBehaviorHabit
+        self.habitVersion = max(1, habitVersion)
+        self.graduatedAt = graduatedAt
+        self.habitLevelStartedAt = habitLevelStartedAt
+        self.lastProgressPromptedAt = lastProgressPromptedAt
     }
 
     public var kind: PlanBlockKind {
@@ -185,6 +234,10 @@ public final class ScheduleTemplate {
     }
 
     public var isArchived: Bool { archivedAt != nil }
+    public var isActiveBehaviorHabit: Bool {
+        isBehaviorHabit && archivedAt == nil && graduatedAt == nil
+    }
+    public var currentHabitLevelStartedAt: Date { habitLevelStartedAt ?? createdAt }
 
     public func applies(to day: Date, calendar: Calendar = .current) -> Bool {
         !isArchived && weekdays.contains(ScheduleWeekday(day: day, calendar: calendar))
@@ -440,6 +493,18 @@ public enum ScheduleWeekday: Int, CaseIterable, Codable, Hashable, Sendable {
         case .friday: "F"
         case .saturday: "S"
         case .sunday: "S"
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .monday: "Monday"
+        case .tuesday: "Tuesday"
+        case .wednesday: "Wednesday"
+        case .thursday: "Thursday"
+        case .friday: "Friday"
+        case .saturday: "Saturday"
+        case .sunday: "Sunday"
         }
     }
 }

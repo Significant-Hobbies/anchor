@@ -33,7 +33,7 @@ struct BehaviorProfileEditor: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 138, maximum: 190), spacing: Space.sm)], spacing: Space.sm) {
                         ForEach(BehaviorPattern.allCases, id: \.self) { pattern in
                             BehavioralArtworkTile(
-                                imageName: pattern.artworkName,
+                                pattern: pattern,
                                 title: pattern.label,
                                 isSelected: patterns.contains(pattern)
                             ) { toggle(pattern) }
@@ -51,7 +51,7 @@ struct BehaviorProfileEditor: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: Space.sm)], spacing: Space.sm) {
                         ForEach(LifeDirection.allCases, id: \.self) { direction in
                             BehavioralArtworkTile(
-                                imageName: direction.artworkName,
+                                direction: direction,
                                 title: direction.label,
                                 isSelected: directions.contains(direction)
                             ) { toggle(direction) }

@@ -1,12 +1,13 @@
 import AnchorCore
+import SwiftData
 import SwiftUI
 
 /// Anchor's visual language.
 ///
 /// The app has one job at its centre — hold your attention on a single number —
 /// so the design is built around subtraction. One accent colour, one bright
-/// surface, everything else recedes. Colour is spent on the ring and on the
-/// distraction categories, and nowhere else.
+/// surface, everything else recedes. The interface itself is ink and paper;
+/// colour belongs to authored doodles and meaningful state.
 ///
 /// Tokens are resolved from the colour scheme rather than pulled from an asset
 /// catalogue so the package stays resource-free and the values stay greppable.
@@ -26,6 +27,7 @@ public struct AnchorTheme: Sendable, Equatable {
     public var accent: Color
     public var accentSoft: Color
     public var accentDeep: Color
+    public var onAccent: Color
 
     // Status.
     public var positive: Color
@@ -41,41 +43,42 @@ public struct AnchorTheme: Sendable, Equatable {
     /// Night is the default posture: focus sessions are long, and a bright slab
     /// of white is a poor companion for an hour.
     ///
-    /// The palette carries the product's central idea: **cool is focus, warm is
-    /// interruption**. Progress, the ring and every primary action are cobalt;
-    /// warmth is spent only on the things that break a session. A single-hue
-    /// scheme made those two read as the same thing.
+    /// The night palette is charcoal rather than blue-black. Primary controls
+    /// reverse to warm paper; small illustration and state colours carry the
+    /// personality without tinting the whole application.
     public static let dark = AnchorTheme(
-        canvas: Color(hex: 0x0A0C10),
-        surface: Color(hex: 0x141922),
-        surfaceRaised: Color(hex: 0x1D2532),
-        hairline: Color.white.opacity(0.075),
-        textPrimary: Color(hex: 0xEDF1F7),
-        textSecondary: Color(hex: 0x94A0B3),
-        textTertiary: Color(hex: 0x636F82),
-        accent: Color(hex: 0x3B82F6),
-        accentSoft: Color(hex: 0x7DD3FC),
-        accentDeep: Color(hex: 0x1D4ED8),
-        positive: Color(hex: 0x4ADE80),
-        caution: Color(hex: 0xF5B849),
-        negative: Color(hex: 0xFB7185),
+        canvas: Color(hex: 0x0B0B0C),
+        surface: Color(hex: 0x151515),
+        surfaceRaised: Color(hex: 0x202020),
+        hairline: Color.white.opacity(0.09),
+        textPrimary: Color(hex: 0xF2F0EA),
+        textSecondary: Color(hex: 0xAAA8A2),
+        textTertiary: Color(hex: 0x89867F),
+        accent: Color(hex: 0xF2F0EA),
+        accentSoft: Color(hex: 0xC7C4BD),
+        accentDeep: Color(hex: 0x85817A),
+        onAccent: Color(hex: 0x111111),
+        positive: Color(hex: 0x72A982),
+        caution: Color(hex: 0xE1AD4A),
+        negative: Color(hex: 0xE66A5C),
         isDark: true
     )
 
     public static let light = AnchorTheme(
-        canvas: Color(hex: 0xF4F6FA),
-        surface: Color(hex: 0xFFFFFF),
-        surfaceRaised: Color(hex: 0xF7F9FC),
-        hairline: Color.black.opacity(0.07),
-        textPrimary: Color(hex: 0x0F172A),
-        textSecondary: Color(hex: 0x53607A),
-        textTertiary: Color(hex: 0x8593AC),
-        accent: Color(hex: 0x2563EB),
-        accentSoft: Color(hex: 0x3B82F6),
-        accentDeep: Color(hex: 0x1E40AF),
-        positive: Color(hex: 0x16A34A),
-        caution: Color(hex: 0xC2810C),
-        negative: Color(hex: 0xE11D48),
+        canvas: Color(hex: 0xF3F1EC),
+        surface: Color(hex: 0xFBFAF7),
+        surfaceRaised: Color(hex: 0xE9E6DF),
+        hairline: Color.black.opacity(0.10),
+        textPrimary: Color(hex: 0x171717),
+        textSecondary: Color(hex: 0x5E5B56),
+        textTertiary: Color(hex: 0x6B6761),
+        accent: Color(hex: 0x191919),
+        accentSoft: Color(hex: 0x5B5852),
+        accentDeep: Color(hex: 0x000000),
+        onAccent: Color(hex: 0xF8F7F3),
+        positive: Color(hex: 0x4F7D61),
+        caution: Color(hex: 0x8A5B12),
+        negative: Color(hex: 0xB94F43),
         isDark: false
     )
 
@@ -99,12 +102,11 @@ public struct AnchorTheme: Sendable, Equatable {
         )
     }
 
-    /// Eight tints for goals, evenly spaced round the wheel and matched in
-    /// saturation so no single goal shouts louder than another.
+    /// Goal colour is deliberately quieter than illustration colour.
     public static let goalTints: [Color] = [
-        Color(hex: 0x3B82F6), Color(hex: 0x7DD3FC), Color(hex: 0xA78BFA),
-        Color(hex: 0xF5B849), Color(hex: 0xFB7185), Color(hex: 0x38BDF8),
-        Color(hex: 0x818CF8), Color(hex: 0x2DD4BF),
+        Color(hex: 0x4F4D49), Color(hex: 0x77736C), Color(hex: 0x6D655D),
+        Color(hex: 0x8A7350), Color(hex: 0x7C5F5B), Color(hex: 0x5E6B68),
+        Color(hex: 0x6F6877), Color(hex: 0x64705B),
     ]
 
     public static func tint(_ index: Int) -> Color {
@@ -112,8 +114,8 @@ public struct AnchorTheme: Sendable, Equatable {
     }
 
     /// Distraction colours encode *origin*, not category, so the chart reads at a
-    /// glance. Deliberately kept clear of the cobalt accent: nothing that
-    /// interrupts you should wear the colour of focus.
+    /// glance. Deliberately kept clear of the neutral focus accent: nothing that
+    /// interrupts you should resemble a primary focus action.
     public func color(for kind: DistractionKind) -> Color {
         color(for: kind.origin)
     }
@@ -133,10 +135,22 @@ private struct AnchorThemeKey: EnvironmentKey {
     static let defaultValue = AnchorTheme.dark
 }
 
+private struct AnchorWorkspaceMaxWidthKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 720
+}
+
 public extension EnvironmentValues {
     var anchorTheme: AnchorTheme {
         get { self[AnchorThemeKey.self] }
         set { self[AnchorThemeKey.self] = newValue }
+    }
+
+
+    /// Planning and evidence surfaces may earn more room on a genuinely wide
+    /// Mac window. Focus remains intentionally narrow and does not consume it.
+    var anchorWorkspaceMaxWidth: CGFloat {
+        get { self[AnchorWorkspaceMaxWidthKey.self] }
+        set { self[AnchorWorkspaceMaxWidthKey.self] = newValue }
     }
 }
 
@@ -150,9 +164,52 @@ public struct AnchorThemeProvider: ViewModifier {
     }
 }
 
+/// Resolves one CloudKit-backed appearance choice for every Anchor scene. The
+/// absence of a record uses Anchor's dark product default, so first launch is
+/// consistent across devices without having to write a preference.
+public struct AnchorAppearanceProvider: ViewModifier {
+    @Environment(\.colorScheme) private var systemScheme
+    @Query(sort: \AnchorPreferences.updatedAt, order: .reverse)
+    private var preferences: [AnchorPreferences]
+
+    private var appearance: AnchorAppearance {
+        AnchorPreferencesPolicy.appearance(in: preferences)
+    }
+
+    private var resolvedScheme: ColorScheme {
+        switch appearance {
+        case .system: systemScheme
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    public func body(content: Content) -> some View {
+        content
+            .environment(\.anchorTheme, .resolve(resolvedScheme))
+            .preferredColorScheme(appearance.preferredColorScheme)
+    }
+}
+
+private extension AnchorAppearance {
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+}
+
 public extension View {
     func anchorTheme() -> some View {
         modifier(AnchorThemeProvider())
+    }
+
+    /// Use at scene roots. Settings, screens, and components then inherit the
+    /// same appearance instead of each platform resolving it independently.
+    func anchorAppearance() -> some View {
+        modifier(AnchorAppearanceProvider())
     }
 }
 

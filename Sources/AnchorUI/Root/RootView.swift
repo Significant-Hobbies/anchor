@@ -38,16 +38,34 @@ public struct FocusScreen: View {
                 VStack(spacing: 0) {
                     if !showsAdHocComposer {
                         Spacer()
-                        EmptyStateView(
-                            symbol: "calendar.badge.plus",
-                            title: "Nothing else is scheduled today",
-                            message: "Add a block in Today, or start something unplanned and Anchor will include it in History."
-                        )
-                        Button("Add a block") { showsBlockEditor = true }
-                            .buttonStyle(PrimaryButtonStyle())
-                            .padding(.top, Space.md)
-                        Button("Start something else") { showsAdHocComposer = true }
-                            .buttonStyle(QuietButtonStyle())
+                        FocusPreludeStage(
+                            eyebrow: "Focus",
+                            title: "Begin with one clear thing",
+                            message: "No block is waiting for you. Name what matters now, and Anchor will hold everything else at the edge."
+                        ) {
+                            #if os(macOS)
+                            HStack(spacing: Space.sm) {
+                                Button("Start focusing") {
+                                    withAnimation(Motion.gentle) { showsAdHocComposer = true }
+                                }
+                                    .buttonStyle(PrimaryButtonStyle(expands: false))
+                                    .accessibilityIdentifier("anchor.focus.start-unplanned")
+                                Button("Add to schedule") { showsBlockEditor = true }
+                                    .buttonStyle(QuietButtonStyle(expands: false))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            #else
+                            Button("Start focusing") {
+                                withAnimation(Motion.gentle) { showsAdHocComposer = true }
+                            }
+                                .buttonStyle(PrimaryButtonStyle())
+                                .accessibilityIdentifier("anchor.focus.start-unplanned")
+                            Button("Add to schedule") { showsBlockEditor = true }
+                                .buttonStyle(QuietButtonStyle())
+                            #endif
+                        }
+                        .padding(Space.lg)
+                        .frame(maxWidth: 980)
                         Spacer()
                     } else {
                         StartComposer { goal, intent, minutes, project, notes, tagIDs in
@@ -103,24 +121,28 @@ public struct FocusScreen: View {
     private func scheduledStart(_ block: PlanBlock) -> some View {
         ScrollView {
             VStack(spacing: Space.lg) {
-                Spacer(minLength: Space.xl)
-                Text(block.plannedStart <= now && now < block.plannedEnd ? "NOW" : (block.plannedStart > now ? "UP NEXT" : "STILL OPEN"))
-                    .font(.caption2.weight(.semibold))
-                    .tracking(1.2)
-                    .foregroundStyle(theme.textTertiary)
-                Image(systemName: block.kind.symbolName)
-                    .font(.system(size: 34, weight: .light))
-                    .foregroundStyle(theme.accent)
-                    .frame(width: 76, height: 76)
-                    .background(theme.accent.opacity(0.12), in: .circle)
-                VStack(spacing: Space.xxs) {
-                    Text(block.title)
-                        .font(.largeTitle.weight(.semibold))
-                        .foregroundStyle(theme.textPrimary)
-                        .multilineTextAlignment(.center)
-                    Text("\(block.plannedStart.formatted(date: .omitted, time: .shortened)) · \(Format.duration(Double(block.plannedSeconds)))")
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(theme.textSecondary)
+                FocusPreludeStage(
+                    eyebrow: block.plannedStart <= now && now < block.plannedEnd ? "Now" : (block.plannedStart > now ? "Up next" : "Still open"),
+                    title: block.title,
+                    message: "\(block.plannedStart.formatted(date: .omitted, time: .shortened)) · \(Format.duration(Double(block.plannedSeconds))). Everything else can wait at the edge."
+                ) {
+                    VStack(spacing: Space.sm) {
+                        Button(isChangingActivity ? "Start actual activity" : "Start this block") {
+                            start(block)
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+                        .disabled(isChangingActivity && actualIntent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        Button(isChangingActivity ? "Use the scheduled block" : "I’m doing something else") {
+                            withAnimation(Motion.snappy) { isChangingActivity.toggle() }
+                            actualIntent = ""
+                        }
+                        .buttonStyle(QuietButtonStyle())
+                        Button("Start an unplanned block") {
+                            withAnimation(Motion.gentle) { showsAdHocComposer = true }
+                        }
+                        .buttonStyle(QuietButtonStyle())
+                    }
                 }
 
                 if let loadError {
@@ -145,28 +167,13 @@ public struct FocusScreen: View {
                     }
                 }
 
-                VStack(spacing: Space.sm) {
-                    Button(isChangingActivity ? "Start actual activity" : "Start this block") {
-                        start(block)
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .disabled(isChangingActivity && actualIntent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    Button(isChangingActivity ? "Use the scheduled block" : "I’m doing something else") {
-                        isChangingActivity.toggle()
-                        actualIntent = ""
-                    }
-                    .buttonStyle(QuietButtonStyle())
-                    Button("Start an unplanned block") { showsAdHocComposer = true }
-                        .buttonStyle(QuietButtonStyle())
-                }
                 Text("Once started, Lock a distraction stays on top of the timer with quick interruption options.")
                     .font(.footnote)
                     .foregroundStyle(theme.textTertiary)
                     .multilineTextAlignment(.center)
             }
             .padding(Space.lg)
-            .frame(maxWidth: 620)
+            .frame(maxWidth: 980)
             .frame(maxWidth: .infinity)
         }
     }
@@ -228,6 +235,94 @@ public struct FocusScreen: View {
     }
 }
 
+/// The first view of Focus is a stage, not an empty-state card. It gives the
+/// authored scene enough room to carry emotion while the action remains the
+/// first operational read. The same component reflows rather than forking the
+/// Mac and iPhone product.
+private struct FocusPreludeStage<Actions: View>: View {
+    @Environment(\.anchorTheme) private var theme
+    private let eyebrow: String
+    private let title: String
+    private let message: String
+    private let actions: Actions
+
+    init(
+        eyebrow: String,
+        title: String,
+        message: String,
+        @ViewBuilder actions: () -> Actions
+    ) {
+        self.eyebrow = eyebrow
+        self.title = title
+        self.message = message
+        self.actions = actions()
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            horizontal
+            vertical
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var horizontal: some View {
+        HStack(alignment: .center, spacing: Space.xxl) {
+            VStack(alignment: .leading, spacing: Space.lg) {
+                copy(titleFont: .system(size: 40, weight: .semibold, design: .rounded))
+                actions
+            }
+            .frame(width: 390, alignment: .leading)
+
+            Image("FocusDoodle")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 460, height: 320)
+                .clipped()
+                .accessibilityHidden(true)
+        }
+        .frame(minWidth: 898, minHeight: 440)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var vertical: some View {
+        VStack(alignment: .leading, spacing: Space.lg) {
+            copy(titleFont: .system(.largeTitle, design: .rounded).weight(.semibold))
+            artwork
+                .frame(maxWidth: .infinity)
+            actions
+        }
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func copy(titleFont: Font) -> some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Text(eyebrow.uppercased())
+                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .tracking(1.2)
+                .foregroundStyle(theme.textTertiary)
+            Text(title)
+                .font(titleFont)
+                .foregroundStyle(theme.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+            DrawnUnderline(width: 82, animated: true)
+            Text(message)
+                .font(.body)
+                .foregroundStyle(theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var artwork: some View {
+        Image("FocusDoodle")
+            .resizable()
+            .scaledToFit()
+            .frame(maxHeight: 320)
+            .accessibilityHidden(true)
+    }
+}
+
 /// Tabs, shared by both platforms so the two apps stay conceptually identical.
 public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
     case focus, today, habits, history
@@ -264,18 +359,21 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
 
 /// The app shell.
 ///
-/// A sidebar on the Mac, tabs on the phone — the platform-native shape in each
-/// case, over one shared set of screens.
+/// An authored responsive rail on the Mac and native tabs on the phone, over
+/// one shared set of screens.
 public struct RootView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
-    @AppStorage("anchor.unified-day-onboarding.seen.v1") private var unifiedOnboardingSeen = false
+    // The product tour changed materially with the schedule/habit overhaul.
+    // A versioned key ensures existing owners see this tour once as well.
+    @AppStorage("anchor.product-tour.seen.v2") private var unifiedOnboardingSeen = false
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
     @State private var tab: AnchorTab = .focus
     @State private var showsSettings = false
     @State private var forcedOnboardingFinished = false
+    @State private var presentsOnboarding = false
 
     public init(
         controller: FocusController,
@@ -291,17 +389,12 @@ public struct RootView: View {
 
     public var body: some View {
         Group {
-            if controller.hasSession || shouldSkipOnboarding {
+            if presentsOnboarding {
+                onboarding
+            } else if controller.hasSession || shouldSkipOnboarding {
                 appShell
             } else if (shouldForceOnboarding && !forcedOnboardingFinished) || !unifiedOnboardingSeen {
-                AnchorOnboardingView(isExistingOwnerOrientation: !sessions.isEmpty) {
-                    unifiedOnboardingSeen = true
-                    forcedOnboardingFinished = true
-                    tab = .focus
-                } onOpenApp: {
-                    unifiedOnboardingSeen = true
-                    forcedOnboardingFinished = true
-                }
+                onboarding
             } else {
                 appShell
             }
@@ -325,31 +418,23 @@ public struct RootView: View {
     private var appShell: some View {
         Group {
         #if os(macOS)
-        NavigationSplitView {
-            List(AnchorTab.allCases, selection: $tab) { item in
-                NavigationLink(value: item) {
-                    // Unselected icons take the brand grey. Selected rows are
-                    // drawn on the accent itself, so the icon has to fall back to
-                    // the system's selection foreground or it would be jade on jade.
-                    Label {
-                        Text(item.label)
-                    } icon: {
-                        Image(systemName: item.symbolName)
-                            .foregroundStyle(
-                                tab == item ? AnyShapeStyle(.primary) : AnyShapeStyle(theme.textSecondary)
-                            )
-                    }
+        MacAppShell(
+            selection: Binding(
+                get: { tab },
+                set: { newValue in
+                    tab = newValue
+                    showsSettings = false
                 }
+            ),
+            controller: controller,
+            isSettingsSelected: showsSettings,
+            onSettings: { showsSettings = true }
+        ) {
+            if showsSettings {
+                SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding)
+            } else {
+                screen(for: tab)
             }
-            // Tint on the List itself, not the split view: the selection highlight
-            // reads from the List's tint and would otherwise draw system blue the
-            // moment the sidebar takes focus.
-            .tint(theme.accent)
-            .navigationSplitViewColumnWidth(min: 168, ideal: 188, max: 240)
-            .safeAreaInset(edge: .bottom) { sidebarStatus }
-        } detail: {
-            screen(for: tab)
-                .navigationTitle(tab.label)
         }
         .tint(theme.accent)
         #else
@@ -358,6 +443,20 @@ public struct RootView: View {
                 NavigationStack {
                     screen(for: item)
                         .navigationTitle(item.label)
+                        .toolbar {
+                            ToolbarItem(placement: .primaryAction) {
+                                Button { showsSettings = true } label: {
+                                    Label("Settings", systemImage: "gearshape")
+                                }
+                                .accessibilityIdentifier("anchor.toolbar.settings")
+                                .help("Open Settings")
+                            }
+                        }
+                        .navigationDestination(isPresented: $showsSettings) {
+                            SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding)
+                                .navigationTitle("Settings")
+                                .toolbar(.hidden, for: .tabBar)
+                        }
                 }
                 .tabItem { Label(item.label, systemImage: item.symbolName) }
                 .tag(item)
@@ -366,10 +465,26 @@ public struct RootView: View {
         .tint(theme.accent)
         #endif
         }
-        .sheet(isPresented: $showsSettings) {
-            NavigationStack { SettingsScreen(storeKind: storeKind) }
-                .anchorTheme()
+    }
+
+    private var onboarding: some View {
+        AnchorOnboardingView(isExistingOwnerOrientation: !sessions.isEmpty) {
+            finishOnboarding(openFocus: true)
+        } onOpenApp: {
+            finishOnboarding(openFocus: false)
         }
+    }
+
+    private func showOnboarding() {
+        showsSettings = false
+        presentsOnboarding = true
+    }
+
+    private func finishOnboarding(openFocus: Bool) {
+        unifiedOnboardingSeen = true
+        forcedOnboardingFinished = true
+        presentsOnboarding = false
+        if openFocus { tab = .focus }
     }
 
     private var shouldForceOnboarding: Bool {
@@ -389,43 +504,6 @@ public struct RootView: View {
             case .habits: HabitsScreen()
             case .history: HistoryScreen()
             }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showsSettings = true } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-            }
-        }
-    }
-
-    /// A live reminder in the sidebar that a session is running, so switching to
-    /// Insights doesn't feel like leaving the timer behind.
-    @ViewBuilder
-    private var sidebarStatus: some View {
-        if controller.hasSession {
-            Button {
-                tab = .focus
-            } label: {
-                HStack(spacing: Space.xs) {
-                    Circle()
-                        .fill(controller.isRunning ? theme.accent : theme.textTertiary)
-                        .frame(width: 7, height: 7)
-                    Text(Format.clock(
-                        controller.session?.account.isOpenEnded == true
-                            ? controller.elapsed
-                            : controller.remaining
-                    ))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(theme.textPrimary)
-                    Spacer()
-                }
-                .padding(.horizontal, Space.sm)
-                .padding(.vertical, Space.xs)
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
         }
     }
 }

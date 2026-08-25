@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Anchor premium doodle compositions</title>
+    <style>
+      * { box-sizing: border-box; }
+      :root { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+      html, body { width: 100%; min-height: 100%; margin: 0; }
+      button { font: inherit; color: inherit; }
+      .screen { width: 100%; min-height: 100vh; position: relative; overflow: hidden; color: #111827; background: #fbfbf8; }
+      .status { height: 46px; padding: 14px 21px 0; display: flex; justify-content: space-between; font-size: 12px; font-weight: 750; }
+      header { padding: 8px 20px 11px; display: flex; align-items: end; justify-content: space-between; }
+      h1 { margin: 0; font-size: 37px; line-height: .95; letter-spacing: -.045em; }
+      header p { margin: 6px 0 0; color: #687285; font-size: 12px; }
+      .date { min-width: 58px; height: 58px; border-radius: 50%; border: 1px solid #d9dee7; display: grid; place-items: center; align-content: center; }
+      .date small { font-size: 9px; color: #7c8594; }
+      .date b { font-size: 18px; }
+      .week { margin: 0 18px 10px; display: grid; grid-template-columns: repeat(7,1fr); border-bottom: 1px solid #dfe3e9; }
+      .week span { min-height: 45px; display: grid; place-items: center; align-content: center; gap: 2px; color: #7d8694; font-size: 9px; }
+      .week b { font-size: 13px; }
+      .week .on { color: #2567e8; border-bottom: 2px solid #2567e8; }
+      .schedule { position: relative; margin: 0 16px 92px; }
+      .row { position: relative; min-height: 85px; display: grid; grid-template-columns: 48px 1fr auto; gap: 8px; align-items: center; border-bottom: 1px solid #e1e4e9; }
+      .row time { font-size: 10px; color: #808997; }
+      .row b { display: block; font-size: 15px; letter-spacing: -.015em; }
+      .row small { display: block; margin-top: 5px; color: #737d8c; font-size: 10px; }
+      .row .state { align-self: start; margin-top: 18px; color: #7b8492; font-size: 10px; }
+      .row.now { margin: 6px -3px; padding: 0 10px 0 3px; border: 0; border-radius: 15px; color: white; background: #2567e8; box-shadow: 0 12px 26px rgba(37,103,232,.18); }
+      .row.now time, .row.now small, .row.now .state { color: #dce8ff; }
+      .row.interrupted::after { content: ""; position: absolute; left: 47px; right: 0; bottom: -1px; border-bottom: 2px solid #f06a79; transform: rotate(-.5deg); }
+      .open { width: 100%; min-height: 58px; margin: 10px 0; border: 1px dashed #b5bdc9; border-radius: 13px; background: transparent; color: #5c6778; text-align: left; padding: 0 12px 0 56px; font-weight: 650; }
+      .bottom { position: fixed; z-index: 10; left: 12px; right: 12px; bottom: 10px; height: 66px; display: grid; grid-template-columns: repeat(4,1fr); border: 1px solid rgba(210,215,223,.85); border-radius: 22px; background: rgba(255,255,255,.94); box-shadow: 0 12px 34px rgba(30,39,55,.14); backdrop-filter: blur(18px); }
+      .bottom button { border: 0; background: transparent; display: grid; place-items: center; align-content: center; gap: 4px; color: #7a8493; font-size: 9px; }
+      .bottom b { font-size: 18px; line-height: 1; font-weight: 500; }
+      .bottom .on { color: #2567e8; }
+      .add { position: fixed; z-index: 12; right: 20px; bottom: 89px; width: 54px; height: 54px; border: 0; border-radius: 50%; color: white; background: #2567e8; box-shadow: 0 12px 28px rgba(37,103,232,.25); font-size: 24px; }
+      .hand { font-family: "Bradley Hand", "Chalkboard SE", cursive; font-weight: 700; }
+
+      /* A: one authored scene establishes the emotional contract. */
+      .scene .hero-art { height: 180px; margin: 0 16px 8px; border-bottom: 1px solid #dfe3e8; position: relative; overflow: hidden; }
+      .scene .hero-art img { width: 166%; height: 100%; object-fit: cover; object-position: center 51%; transform: translateX(-20%); }
+      .scene .hero-art .caption { position: absolute; right: 5px; bottom: 8px; padding: 4px 7px; color: #18243b; background: rgba(255,255,255,.9); font-size: 13px; transform: rotate(-2deg); }
+      .scene .schedule { margin-top: 0; }
+      .scene .row { min-height: 74px; }
+      .scene .row.extra { display: none; }
+
+      /* B: the doodle itself becomes the day rail. */
+      .thread .thread-wrap { position: absolute; z-index: 2; left: 73px; top: 196px; bottom: 86px; width: 25px; pointer-events: none; }
+      .thread .thread-wrap svg { width: 100%; height: 100%; overflow: visible; }
+      .thread .schedule { margin-left: 18px; }
+      .thread .row { grid-template-columns: 56px 1fr auto; padding-left: 22px; }
+      .thread .row.now { margin-left: 12px; }
+      .thread .open { padding-left: 79px; }
+      .thread .hand-note { position: absolute; z-index: 4; left: 68px; top: 318px; color: #2567e8; font-size: 12px; transform: rotate(-8deg); }
+
+      /* C: a restrained doodle companion marks the current action. */
+      .companion .companion-stage { position: relative; height: 122px; margin: 0 16px 4px; overflow: hidden; }
+      .companion .companion-stage img { position: absolute; width: 238px; height: 138px; object-fit: cover; object-position: 47% 54%; left: 64px; top: -2px; }
+      .companion .companion-stage .promise { position: absolute; right: 5px; top: 9px; max-width: 125px; font-size: 14px; line-height: 1.05; transform: rotate(2deg); }
+      .companion .schedule { margin-top: 0; }
+      .companion .row { min-height: 76px; }
+      .companion .row.now::before { content: "keep this one"; position: absolute; z-index: 4; right: 19px; bottom: -17px; color: #2567e8; font: 700 12px "Bradley Hand", "Chalkboard SE", cursive; transform: rotate(-3deg); }
+
+      @media (min-width: 600px) {
+        body { display: grid; place-items: center; padding: 24px; background: #e6e8eb; }
+        .screen { width: 390px; min-height: 844px; max-height: 844px; border-radius: 43px; box-shadow: 0 30px 80px rgba(19,27,40,.24); }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="screen" class="screen thread">
+      <div class="status"><span>9:41</span><span>●●● ᯤ 100%</span></div>
+      <header><div><h1>Today</h1><p>A plan is a hypothesis, not a verdict.</p></div><div class="date"><small>TUE</small><b>25</b></div></header>
+      <div class="week"><span>M<b>24</b></span><span class="on">T<b>25</b></span><span>W<b>26</b></span><span>T<b>27</b></span><span>F<b>28</b></span><span>S<b>29</b></span><span>S<b>30</b></span></div>
+
+      <section class="scene-only hero-art" hidden>
+        <img src="file:///Users/sarthak/Desktop/fleet/anchor/Apps/Shared/Assets.xcassets/AnchorOnboarding.imageset/anchor-onboarding.png" alt="Doodle showing focus held beside an interruption basket" />
+        <span class="caption hand">choose the day before it chooses you</span>
+      </section>
+
+      <section class="companion-only companion-stage" hidden>
+        <img src="file:///Users/sarthak/Desktop/fleet/anchor/Apps/Shared/Assets.xcassets/HabitsOnboarding.imageset/habits-onboarding.png" alt="Doodle showing chosen time balancing lost time" />
+        <span class="promise hand">make room for what you actually want</span>
+      </section>
+
+      <div class="thread-only thread-wrap">
+        <svg viewBox="0 0 32 520" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M17 0 C5 43, 28 69, 14 112 S26 184, 13 226 S27 302, 13 344 S23 430, 15 520" fill="none" stroke="#111827" stroke-width="2.4" stroke-linecap="round" />
+          <circle cx="14" cy="112" r="6" fill="#2567e8" stroke="#fbfbf8" stroke-width="2" />
+          <path d="M8 232 C18 220, 25 225, 23 238 C20 250, 5 248, 8 232Z" fill="none" stroke="#f06a79" stroke-width="2" />
+        </svg>
+      </div>
+      <span class="thread-only hand hand-note">now →</span>
+
+      <section class="schedule" aria-label="Today's schedule">
+        <article class="row"><time>8:10</time><div><b>Plan the launch</b><small>75 min · complete</small></div><span class="state">Done</span></article>
+        <article class="row now"><time>9:40</time><div><b>Build the schedule view</b><small>38 min remaining</small></div><span class="state">Now</span></article>
+        <article class="row interrupted"><time>10:20</time><div><b>Support call</b><small>12 min · came to you</small></div><span class="state">Logged</span></article>
+        <article class="row"><time>11:30</time><div><b>Lunch outside</b><small>45 min · enjoyment</small></div><span class="state">Next</span></article>
+        <button class="open">＋ Use this open time</button>
+        <article class="row extra"><time>1:00</time><div><b>Release checks</b><small>85 min · focus</small></div><span class="state">Later</span></article>
+      </section>
+      <button class="add" aria-label="Add a block">＋</button>
+      <nav class="bottom"><button><b>◎</b>Focus</button><button class="on"><b>▤</b>Today</button><button><b>↻</b>Habits</button><button><b>◴</b>History</button></nav>
+    </main>
+    <script>
+      const composition = new URLSearchParams(location.search).get('composition') || 'thread';
+      const screen = document.querySelector('#screen');
+      screen.className = `screen ${composition}`;
+      document.querySelectorAll('.scene-only').forEach((node) => node.hidden = composition !== 'scene');
+      document.querySelectorAll('.thread-only').forEach((node) => node.hidden = composition !== 'thread');
+      document.querySelectorAll('.companion-only').forEach((node) => node.hidden = composition !== 'companion');
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "images" : [
+    { "filename" : "today-doodle.png", "idiom" : "universal", "scale" : "1x" },
+    {
+      "appearances" : [
+        { "appearance" : "luminosity", "value" : "dark" }
+      ],
+      "filename" : "today-doodle-dark.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    { "idiom" : "universal", "scale" : "2x" },
+    { "idiom" : "universal", "scale" : "3x" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

@@ -1,0 +1,36 @@
+{
+  "title": "Simple, premium, doodle-first",
+  "question": "The visual world is now fixed. Which mobile composition gets the balance right?",
+  "options": [
+    {
+      "id": "doodle-scene",
+      "label": "Doodle Scene",
+      "kicker": "RECOMMENDED",
+      "lineage": "one authored Anchor doodle followed by a quiet native schedule",
+      "body": "The original focus-versus-interruption scene carries the personality, then gets out of the way. Schedule rows stay exceptionally simple and the cobalt current block remains unmistakable. Best balance of doodle-first identity and premium daily usability. Risk: the scene uses vertical room, so dense days need a graceful collapsed state after first scroll.",
+      "hero": "artifacts/design/anchor-overhaul-directions/doodle-scene-390.png",
+      "board": "artifacts/design/anchor-overhaul-directions/doodle-scene-390.png"
+    },
+    {
+      "id": "doodle-thread",
+      "label": "Doodle Thread",
+      "kicker": "INTEGRATED ALTERNATE",
+      "lineage": "a hand-drawn day path running through clean native rows",
+      "body": "The doodle becomes functional: one imperfect line connects the day, a cobalt knot marks now, and a coral loop records an interruption. It keeps more schedule visible than the scene. Risk: the hand-drawn rail must be rendered with exceptional restraint or it will feel casual instead of premium.",
+      "hero": "artifacts/design/anchor-overhaul-directions/doodle-thread-390.png",
+      "board": "artifacts/design/anchor-overhaul-directions/doodle-thread-390.png"
+    },
+    {
+      "id": "doodle-companion",
+      "label": "Doodle Companion",
+      "kicker": "QUIET ALTERNATE",
+      "lineage": "small original chosen-time vignette beside the active plan",
+      "body": "A restrained doodle companion keeps the art present without dominating the schedule. Handwritten annotations appear only where they add human meaning. Risk: it may under-deliver on doodle-first and drift back toward the generic clean app the previous round rejected.",
+      "hero": "artifacts/design/anchor-overhaul-directions/doodle-companion-390.png",
+      "board": "artifacts/design/anchor-overhaul-directions/doodle-companion-390.png"
+    }
+  ],
+  "reroll": false,
+  "canon": false,
+  "steer": true
+}

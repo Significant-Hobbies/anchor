@@ -74,11 +74,14 @@ gaps, then offers evidence-linked changes for a future day.
 
 - Name: Anchor.
 - Voice: concise, calm, adult, factual, private, and non-moralizing.
-- Anchor's cobalt focus language remains the operational identity. Warm colors
-  identify interruption origins and never masquerade as focus.
-- Original Indulge/Habits illustrations are approved for private onboarding and
-  replacement-selection moments. They bring humanity to behavioral reflection
-  without turning the daily interface into a decorative habit dashboard.
+- Anchor's ink-and-paper focus language is the operational identity. Colour
+  belongs primarily to authored doodles and known interruption origins, never
+  to a bluish wash across the interface.
+- Anchor is doodle-first. The original Indulge/Habits line-art world is the
+  canonical product personality across planning, focus, habits, review, and the
+  public landing. Operational screens use one purposeful scene, annotation, or
+  state illustration at a time; controls and data remain quiet, native, and
+  immediately legible rather than becoming a decorative cartoon dashboard.
 - Intentional enjoyment is not failure. A conscious change of plan is a valid
   outcome and must remain distinct from an automatic pull.
 

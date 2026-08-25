@@ -48,5 +48,10 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .testTarget(
+            name: "AnchorUITests",
+            dependencies: ["AnchorUI"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ]
 )

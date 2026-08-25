@@ -5,18 +5,21 @@ import SwiftUI
 
 struct PlanScreen: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.modelContext) private var context
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
+    @Query(sort: \DayPlanConfirmation.updatedAt, order: .reverse) private var confirmations: [DayPlanConfirmation]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
     private let onOpenFocus: () -> Void
     @State private var today = Date()
-    @State private var showsEditor = false
+    @State private var editorSeed: EditorSeed?
     @State private var showsRoutines = false
     @State private var editingBlock: PlanBlock?
     @State private var explainingBlock: PlanBlock?
     @State private var loadError: String?
+    @State private var checkInDeferredInSession = false
 
     init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
         self.controller = controller
@@ -37,7 +40,15 @@ struct PlanScreen: View {
             VStack(alignment: .leading, spacing: Space.lg) {
                 dayHeader
 
-                completionCard
+                if shouldShowDailyCheckIn {
+                    dailyCheckIn
+                } else if todayConfirmation?.decision == .adjusted {
+                    todayOnlyStatus
+                }
+
+                if !blocks.isEmpty {
+                    daySummary
+                }
 
                 if let loadError {
                     Label(loadError, systemImage: "exclamationmark.triangle")
@@ -46,40 +57,59 @@ struct PlanScreen: View {
                 }
 
                 if blocks.isEmpty {
-                    EmptyStateView(
-                        symbol: "calendar.badge.plus",
-                        title: "Give the day one anchor",
-                        message: "Add a focus block, commitment, routine, rest, or intentional enjoyment. Recurring blocks return on the days you choose."
-                    )
-                    Button("Add the first block") { showsEditor = true }
-                        .buttonStyle(PrimaryButtonStyle())
+                    Card(padding: Space.lg) {
+                        #if os(macOS)
+                        HStack(spacing: Space.lg) {
+                            emptyDayCopy
+                            Spacer(minLength: Space.lg)
+                            Button("Add the first block") { editorSeed = EditorSeed(start: suggestedStart) }
+                                .buttonStyle(PrimaryButtonStyle(expands: false))
+                        }
+                        #else
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: Space.lg) {
+                                emptyDayCopy
+                                Spacer(minLength: Space.lg)
+                                Button("Add the first block") { editorSeed = EditorSeed(start: suggestedStart) }
+                                    .buttonStyle(PrimaryButtonStyle(expands: false))
+                            }
+                            VStack(alignment: .leading, spacing: Space.md) {
+                                emptyDayCopy
+                                Button("Add the first block") { editorSeed = EditorSeed(start: suggestedStart) }
+                                .buttonStyle(PrimaryButtonStyle())
+                            }
+                        }
+                        #endif
+                    }
                 } else {
                     VStack(spacing: 0) {
-                        ForEach(blocks) { block in
-                            PlanBlockRow(
-                                block: block,
-                                linkedSession: block.sessionID.flatMap { id in sessions.first { $0.id == id } },
-                                hasDifferentActiveSession: controller.hasSession && controller.session?.id != block.sessionID,
-                                onStart: { start(block) },
-                                onOpenFocus: onOpenFocus,
-                                onComplete: { complete(block) },
-                                onEdit: { editingBlock = block },
-                                onExplain: { explainingBlock = block }
-                            )
-                            if block.id != blocks.last?.id {
-                                Divider().overlay(theme.hairline).padding(.leading, 76)
+                        ForEach(timelineItems) { item in
+                            switch item {
+                            case let .block(block):
+                                PlanBlockRow(
+                                    block: block,
+                                    linkedSession: block.sessionID.flatMap { id in sessions.first { $0.id == id } },
+                                    hasDifferentActiveSession: controller.hasSession && controller.session?.id != block.sessionID,
+                                    isCurrent: isCurrent(block),
+                                    onStart: { start(block) },
+                                    onOpenFocus: onOpenFocus,
+                                    onComplete: { complete(block) },
+                                    onEdit: { editingBlock = block },
+                                    onExplain: { explainingBlock = block }
+                                )
+                            case let .gap(gap):
+                                ScheduleGapRow(gap: gap) {
+                                    editorSeed = EditorSeed(start: gap.start)
+                                }
                             }
                         }
                     }
-                    .padding(.horizontal, Space.md)
-                    .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.lg).strokeBorder(theme.hairline))
                 }
 
-                if !templates.filter({ !$0.isArchived }).isEmpty {
+                if !activeTemplates.isEmpty {
                     Button { showsRoutines = true } label: {
                         HStack {
-                            Label("\(templates.filter { !$0.isArchived }.count) recurring routine\(templates.filter { !$0.isArchived }.count == 1 ? "" : "s")", systemImage: "repeat")
+                            Label("Your usual week · \(activeTemplates.count) item\(activeTemplates.count == 1 ? "" : "s")", systemImage: "calendar.badge.clock")
                             Spacer()
                             Text("Manage")
                             Image(systemName: "chevron.right")
@@ -93,20 +123,21 @@ struct PlanScreen: View {
                 }
             }
             .padding(Space.lg)
-            .frame(maxWidth: 680)
+            .frame(maxWidth: workspaceMaxWidth)
             .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .bottom) {
             if !blocks.isEmpty {
-                Button("Add a block") { showsEditor = true }
+                Button("Add a block") { editorSeed = EditorSeed(start: suggestedStart) }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Space.lg)
                     .padding(.vertical, Space.xs)
                     .background(.bar)
             }
         }
-        .sheet(isPresented: $showsEditor) {
-            PlanBlockEditor(initialDay: today) { refresh() }
+        .background(theme.canvas)
+        .sheet(item: $editorSeed) { seed in
+            PlanBlockEditor(initialDay: today, suggestedStart: seed.start) { refresh() }
                 .anchorTheme()
         }
         .sheet(isPresented: $showsRoutines) {
@@ -158,47 +189,154 @@ struct PlanScreen: View {
     }
 
     private var dayHeader: some View {
+        DoodleScene(
+            "TodayDoodle",
+            eyebrow: Date().formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
+            title: "Draw the day",
+            message: "Give the important things a place. The plan can move when life does."
+        )
+    }
+
+    private var activeTemplates: [ScheduleTemplate] { templates.filter { !$0.isArchived } }
+
+    private var todayConfirmation: DayPlanConfirmation? {
+        confirmations.first { Calendar.current.isDate($0.day, inSameDayAs: today) }
+    }
+
+    private var shouldShowDailyCheckIn: Bool {
+        todayConfirmation?.decision.isConfirmed != true && !checkInDeferredInSession
+    }
+
+    private var usualDayName: String {
+        today.formatted(.dateTime.weekday(.wide))
+    }
+
+    private var dailyCheckIn: some View {
+        Card(padding: Space.lg) {
+            VStack(alignment: .leading, spacing: Space.md) {
+                HStack(alignment: .top, spacing: Space.sm) {
+                    Image(systemName: "sun.horizon.fill")
+                        .foregroundStyle(theme.accent)
+                        .frame(width: 32, height: 32)
+                        .background(theme.accent.opacity(0.12), in: .circle)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(activeTemplates.isEmpty ? "Build your usual week" : "Same plan today?")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(theme.textPrimary)
+                        Text(activeTemplates.isEmpty
+                             ? "Set the week once. Anchor will bring each day forward for a quick confirmation."
+                             : "Your usual \(usualDayName) is already here. Confirm it, or change only today.")
+                            .font(.subheadline)
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.sm) { dailyCheckInButtons }
+                    VStack(spacing: Space.sm) { dailyCheckInButtons }
+                }
+            }
+        }
+        .accessibilityIdentifier("anchor.today.daily-check-in")
+    }
+
+    @ViewBuilder
+    private var dailyCheckInButtons: some View {
+        if activeTemplates.isEmpty {
+            Button("Set up usual week") { showsRoutines = true }
+                .buttonStyle(PrimaryButtonStyle())
+        } else {
+            Button("Use usual \(usualDayName)") { recordCheckIn(.usual) }
+                .buttonStyle(PrimaryButtonStyle())
+            Button("Adjust today") { recordCheckIn(.adjusted) }
+                .buttonStyle(QuietButtonStyle())
+        }
+        Button("Later") {
+            recordCheckIn(.later)
+            checkInDeferredInSession = true
+        }
+        .buttonStyle(QuietButtonStyle(expands: false))
+    }
+
+    private var todayOnlyStatus: some View {
+        HStack(spacing: Space.sm) {
+            Image(systemName: "pencil.and.list.clipboard")
+                .foregroundStyle(theme.accent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Adjusting today only")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+                Text("Edit or move blocks below. Your usual \(usualDayName) will not change.")
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+            }
+            Spacer(minLength: 0)
+            Button("Edit usual week") { showsRoutines = true }
+                .buttonStyle(.plain)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(theme.accent)
+        }
+        .padding(Space.md)
+        .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.md))
+    }
+
+    private var emptyDayCopy: some View {
         VStack(alignment: .leading, spacing: Space.xxs) {
-            Text("Today")
-                .font(.largeTitle.weight(.semibold))
+            Text("Give the day one anchor")
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
-            Text("A plan is a hypothesis, not a verdict.")
+            Text("Start with the thing worth protecting. Commitments, rest, and recurring routines can take their place around it.")
                 .font(.subheadline)
                 .foregroundStyle(theme.textSecondary)
         }
     }
 
-    private var completionCard: some View {
+    private var daySummary: some View {
         let completed = blocks.filter { $0.state == .completed }.count
-        let percent = Int((Double(completed) / Double(max(1, blocks.count)) * 100).rounded())
-        return Card(padding: Space.lg) {
-            HStack(spacing: Space.md) {
-                ZStack {
-                    Circle()
-                        .stroke(theme.hairline, lineWidth: 7)
-                    Circle()
-                        .trim(from: 0, to: Double(percent) / 100)
-                        .stroke(theme.accent, style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                    Text("\(percent)%")
-                        .font(.title3.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(theme.textPrimary)
-                }
-                .frame(width: 72, height: 72)
-
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text(blocks.isEmpty ? "No blocks scheduled yet" : "\(completed) of \(blocks.count) scheduled blocks complete")
-                        .font(.headline)
-                        .foregroundStyle(theme.textPrimary)
-                    Text("A neutral snapshot of the schedule so far — not a score.")
-                        .font(.subheadline)
-                        .foregroundStyle(theme.textSecondary)
-                }
-                Spacer(minLength: 0)
-            }
+        let active = blocks.filter { isCurrent($0) || $0.state == .inProgress }.count
+        let ahead = blocks.filter { $0.state == .planned && !isCurrent($0) }.count
+        return HStack(spacing: Space.xs) {
+            Image(systemName: "scribble.variable")
+                .foregroundStyle(theme.accent)
+            Text(blocks.isEmpty
+                 ? "The page is open. Start with one honest block."
+                 : "\(completed) finished · \(active) now · \(ahead) ahead")
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(theme.textSecondary)
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, Space.xxs)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("anchor.today.completion")
+    }
+
+    private var timelineItems: [PlanTimelineItem] {
+        var result: [PlanTimelineItem] = []
+        let sorted = blocks.sorted { $0.plannedStart < $1.plannedStart }
+        for (index, block) in sorted.enumerated() {
+            result.append(.block(block))
+            guard index + 1 < sorted.count else { continue }
+            let end = block.plannedStart.addingTimeInterval(Double(block.plannedSeconds))
+            let next = sorted[index + 1].plannedStart
+            if next.timeIntervalSince(end) >= 30 * 60 {
+                result.append(.gap(ScheduleGap(start: end, end: next)))
+            }
+        }
+        return result
+    }
+
+    private var suggestedStart: Date {
+        let calendar = Calendar.current
+        let now = Date()
+        let base = calendar.isDate(now, inSameDayAs: today) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
+        let minute = calendar.component(.minute, from: base)
+        let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: base) ?? base
+        let latestEnd = blocks.map { $0.plannedStart.addingTimeInterval(Double($0.plannedSeconds)) }.max()
+        return max(rounded, latestEnd ?? rounded)
+    }
+
+    private func isCurrent(_ block: PlanBlock) -> Bool {
+        let now = Date()
+        return block.state == .inProgress || (now >= block.plannedStart && now < block.plannedStart.addingTimeInterval(Double(block.plannedSeconds)))
     }
 
     private func refresh() {
@@ -208,6 +346,16 @@ struct PlanScreen: View {
             loadError = nil
         } catch {
             loadError = "The plan is still on this device, but Anchor could not refresh it: \(error.localizedDescription)"
+        }
+    }
+
+    private func recordCheckIn(_ decision: DayPlanConfirmationDecision) {
+        do {
+            try DailyPlanService(context: context).record(decision, for: today)
+            loadError = nil
+        } catch {
+            context.rollback()
+            loadError = "Anchor could not save today’s confirmation. Your schedule is still available."
         }
     }
 
@@ -281,6 +429,7 @@ private struct PlanBlockRow: View {
     let block: PlanBlock
     let linkedSession: FocusSession?
     let hasDifferentActiveSession: Bool
+    let isCurrent: Bool
     let onStart: () -> Void
     let onOpenFocus: () -> Void
     let onComplete: () -> Void
@@ -299,11 +448,11 @@ private struct PlanBlockRow: View {
             }
             .frame(width: 58)
 
-            Image(systemName: block.kind.symbolName)
-                .font(.body.weight(.medium))
-                .foregroundStyle(block.state == .completed ? theme.positive : theme.accent)
-                .frame(width: 28, height: 28)
-                .background((block.state == .completed ? theme.positive : theme.accent).opacity(0.12), in: .circle)
+            DayRailSegment(
+                isCurrent: isCurrent,
+                isCompleted: block.state == .completed
+            )
+            .frame(width: 20, height: 74)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(block.title)
@@ -349,7 +498,20 @@ private struct PlanBlockRow: View {
             }
             .accessibilityLabel(actionLabel)
         }
-        .padding(.vertical, Space.sm)
+        .padding(.horizontal, Space.sm)
+        .padding(.vertical, Space.xs)
+        .background(
+            isCurrent ? theme.surfaceRaised : .clear,
+            in: .rect(cornerRadius: Radius.md)
+        )
+        .overlay {
+            if isCurrent {
+                RoundedRectangle(cornerRadius: Radius.md)
+                    .strokeBorder(theme.accent.opacity(0.22), lineWidth: 1)
+            }
+        }
+        .shadow(color: .black.opacity(isCurrent ? (theme.isDark ? 0.22 : 0.07) : 0), radius: 12, y: 5)
+        .padding(.vertical, 3)
         .accessibilityElement(children: .contain)
     }
 
@@ -379,10 +541,132 @@ private struct PlanBlockRow: View {
     }
 }
 
+private struct ScheduleGap: Identifiable {
+    let start: Date
+    let end: Date
+    var id: Date { start }
+    var seconds: TimeInterval { end.timeIntervalSince(start) }
+}
+
+private enum PlanTimelineItem: Identifiable {
+    case block(PlanBlock)
+    case gap(ScheduleGap)
+
+    var id: String {
+        switch self {
+        case let .block(block): "block-\(block.id)"
+        case let .gap(gap): "gap-\(gap.start.timeIntervalSinceReferenceDate)"
+        }
+    }
+}
+
+private struct EditorSeed: Identifiable {
+    let id = UUID()
+    let start: Date
+}
+
+private struct ScheduleGapRow: View {
+    @Environment(\.anchorTheme) private var theme
+    let gap: ScheduleGap
+    let onUse: () -> Void
+
+    var body: some View {
+        Button(action: onUse) {
+            HStack(spacing: Space.sm) {
+                Text(gap.start.formatted(date: .omitted, time: .shortened))
+                    .font(.caption.monospacedDigit())
+                    .frame(width: 58)
+                DayGapMark()
+                    .frame(width: 20, height: 52)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Open space · \(Format.duration(gap.seconds))")
+                        .font(.subheadline.weight(.medium))
+                    Text("Use this time")
+                        .font(.caption)
+                        .foregroundStyle(theme.textTertiary)
+                }
+                Spacer()
+            }
+            .foregroundStyle(theme.textSecondary)
+            .padding(.horizontal, Space.sm)
+            .padding(.vertical, Space.xs)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Use open time at \(gap.start.formatted(date: .omitted, time: .shortened)) for \(Format.duration(gap.seconds))")
+    }
+}
+
+private struct DayRailSegment: View {
+    @Environment(\.anchorTheme) private var theme
+    let isCurrent: Bool
+    let isCompleted: Bool
+
+    var body: some View {
+        ZStack {
+            DayRailShape()
+                .stroke(theme.hairline, style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+            if isCurrent {
+                DayRailShape()
+                    .stroke(theme.accent, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+            }
+            Circle()
+                .fill(isCompleted ? theme.positive : (isCurrent ? theme.accent : theme.canvas))
+                .overlay(
+                    Circle().strokeBorder(
+                        isCompleted ? theme.positive : (isCurrent ? theme.accent : theme.textTertiary),
+                        lineWidth: isCurrent ? 2 : 1
+                    )
+                )
+                .frame(width: isCurrent ? 14 : 11, height: isCurrent ? 14 : 11)
+            if isCurrent {
+                Circle()
+                    .strokeBorder(theme.accent.opacity(0.18), lineWidth: 5)
+                    .frame(width: 22, height: 22)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct DayGapMark: View {
+    @Environment(\.anchorTheme) private var theme
+
+    var body: some View {
+        ZStack {
+            DayRailShape()
+                .stroke(
+                    theme.hairline,
+                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round, dash: [3, 5])
+                )
+            Image(systemName: "plus")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(theme.textSecondary)
+                .frame(width: 18, height: 18)
+                .background(theme.canvas, in: .circle)
+                .overlay(Circle().strokeBorder(theme.hairline))
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct DayRailShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX + 0.5, y: rect.minY))
+        path.addCurve(
+            to: CGPoint(x: rect.midX - 0.5, y: rect.maxY),
+            control1: CGPoint(x: rect.midX - 1.4, y: rect.height * 0.28),
+            control2: CGPoint(x: rect.midX + 1.2, y: rect.height * 0.72)
+        )
+        return path
+    }
+}
+
 struct PlanBlockEditor: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Query private var allTemplates: [ScheduleTemplate]
     @State private var title = ""
     @State private var details = ""
     @State private var plannedStart: Date
@@ -396,13 +680,16 @@ struct PlanBlockEditor: View {
     @State private var saveError: String?
     private let block: PlanBlock?
     private let template: ScheduleTemplate?
+    private let isBehaviorHabit: Bool
     private let onSave: () -> Void
 
     init(
         initialDay: Date,
+        suggestedStart: Date? = nil,
         block: PlanBlock? = nil,
         template: ScheduleTemplate? = nil,
         startsRecurring: Bool = false,
+        startsBehaviorHabit: Bool = false,
         onSave: @escaping () -> Void
     ) {
         let calendar = Calendar.current
@@ -414,6 +701,7 @@ struct PlanBlockEditor: View {
                     to: calendar.startOfDay(for: initialDay)
                 )
             }
+            ?? suggestedStart
             ?? calendar.date(
                 bySettingHour: calendar.component(.hour, from: Date()),
                 minute: 0,
@@ -425,57 +713,111 @@ struct PlanBlockEditor: View {
         _details = State(initialValue: block?.details ?? template?.details ?? "")
         _plannedStart = State(initialValue: suggested)
         _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? template?.plannedSeconds ?? 1_800) / 60))
-        _kind = State(initialValue: block?.kind ?? template?.kind ?? .focus)
+        _kind = State(initialValue: startsBehaviorHabit ? .routine : (block?.kind ?? template?.kind ?? .focus))
         _flexibility = State(initialValue: block?.flexibility ?? template?.flexibility ?? .flexible)
-        _repeats = State(initialValue: template != nil || startsRecurring)
+        _repeats = State(initialValue: template != nil || startsRecurring || startsBehaviorHabit)
         _weekdays = State(initialValue: template?.weekdays ?? [ScheduleWeekday(day: suggested)])
         _direction = State(initialValue: block?.lifeDirection ?? template?.lifeDirection)
         _behaviorPattern = State(initialValue: block?.behaviorPattern ?? template?.behaviorPattern)
         self.block = block
         self.template = template
+        self.isBehaviorHabit = startsBehaviorHabit || template?.isBehaviorHabit == true
         self.onSave = onSave
     }
 
     var body: some View {
         NavigationStack {
-            Form {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.lg) {
+                if block?.templateID != nil {
+                    Label("This changes today only. Your usual week stays intact.", systemImage: "calendar.badge.clock")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(theme.textSecondary)
+                        .padding(Space.sm)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
+                }
                 if let saveError {
-                    Section {
-                        Label(saveError, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(theme.negative)
-                            .accessibilityIdentifier("anchor.plan.save-error")
+                    Label(saveError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(theme.negative)
+                        .accessibilityIdentifier("anchor.plan.save-error")
+                }
+
+                Card(padding: Space.lg) {
+                    VStack(alignment: .leading, spacing: Space.md) {
+                        editorLabel("Intention", detail: "The thing that deserves a place")
+                        TextField("What will you do?", text: $title, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 23, weight: .semibold, design: .rounded))
+                            .foregroundStyle(theme.textPrimary)
+                            .lineLimit(1...3)
+                        Divider().overlay(theme.hairline)
+                        TextField("Context or what success looks like", text: $details, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.subheadline)
+                            .foregroundStyle(theme.textSecondary)
+                            .lineLimit(2...4)
+
+                        if isBehaviorHabit {
+                            Label("Behavior-change habit", systemImage: "leaf")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(theme.accent)
+                        } else {
+                            FlowRow(spacing: Space.xs) {
+                                ForEach(PlanBlockKind.allCases, id: \.self) { option in
+                                    Button {
+                                        withAnimation(Motion.snappy) { kind = option }
+                                    } label: {
+                                        Chip(option.label, symbol: option.symbolName, isSelected: kind == option)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
                     }
                 }
-                Section("Intention") {
-                    TextField("What will you do?", text: $title)
-                    TextField("Context or what success looks like", text: $details, axis: .vertical)
-                        .lineLimit(2...4)
-                    Picker("Kind", selection: $kind) {
-                        ForEach(PlanBlockKind.allCases, id: \.self) { Label($0.label, systemImage: $0.symbolName).tag($0) }
+
+                Card(padding: Space.lg) {
+                    VStack(alignment: .leading, spacing: Space.md) {
+                        editorLabel("Time", detail: "A useful edge, not a promise carved in stone")
+                        HStack(spacing: Space.lg) {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text("STARTS").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
+                                DatePicker("Starts", selection: $plannedStart)
+                                    .labelsHidden()
+                            }
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text("DURATION").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
+                                Stepper("\(minutes) min", value: $minutes, in: 5...240, step: 5)
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        Picker("Flexibility", selection: $flexibility) {
+                            ForEach(ScheduleFlexibility.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
                     }
                 }
-                Section("Time") {
-                    DatePicker("Starts", selection: $plannedStart)
-                    Stepper("\(minutes) minutes", value: $minutes, in: 5...240, step: 5)
-                    Picker("Flexibility", selection: $flexibility) {
-                        ForEach(ScheduleFlexibility.allCases, id: \.self) { Text($0.label).tag($0) }
-                    }
-                }
-                Section("Rhythm") {
-                    if block == nil && template == nil {
+
+                Card(padding: Space.lg) {
+                    VStack(alignment: .leading, spacing: Space.md) {
+                    editorLabel("Rhythm", detail: "Make this a gentle default when it repeats")
+                    if block == nil && template == nil && !isBehaviorHabit {
                         Toggle("Repeat weekly", isOn: $repeats)
+                            .tint(theme.accent)
                     }
                     if repeats && block == nil {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 44, maximum: 64), spacing: Space.xxs)], spacing: Space.xxs) {
+                        FlowRow(spacing: Space.xs) {
                             ForEach(ScheduleWeekday.allCases, id: \.self) { day in
                                 Button {
                                     if weekdays.contains(day) { weekdays.remove(day) } else { weekdays.insert(day) }
                                 } label: {
-                                    Text(day.shortLabel)
-                                        .frame(minWidth: 44, minHeight: 44)
+                                    Chip(day.shortLabel, isSelected: weekdays.contains(day))
                                 }
-                                .buttonStyle(.bordered)
-                                .tint(weekdays.contains(day) ? theme.accent : theme.textTertiary)
+                                .buttonStyle(.plain)
                                 .accessibilityLabel("\(String(describing: day)) \(weekdays.contains(day) ? "selected" : "not selected")")
                             }
                         }
@@ -488,9 +830,15 @@ struct PlanBlockEditor: View {
                             ForEach(BehaviorPattern.allCases, id: \.self) { Text($0.label).tag(Optional($0)) }
                         }
                     }
+                    }
                 }
+                }
+                .padding(Space.lg)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
-            .navigationTitle(template != nil ? "Edit routine" : (block == nil ? (repeats ? "New routine" : "New block") : "Edit block"))
+            .background(theme.canvas)
+            .navigationTitle(isBehaviorHabit ? (template == nil ? "New habit" : "Edit habit") : (template != nil ? "Edit usual week" : (block == nil ? (repeats ? "New usual-week item" : "New block") : "Edit block")))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -498,6 +846,20 @@ struct PlanBlockEditor: View {
                         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (repeats && weekdays.isEmpty))
                 }
             }
+        }
+        #if os(macOS)
+        .frame(minWidth: 540, idealWidth: 620, minHeight: 460, idealHeight: 680)
+        #endif
+    }
+
+    private func editorLabel(_ title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(theme.textPrimary)
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(theme.textTertiary)
         }
     }
 
@@ -546,8 +908,16 @@ struct PlanBlockEditor: View {
                 template.flexibility = flexibility
                 template.lifeDirection = direction
                 template.behaviorPattern = behaviorPattern
+                template.updatedAt = Date()
                 try DayPlanService(context: context).reconcileFutureBlocks(for: template)
             } else if repeats {
+                if isBehaviorHabit {
+                    let activeHabitCount = allTemplates.filter(\.isActiveBehaviorHabit).count
+                    guard HabitPolicy().canAdd(activeHabitCount: activeHabitCount) else {
+                        saveError = "All five habit slots are in use. Build a seven-occurrence streak, then upgrade or graduate one first."
+                        return
+                    }
+                }
                 let template = ScheduleTemplate(
                     title: trimmed,
                     details: details,
@@ -557,7 +927,9 @@ struct PlanBlockEditor: View {
                     kind: kind,
                     flexibility: flexibility,
                     behaviorPattern: behaviorPattern,
-                    lifeDirection: direction
+                    lifeDirection: direction,
+                    isBehaviorHabit: isBehaviorHabit,
+                    habitLevelStartedAt: isBehaviorHabit ? Date() : nil
                 )
                 context.insert(template)
                 try context.save()
@@ -591,6 +963,7 @@ struct RoutineManager: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
     @State private var editingTemplate: ScheduleTemplate?
+    @State private var showsNewTemplate = false
     @State private var saveError: String?
     let onChange: () -> Void
 
@@ -632,9 +1005,19 @@ struct RoutineManager: View {
                     ContentUnavailableView("No recurring routines", systemImage: "repeat", description: Text("Create one from Add a block and turn on Repeat weekly."))
                 }
             }
-            .navigationTitle("Recurring routines")
+            .navigationTitle("Your usual week")
             .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add", systemImage: "plus") { showsNewTemplate = true }
+                }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .sheet(isPresented: $showsNewTemplate) {
+                PlanBlockEditor(initialDay: Date(), startsRecurring: true) {
+                    saveError = nil
+                    onChange()
+                }
+                .anchorTheme()
             }
             .sheet(item: $editingTemplate) { template in
                 PlanBlockEditor(initialDay: Date(), template: template) {
@@ -759,6 +1142,7 @@ struct DivergenceEditor: View {
 
 struct DayReviewScreen: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.modelContext) private var context
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
@@ -786,10 +1170,18 @@ struct DayReviewScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
+                DoodleScene(
+                    "HistoryDoodle",
+                    eyebrow: "History",
+                    title: "Read the real day",
+                    message: "Compare what you drew with what happened. Keep the lesson, not the score.",
+                    compact: true
+                )
+
                 HStack {
                     VStack(alignment: .leading, spacing: Space.xxs) {
-                        Text(Calendar.current.isDateInToday(selectedDay) ? "Today, honestly" : selectedDay.formatted(date: .complete, time: .omitted))
-                            .font(.largeTitle.weight(.semibold))
+                        Text(Calendar.current.isDateInToday(selectedDay) ? "Reviewing today" : selectedDay.formatted(date: .complete, time: .omitted))
+                            .font(.title2.weight(.semibold))
                             .foregroundStyle(theme.textPrimary)
                         Text("The largest differences, not a score.")
                             .font(.subheadline)
@@ -799,10 +1191,11 @@ struct DayReviewScreen: View {
                     DatePicker("Day", selection: $selectedDay, displayedComponents: .date).labelsHidden()
                 }
 
-                HStack(spacing: Space.sm) {
-                    StatTile(label: "Planned", value: Format.duration(review.plannedSeconds), symbol: "calendar")
-                    StatTile(label: "Observed time", value: observedTimeSummary, symbol: "clock")
-                }
+                DayComparison(
+                    planned: review.plannedSeconds,
+                    observed: review.actualSeconds,
+                    observedSummary: observedTimeSummary
+                )
 
                 if review.gaps.isEmpty {
                     EmptyStateView(
@@ -827,22 +1220,22 @@ struct DayReviewScreen: View {
                     VStack(alignment: .leading, spacing: Space.sm) {
                         SectionHeader("Try next", subtitle: "Evidence-based ideas you can accept or ignore")
                         ForEach(review.suggestions) { suggestion in
-                            Card {
-                                VStack(alignment: .leading, spacing: Space.xs) {
-                                    Text(suggestion.title)
-                                        .font(.headline)
-                                        .foregroundStyle(theme.textPrimary)
-                                    Text(suggestion.detail)
-                                        .font(.subheadline)
-                                        .foregroundStyle(theme.textSecondary)
-                                }
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text(suggestion.title)
+                                    .font(.headline)
+                                    .foregroundStyle(theme.textPrimary)
+                                Text(suggestion.detail)
+                                    .font(.subheadline)
+                                    .foregroundStyle(theme.textSecondary)
                             }
+                            .padding(.vertical, Space.sm)
+                            Divider().overlay(theme.hairline)
                         }
                     }
                 }
             }
             .padding(Space.lg)
-            .frame(maxWidth: 680)
+            .frame(maxWidth: workspaceMaxWidth)
             .frame(maxWidth: .infinity)
         }
         .sheet(item: $explainingGap) { gap in
@@ -894,13 +1287,78 @@ struct DayReviewScreen: View {
     }
 }
 
+private struct DayComparison: View {
+    @Environment(\.anchorTheme) private var theme
+    let planned: Double
+    let observed: Double
+    let observedSummary: String
+
+    private var maximum: Double { max(1, max(planned, observed)) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.md) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.lg) {
+                metric("Planned", Format.duration(planned), theme.textSecondary)
+                Image(systemName: "arrow.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(theme.textTertiary)
+                metric("Lived", observedSummary, theme.textPrimary)
+            }
+
+            VStack(spacing: Space.xs) {
+                comparisonTrack(label: "Plan", fraction: planned / maximum, tint: theme.textTertiary)
+                comparisonTrack(label: "Day", fraction: observed / maximum, tint: theme.textPrimary)
+            }
+
+            Text("Two traces of the same day. Difference is evidence, not failure.")
+                .font(.caption)
+                .foregroundStyle(theme.textTertiary)
+        }
+        .padding(Space.lg)
+        .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
+        .overlay(RoundedRectangle(cornerRadius: Radius.lg).strokeBorder(theme.hairline))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func metric(_ label: String, _ value: String, _ tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.caption2.weight(.semibold))
+                .tracking(1.1)
+                .foregroundStyle(theme.textTertiary)
+            Text(value)
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(tint)
+                .minimumScaleFactor(0.65)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func comparisonTrack(label: String, fraction: Double, tint: Color) -> some View {
+        HStack(spacing: Space.sm) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(theme.textTertiary)
+                .frame(width: 30, alignment: .leading)
+            DrawnTrace(fraction: fraction, tint: tint)
+                .frame(height: 14)
+        }
+    }
+}
+
 private struct ReviewGapRow: View {
     @Environment(\.anchorTheme) private var theme
     let gap: DayReviewEngine.Gap
     let onExplain: () -> Void
 
     var body: some View {
-        Card {
+        HStack(alignment: .top, spacing: Space.md) {
+            Capsule()
+                .fill(causeTint)
+                .frame(width: 3)
+                .frame(maxHeight: .infinity)
             VStack(alignment: .leading, spacing: Space.sm) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -923,6 +1381,8 @@ private struct ReviewGapRow: View {
                 }
             }
         }
+        .padding(.vertical, Space.sm)
+        .overlay(alignment: .bottom) { Divider().overlay(theme.hairline) }
     }
 
     private var causeTint: Color {

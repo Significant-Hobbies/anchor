@@ -9,6 +9,11 @@ Apps/Anchor.xcodeproj/
 
 .DS_Store
 
+# Local design-review working state; durable decisions live in DESIGN.md and
+# .fleet/design-review.json, while screenshots stay under artifacts/design.
+.impeccable/critique/
+.impeccable/questions/
+
 # Landing page
 landing/node_modules/
 landing/dist/

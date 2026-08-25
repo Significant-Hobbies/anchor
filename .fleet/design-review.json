@@ -1,33 +1,80 @@
 {
   "$schema": "fleet.design-review.v1",
   "version": 1,
-  "project": "anchor-unified-day-33",
-  "target": "Merged behavioral onboarding, day plan, and daily review",
-  "mode": "preserve",
+  "project": "anchor",
+  "target": "Anchor product and day-planning experience",
+  "mode": "overhaul",
   "register": "product",
   "context": {
     "product": "PRODUCT.md",
     "design": "DESIGN.md"
   },
   "direction": {
-    "references": [],
-    "probes": [],
-    "selected": "existing-design",
-    "approval": "not-required",
-    "before": "artifacts/design/onboarding/welcome-iphone.png"
+    "references": [
+      "Anchor's original interruption line artwork",
+      "Indulge's original chosen-time balance artwork",
+      "Native iOS typography, spacing, and control hierarchy"
+    ],
+    "probes": [
+      {
+        "id": "doodle-scene",
+        "path": "artifacts/design/anchor-overhaul-directions/doodle-scene-390.png"
+      },
+      {
+        "id": "doodle-thread",
+        "path": "artifacts/design/anchor-overhaul-directions/doodle-thread-390.png"
+      },
+      {
+        "id": "doodle-companion",
+        "path": "artifacts/design/anchor-overhaul-directions/doodle-companion-390.png"
+      }
+    ],
+    "selected": "doodle-scene",
+    "approval": "approved",
+    "before": "artifacts/design/unified-day/day-macos-wide.jpeg"
   },
   "evidence": {
     "screenshots": [
-      { "width": 390, "path": "artifacts/design/unified-day/onboarding-iphone.png" },
-      { "width": 768, "path": "artifacts/design/unified-day/onboarding-ipad.png" },
-      { "width": 1440, "path": "artifacts/design/unified-day/day-macos-wide.jpeg" }
+      {
+        "width": 390,
+        "path": "artifacts/design/anchor-ios-focus.png"
+      },
+      {
+        "width": 390,
+        "path": "artifacts/design/anchor-ios-settings.png"
+      },
+      {
+        "width": 1264,
+        "path": "artifacts/design/anchor-mac-focus.jpeg"
+      },
+      {
+        "width": 1264,
+        "path": "artifacts/design/anchor-mac-settings.jpeg"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/anchor-ios-hub-onboarding.png"
+      },
+      {
+        "width": 1100,
+        "path": "artifacts/design/anchor-mac-hub-onboarding.png"
+      },
+      {
+        "width": 768,
+        "path": "artifacts/design/anchor-mac-hub-onboarding-768.png"
+      },
+      {
+        "width": 1440,
+        "path": "artifacts/design/anchor-mac-hub-onboarding-1440.png"
+      }
     ],
     "projectCheck": {
-      "command": "swift build && swift test (131 tests); xcodegen generate; iOS build with embedded watchOS and Live Activity; macOS build; 4 iOS UI journeys plus signed focused Day and onboarding reruns",
-      "status": "pass"
+      "command": "swift test; xcodebuild DebugLocal for macOS and iOS Simulator (including watch dependency); focused macOS onboarding UI test; focused iOS onboarding and toolbar UI test attempts; manual Mac and iOS account walkthroughs",
+      "status": "pass",
+      "note": "All 152 package tests and both native DebugLocal builds pass. The macOS onboarding UI journey passed through the Hub stage. The final iOS UI-test repeat hung before app launch in the Xcode 27 beta harness and was stopped; a Maestro fallback could not start because Java is not installed. Final iPhone and Mac account renders were inspected directly at 402, 768, 1100, and 1440-point widths; the Mac shell uses the standard native title bar and traffic-light controls."
     },
     "critique": {
-      "score": 36,
+      "score": 32,
       "maximum": 40
     },
     "audit": {
@@ -40,15 +87,11 @@
     },
     "detector": {
       "posture": "advisory",
-      "findings": [
-        "Automated web-interface detector is not applicable to native SwiftUI; manual audit found no raw colors, fixed text fonts, missing image labels, or Reduce Motion regressions.",
-        "Primary and quiet actions now enforce a 44-point minimum target; weekday controls use an adaptive grid instead of a forced seven-item row.",
-        "The required 768 class is represented by an 834-point iPad capture; the 1440 class is a genuine full-screen macOS capture compressed by the Computer Use screenshot service."
-      ]
+      "findings": []
     }
   },
   "ownerFeedback": {
-    "decision": "delegated",
-    "note": "The owner explicitly directed the merge into Anchor and selected the original Indulge onboarding graphics as a preserved product asset."
+    "decision": "keep",
+    "note": "Round 0 rejected: the Day Overlay and Focus Viewfinder felt too simple and basic; Departure Lines had welcome authorship but its literal depot-board execution did not earn selection. Round 1 was rejected as too funky. The owner pinned the world to simple, premium, and doodle-first, selected Doodle Scene as the structural base, rejected the first repeated selector drawings, and asked for neutral chrome so authored colour could pop. The owner approved the implemented direction on 2026-08-25 and requested one final button refinement. Primary, quiet, and transport controls now share shallow physical depth and settle-on-press feedback. Dark is now the shared product default, with one iCloud-backed System, Light, or Dark choice for every Anchor device. The owner then asked for signup inside onboarding, a stronger Settings account experience, a real Google mark, and verified top-toolbar behavior; the shared Hub panel and responsive six-stage onboarding now carry that direction. The final account composition is viewport-centered, uses compact secondary actions, and leaves Mac window chrome entirely to the native title bar."
   }
 }

@@ -22,6 +22,7 @@ public struct StartComposer: View {
     @State private var selectedProjectID: UUID?
     @State private var selectedTagIDs: [String] = []
     @State private var minutes: Int = 25
+    @State private var showsMoreContext = false
     @FocusState private var intentFocused: Bool
 
     private let onStart: (Goal?, String, Int, Project?, String, [String]) -> Void
@@ -75,22 +76,33 @@ public struct StartComposer: View {
                             fieldLabel("Against which goal?")
                             goalPicker
                         }
-                    }
-                }
 
-                Card(padding: Space.lg) {
-                    VStack(alignment: .leading, spacing: Space.md) {
-                        ProjectPicker(selectedID: $selectedProjectID)
                         Divider().overlay(theme.hairline)
-                        SavedTagPicker(selectedIDs: $selectedTagIDs)
-                    }
-                }
-
-                Card(padding: Space.lg) {
-                    VStack(alignment: .leading, spacing: Space.md) {
                         fieldLabel("For how long?")
                         durationPicker
                     }
+                }
+
+                Card(padding: Space.lg) {
+                    DisclosureGroup(isExpanded: $showsMoreContext) {
+                        VStack(alignment: .leading, spacing: Space.md) {
+                            Divider().overlay(theme.hairline)
+                            ProjectPicker(selectedID: $selectedProjectID)
+                            Divider().overlay(theme.hairline)
+                            SavedTagPicker(selectedIDs: $selectedTagIDs)
+                        }
+                        .padding(.top, Space.sm)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("More context")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(theme.textPrimary)
+                            Text("Project and saved tags")
+                                .font(.caption)
+                                .foregroundStyle(theme.textTertiary)
+                        }
+                    }
+                    .tint(theme.textSecondary)
                 }
 
                 #if os(macOS)
@@ -152,17 +164,12 @@ public struct StartComposer: View {
     }
 
     private var header: some View {
-        VStack(spacing: Space.xxs) {
-            Image(systemName: "scope")
-                .font(.system(size: 26, weight: .light))
-                .foregroundStyle(theme.accent)
-            Text("Set your anchor")
-                .font(.system(size: 26, weight: .semibold, design: .rounded))
-                .foregroundStyle(theme.textPrimary)
-            Text("Name the work, then everything else waits.")
-                .font(.system(size: 13))
-                .foregroundStyle(theme.textSecondary)
-        }
+        DoodleScene(
+            "FocusDoodle",
+            eyebrow: "Focus",
+            title: "Hold one thing",
+            message: "Name the work. Park what pulls you away. Return without losing the thread."
+        )
         .padding(.top, Space.md)
     }
 

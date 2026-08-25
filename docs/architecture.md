@@ -3,8 +3,9 @@
 Four layers, each of which can be reasoned about without the one above it.
 
 ```
-Apps/Mac  Apps/iOS        thin shells: scenes, menu bar, commands
-      └── AnchorUI        SwiftUI screens + design system
+Apps/Mac  Apps/iOS        thin shells: native scenes and registration
+      └── Apps/Shared     shared build-configuration factory
+            └── AnchorUI  app world, product root, screens + design system
             └── AnchorCore    models, timing, tagging, analytics, export
                   └── SwiftData + CloudKit
 anchor-mcp ───────┘        reads AnchorCore directly, no UI
@@ -14,6 +15,13 @@ anchor-mcp ───────┘        reads AnchorCore directly, no UI
 command line with no simulator and no Xcode. `AnchorUI` holds every screen, and
 the two app targets are shells — this is what keeps the platforms honestly
 identical rather than two apps that drift.
+
+`AnchorAppWorld` owns the store, focus controller, Hub sync bridge, and the
+platform-specific controller injection. `AnchorProductRoot` owns the shared
+RootView, appearance provider, and sync restoration. The Mac and iOS entry
+points must not instantiate those concerns themselves; a source-level
+architecture test guards that boundary. Mac still declares its menu-bar and
+window scenes, while iPhone still declares its native WindowGroup.
 
 ## Timing: a bank, not a countdown
 
@@ -60,6 +68,12 @@ Mac, Anchor samples system idle duration while the app is running; it never stor
 apps, windows, sites, keys, pointer data, or event content. This aggregate is
 analytics context, not timer input: `TimeAccount` remains the sole authority for
 focus elapsed time.
+
+`AnchorPreferences` stores the owner-selected System, Light, or Dark appearance.
+Dark is the product default when no record exists. Signed builds mirror an
+explicit choice through the same private CloudKit store as the rest of Anchor;
+if two offline devices create preferences, the record with the newest
+`updatedAt` wins deterministically.
 
 Projects carry an optional hourly rate and currency. Each session snapshots those
 values when it starts so later project edits cannot rewrite historical earnings.
@@ -118,15 +132,19 @@ One accent colour, one card, one spring — in
 from the colour scheme in code rather than from an asset catalogue, which keeps
 the package resource-free and the values greppable.
 
-The palette is built on one rule: **cobalt is focus, warm is interruption.** The
-ring, progress and every primary action are cobalt; nothing that breaks a session
-is ever allowed to wear that colour. Distraction colour then encodes *origin* —
-coral for "the world came to you", violet for "you went to it", amber for mixed.
-That split is the most actionable thing in the data, so the eye gets it for free.
+The palette is built on one rule: **focus is neutral; known interruptions are
+warm.** The ring, progress, selected navigation, and primary actions reverse
+between ink and paper. Distraction colour then encodes *origin* — coral for
+"the world came to you", violet for "you went to it", amber for mixed. Authored
+doodles carry the broader colour without tinting the whole interface.
 
-One thing does need an asset: macOS draws sidebar selection with the
-*asset-catalog* accent colour, and `.tint()` cannot override it. `Apps/Shared/
-Assets.xcassets` carries an `AccentColor` matching the token so the system
+One shared `AnchorAppearanceProvider` resolves the app-wide appearance before
+injecting those tokens. Dark is consistent by default; an explicit Light or
+Dark choice follows private iCloud continuity, while System intentionally allows
+each device to follow its own OS setting. Main windows, Mac auxiliary timer
+surfaces, and Watch all consume the same provider.
+
+The asset catalogue still carries an `AccentColor` matching the token so system
 chrome and the app agree. (Adding that catalog is also why an `AppIcon` set has
 to exist — iOS refuses to build a catalog without one.)
 

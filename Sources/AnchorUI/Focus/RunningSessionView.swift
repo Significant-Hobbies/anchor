@@ -75,33 +75,33 @@ public struct RunningSessionView: View {
                     Image(systemName: project.symbolName)
                     Text(project.name)
                 }
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
                 .foregroundStyle(AnchorTheme.tint(project.tintIndex))
             }
             if showGoal, let goal {
                 HStack(spacing: Space.xxs) {
                     Image(systemName: goal.symbolName)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                     Text(goal.title)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.system(.caption, design: .rounded).weight(.semibold))
                 }
                 .foregroundStyle(AnchorTheme.tint(goal.tintIndex))
             }
             Text(headline)
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .font(.system(.title2, design: .rounded).weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
             if let notes = session?.notes, !notes.isEmpty {
                 Text(notes)
-                    .font(.system(size: 12))
+                    .font(.subheadline)
                     .foregroundStyle(theme.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
             }
             if !tagNames.isEmpty {
                 Text(tagNames.map { "#\($0)" }.joined(separator: "  "))
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .font(.system(.caption2, design: .rounded).weight(.medium))
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(1)
             }
@@ -109,7 +109,7 @@ public struct RunningSessionView: View {
                 Text(
                     "\(Format.money(controller.elapsed / 3600 * session.hourlyRate, currencyCode: session.currencyCode)) earned"
                 )
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
                 .foregroundStyle(theme.positive)
             }
         }
@@ -134,7 +134,10 @@ public struct RunningSessionView: View {
             Button {
                 controller.beginManualCapture()
             } label: {
-                Label("Lock a distraction", systemImage: "lock.fill")
+                HStack(spacing: Space.xs) {
+                    InterruptionKnotMark(tint: theme.onAccent)
+                    Text("Lock a distraction")
+                }
             }
             .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut("l", modifiers: [.command, .shift])
@@ -176,16 +179,16 @@ public struct RunningSessionView: View {
                             KindGlyph(distraction.displayKind, size: 28)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(distraction.note)
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.subheadline.weight(.medium))
                                     .foregroundStyle(theme.textPrimary)
                                     .lineLimit(2)
                                 Text(distraction.displayKind.label)
-                                    .font(.system(size: 11))
+                                    .font(.caption2)
                                     .foregroundStyle(theme.textTertiary)
                             }
                             Spacer(minLength: Space.xs)
                             Text(Format.duration(distraction.offsetSeconds))
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .font(.system(.caption2, design: .rounded).weight(.medium))
                                 .monospacedDigit()
                                 .foregroundStyle(theme.textTertiary)
                         }

@@ -72,6 +72,11 @@ is interruption, and nothing that breaks a session may wear the accent colour. T
 survives any future repaint. Lesson recorded plainly: colour is taste, so present
 options rather than guessing twice.
 
+The August 2026 doodle-first redesign superseded cobalt as the product-wide
+accent. Focus now reverses between ink and paper, while the lasting semantic
+rule remains: interruption origins use their own warm colours and never resemble
+a primary focus action.
+
 ## A mini timer window as well as the menu bar
 
 The menu-bar panel is the real compact app — start, pause, resume, capture and end
@@ -184,6 +189,39 @@ Two things the script guards, both learned by tripping over them:
 - **Don't pipe `codesign` into `grep -q` under `pipefail`.** `grep -q` exits on
   first match, SIGPIPEs codesign, and the pipeline reads as failed — which is
   exactly how the hardened-runtime check produced a false negative.
+
+## One product root and one appearance preference
+
+Mac and iPhone are not separate product implementations. Both instantiate
+`AnchorAppWorld` and render `AnchorProductRoot` from AnchorUI. Their target files
+own only native scene chrome and remote-notification registration; shared tests
+fail if either target starts constructing RootView, platform sync, or appearance
+policy independently.
+
+Dark is Anchor's default on every device because it is the approved long-session
+posture and avoids accidental Mac-dark/iPhone-light divergence. Settings exposes
+System, Light, and Dark from one shared screen. An explicit preference is a
+CloudKit-safe `AnchorPreferences` record; newest update wins when offline devices
+produce more than one record. System remains an intentional escape hatch and is
+the only mode in which devices may look different.
+
+This adds a CloudKit record type. It must be present in the Production schema
+before a release can truthfully claim cross-device appearance sync.
+
+## Share the family foundation, not one cloned app
+
+Significant Hobbies products should not each rebuild buttons, preference rows,
+theme resolution, responsive containers, artwork placement, and accessibility
+motion policy. Those state-free mechanics belong in a small
+`SignificantDesignKit` product beside `PersonalSyncKit`; GitHub issue #147 tracks
+that extraction.
+
+Anchor remains the proving ground until the visual direction earns an explicit
+keep. Extracting rejected components would reduce line count while multiplying
+the wrong design. Once accepted, sibling apps adopt the kit incrementally and
+keep their own doodles, copy, navigation, and domain-specific components. A
+third-party styled UI kit is not the family foundation because it would trade
+owned identity for another package's visual language.
 
 ## Known gaps
 

@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Anchor overhaul directions</title>
+    <style>
+      * { box-sizing: border-box; }
+      :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+      body { margin: 0; background: #eef1f5; color: #121722; }
+      button { font: inherit; }
+      .shell { min-height: 100vh; padding: clamp(18px, 3vw, 46px); }
+      .masthead { max-width: 1440px; margin: 0 auto 22px; display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+      .masthead h1 { margin: 0; font-size: clamp(28px, 4vw, 54px); letter-spacing: -.04em; line-height: .94; }
+      .masthead p { max-width: 580px; margin: 0; color: #5c6370; font-size: 14px; line-height: 1.55; }
+      .switcher { max-width: 1440px; margin: 0 auto 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .switcher button { border: 0; border-radius: 12px; padding: 14px 16px; text-align: left; background: #fff; color: #596171; cursor: pointer; box-shadow: 0 1px 0 rgba(17,24,39,.06); }
+      .switcher button strong { display: block; color: #141923; margin-bottom: 3px; }
+      .switcher button[aria-selected="true"] { background: #2469ed; color: #dfeaff; }
+      .switcher button[aria-selected="true"] strong { color: white; }
+      .direction { display: none; max-width: 1440px; margin: 0 auto; min-height: 790px; overflow: hidden; border-radius: 26px; box-shadow: 0 30px 80px rgba(22,30,44,.18); }
+      .direction.active { display: grid; }
+      .study-note { position: absolute; right: 22px; top: 18px; z-index: 4; font-size: 10px; letter-spacing: .11em; text-transform: uppercase; opacity: .64; }
+      .copy h2 { margin: 0; font-size: clamp(48px, 6vw, 92px); line-height: .91; letter-spacing: -.055em; }
+      .copy p { font-size: 17px; line-height: 1.55; max-width: 520px; }
+      .copy .kicker { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+      .actions { display: flex; align-items: center; gap: 14px; margin-top: 28px; }
+      .action { border: 0; padding: 13px 20px; border-radius: 12px; font-weight: 700; }
+      .proof { font-size: 12px; opacity: .7; }
+
+      /* Direction A — architectural trace overlay */
+      .trace { position: relative; grid-template-columns: .82fr 1.18fr; background: #f7f9fc; color: #102147; }
+      .trace::before { content: ""; position: absolute; inset: 0; opacity: .16; background-image: linear-gradient(#215eea 1px, transparent 1px), linear-gradient(90deg, #215eea 1px, transparent 1px); background-size: 36px 36px; mask-image: linear-gradient(90deg, #000, transparent 72%); }
+      .trace .copy { position: relative; padding: clamp(42px, 7vw, 104px); display: flex; flex-direction: column; justify-content: center; }
+      .trace .kicker { color: #2469ed; }
+      .trace .action { color: white; background: #2469ed; box-shadow: 0 9px 22px rgba(36,105,237,.24); }
+      .trace .canvas { position: relative; padding: 74px 58px 58px 16px; display: flex; align-items: center; }
+      .trace .sheet { position: relative; width: 100%; min-height: 610px; background: rgba(255,255,255,.92); border: 1px solid #cbd8f6; box-shadow: 0 24px 54px rgba(21,55,124,.18); border-radius: 16px; overflow: hidden; display: grid; grid-template-columns: 136px 1fr 260px; }
+      .trace .side { padding: 22px 14px; background: #edf3ff; border-right: 1px solid #cbd8f6; }
+      .trace .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; margin-bottom: 28px; }
+      .trace .brand-mark { width: 26px; height: 26px; border: 6px solid #2469ed; border-radius: 50%; }
+      .trace nav span { display: block; padding: 9px 10px; margin: 4px 0; border-radius: 8px; font-size: 12px; color: #5a6c8d; }
+      .trace nav .on { color: white; background: #2469ed; }
+      .trace .plan { padding: 26px 26px 32px; min-width: 0; }
+      .trace .plan-head { display: flex; align-items: start; justify-content: space-between; margin-bottom: 22px; }
+      .trace .plan-head h3 { margin: 0; font-size: 27px; letter-spacing: -.03em; }
+      .trace .plan-head small { color: #6f7d96; }
+      .trace .rail { display: grid; grid-template-columns: 48px 1fr; position: relative; }
+      .trace .times { display: grid; grid-template-rows: repeat(8, 48px); color: #8290aa; font-size: 10px; }
+      .trace .track { position: relative; min-height: 384px; border-top: 1px solid #dce4f4; background: repeating-linear-gradient(to bottom, transparent 0 47px, #dce4f4 47px 48px); }
+      .trace .now { position: absolute; z-index: 2; left: -6px; right: 0; top: 151px; border-top: 2px solid #ed6171; }
+      .trace .now::before { content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #ed6171; left: -2px; top: -5px; }
+      .trace .block { position: absolute; left: 10px; right: 12px; border-radius: 9px; padding: 9px 11px; font-size: 11px; line-height: 1.25; border: 1px solid; }
+      .trace .block b { display: block; font-size: 12px; }
+      .trace .b1 { top: 8px; height: 76px; background: #e3edff; border-color: #9ab9fb; color: #174fb9; }
+      .trace .b2 { top: 101px; height: 92px; background: #dce8ff; border-color: #77a3fa; color: #123f91; }
+      .trace .b3 { top: 210px; height: 43px; background: #fff1d7; border-color: #f0c06c; color: #815309; }
+      .trace .b4 { top: 275px; height: 82px; background: #f0e8ff; border-color: #b99af2; color: #6237a6; }
+      .trace .inspector { background: rgba(235,241,252,.72); border-left: 1px solid #cbd8f6; padding: 28px 20px; }
+      .trace .inspector h4 { margin: 0 0 16px; font-size: 13px; }
+      .trace .inspector .metric { padding: 14px 0; border-top: 1px solid #cbd8f6; }
+      .trace .metric strong { display: block; font-size: 22px; letter-spacing: -.03em; }
+      .trace .metric span { font-size: 11px; color: #6f7d96; }
+      .trace .overlay-note { position: absolute; right: 52px; bottom: 34px; width: 220px; padding: 12px 14px; background: rgba(255,244,211,.88); border: 1px solid #ebb84d; transform: rotate(-2deg); box-shadow: 0 10px 28px rgba(84,60,8,.12); font-size: 11px; line-height: 1.35; color: #684507; }
+
+      /* Direction B — depot blind */
+      .departure { position: relative; grid-template-columns: 44% 56%; background: #12372e; color: #fff2c8; }
+      .departure .copy { padding: clamp(42px, 7vw, 104px); display: flex; flex-direction: column; justify-content: center; }
+      .departure .copy h2 { font-family: Impact, "Arial Narrow", sans-serif; text-transform: uppercase; font-weight: 900; letter-spacing: -.025em; line-height: .84; }
+      .departure .kicker { color: #ffd54a; }
+      .departure .action { background: #ffd54a; color: #12372e; border-radius: 2px; text-transform: uppercase; }
+      .departure .board-wrap { position: relative; padding: 72px 46px; display: flex; align-items: center; background: #09251f; }
+      .departure .board { width: 100%; background: #143f34; border: 10px solid #0b1c18; box-shadow: 0 28px 70px #061611; }
+      .departure .board-head, .departure .course { display: grid; grid-template-columns: 88px 1fr 118px; align-items: center; }
+      .departure .board-head { padding: 14px 18px; color: #8fb2a6; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+      .departure .course { min-height: 84px; padding: 12px 18px; border-top: 2px dashed #315e51; font-family: "Arial Narrow", Arial, sans-serif; text-transform: uppercase; }
+      .departure .course time { font-size: 24px; font-weight: 900; color: #ffd54a; }
+      .departure .course b { font-size: 25px; letter-spacing: -.02em; }
+      .departure .course span { justify-self: end; font-size: 11px; color: #b9d0c9; }
+      .departure .course.active { background: #ffd54a; color: #0c332a; }
+      .departure .course.active time, .departure .course.active span { color: #0c332a; }
+      .departure .course.interrupted { background: #f06b74; color: #321015; }
+      .departure .course.interrupted time, .departure .course.interrupted span { color: #321015; }
+      .departure .tape { position: absolute; left: 20px; top: 72px; bottom: 72px; width: 10px; background: radial-gradient(circle, #ffd54a 2px, transparent 3px) center top / 10px 22px repeat-y; }
+
+      /* Direction C — viewfinder */
+      .viewfinder { position: relative; grid-template-columns: 1fr; background: #0a0b0d; color: white; }
+      .viewfinder .scene { position: absolute; inset: 0; background: radial-gradient(circle at 67% 41%, rgba(36,105,237,.34), transparent 28%), linear-gradient(110deg, #111722, #070809 60%); }
+      .viewfinder .copy { position: relative; z-index: 2; width: 46%; padding: clamp(46px, 7vw, 104px); display: flex; flex-direction: column; justify-content: center; }
+      .viewfinder .kicker, .viewfinder .hud { color: #ffb13b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .viewfinder .action { color: #101113; background: #ffb13b; border-radius: 4px; }
+      .viewfinder .frame { position: absolute; z-index: 1; right: 6%; top: 12%; width: 46%; height: 72%; border: 1px solid rgba(255,255,255,.52); }
+      .viewfinder .frame::before, .viewfinder .frame::after { content: ""; position: absolute; inset: 23%; border: 2px solid rgba(255,255,255,.82); border-top-color: transparent; border-bottom-color: transparent; }
+      .viewfinder .frame::after { inset: 32%; border-left-color: transparent; border-right-color: transparent; border-top-color: rgba(255,255,255,.82); border-bottom-color: rgba(255,255,255,.82); }
+      .viewfinder .focus-card { position: absolute; inset: 13% 10%; border-radius: 22px; background: #121722; box-shadow: 0 25px 80px #000; display: grid; grid-template-rows: auto 1fr auto; padding: 28px; text-align: center; }
+      .viewfinder .focus-card small { color: #91a0b9; }
+      .viewfinder .ring { margin: auto; width: 235px; aspect-ratio: 1; border-radius: 50%; border: 10px solid #2469ed; box-shadow: inset 0 0 0 1px #74a0ff; display: grid; place-items: center; }
+      .viewfinder .ring strong { font-size: 48px; letter-spacing: -.05em; }
+      .viewfinder .next { display: flex; justify-content: space-between; border-top: 1px solid #30394a; padding-top: 16px; font-size: 12px; color: #aeb8c9; }
+      .viewfinder .hud { position: absolute; z-index: 3; font-size: 11px; letter-spacing: .08em; }
+      .viewfinder .rec { top: 24px; left: 28px; }
+      .viewfinder .counter { right: 28px; bottom: 24px; }
+      .viewfinder .zoom { left: 50%; bottom: 24px; transform: translateX(-50%); }
+
+      .notes { max-width: 1440px; margin: 16px auto 0; display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 8px; }
+      .note { padding: 16px; border-radius: 12px; background: white; color: #596171; font-size: 12px; line-height: 1.5; }
+      .note strong { color: #141923; }
+      .note.recommend { background: #e4edff; color: #315998; }
+      @media (max-width: 900px) {
+        .masthead { align-items: start; flex-direction: column; }
+        .switcher { grid-template-columns: 1fr; }
+        .direction { min-height: 980px; }
+        .trace, .departure { grid-template-columns: 1fr; }
+        .trace .copy, .departure .copy { padding-bottom: 30px; }
+        .trace .canvas, .departure .board-wrap { padding: 16px 18px 32px; }
+        .trace .sheet { grid-template-columns: 1fr; min-height: 560px; }
+        .trace .side, .trace .inspector { display: none; }
+        .viewfinder .copy { width: 100%; justify-content: start; padding-bottom: 480px; }
+        .viewfinder .frame { width: 82%; height: 430px; top: auto; bottom: 50px; right: 9%; }
+        .notes { grid-template-columns: 1fr; }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .direction.active { animation: reveal 360ms cubic-bezier(.16,1,.3,1); }
+        @keyframes reveal { from { opacity: .45; clip-path: inset(0 0 10% 0 round 26px); } }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <h1>Anchor, rebuilt<br />around the day.</h1>
+        <p>Three system-level directions for the native app and the shared landing template. Every direction uses the same truth: build a schedule, protect the current block, capture what moves it, then compare the plan with the day actually lived.</p>
+      </header>
+
+      <div class="switcher" role="tablist" aria-label="Design directions">
+        <button role="tab" aria-selected="true" data-target="trace"><strong>The Day Overlay</strong>Planned and lived time as editable layers.</button>
+        <button role="tab" aria-selected="false" data-target="departure"><strong>Departure Lines</strong>The day as a decisive operating board.</button>
+        <button role="tab" aria-selected="false" data-target="viewfinder"><strong>Focus Viewfinder</strong>Zoom from the whole day into now.</button>
+      </div>
+
+      <section id="trace" class="direction trace active" role="tabpanel">
+        <span class="study-note">Direction study · illustrative data</span>
+        <div class="copy">
+          <span class="kicker">Recommended direction</span>
+          <h2>See the day twice.</h2>
+          <p>Build the plan as a precise blue trace. As the day unfolds, Anchor lays the lived path over it—without erasing the original.</p>
+          <div class="actions"><button class="action">Build today’s plan</button><span class="proof">Private iCloud sync · no tracking</span></div>
+        </div>
+        <div class="canvas" aria-label="Mac schedule workspace concept">
+          <div class="sheet">
+            <aside class="side"><div class="brand"><span class="brand-mark"></span>Anchor</div><nav><span>Focus</span><span class="on">Today</span><span>Habits</span><span>History</span></nav></aside>
+            <div class="plan">
+              <div class="plan-head"><div><h3>Monday, 24 August</h3><small>A plan is a hypothesis.</small></div><button class="action">+ Block</button></div>
+              <div class="rail"><div class="times"><span>8 AM</span><span>9</span><span>10</span><span>11</span><span>12 PM</span><span>1</span><span>2</span><span>3</span></div><div class="track"><div class="now"></div><div class="block b1"><b>Plan the launch</b>8:10–9:25 · Focus</div><div class="block b2"><b>Build the schedule view</b>9:40–11:10 · In progress</div><div class="block b3"><b>Lunch outside</b>11:30–12:15 · Enjoyment</div><div class="block b4"><b>Release checks</b>12:40–2:05 · Focus</div></div></div>
+            </div>
+            <aside class="inspector"><h4>THE DAY’S SHAPE</h4><div class="metric"><strong>4h 20m</strong><span>protected focus</span></div><div class="metric"><strong>45m</strong><span>unclaimed space</span></div><div class="metric"><strong>10:32</strong><span>current point in plan</span></div></aside>
+          </div>
+          <div class="overlay-note"><strong>Plan changed at 10:20</strong><br />Support call came to you. The original block stays visible in Review.</div>
+        </div>
+      </section>
+
+      <section id="departure" class="direction departure" role="tabpanel">
+        <span class="study-note">Direction study · illustrative data</span>
+        <div class="copy"><span class="kicker">Expressive alternate</span><h2>Your day.<br />On the board.</h2><p>Every block has a destination, departure, and state. The current course inverts; interruptions stop a row visibly instead of disappearing into history.</p><div class="actions"><button class="action">Set the first departure</button><span class="proof">Mac · iPhone · Watch</span></div></div>
+        <div class="board-wrap"><div class="tape"></div><div class="board"><div class="board-head"><span>Time</span><span>Direction</span><span>Status</span></div><div class="course"><time>08:10</time><b>Plan the launch</b><span>Complete</span></div><div class="course active"><time>09:40</time><b>Build schedule</b><span>Now · 38 min</span></div><div class="course interrupted"><time>10:20</time><b>Support call</b><span>Came to you</span></div><div class="course"><time>11:30</time><b>Lunch outside</b><span>On time</span></div><div class="course"><time>12:40</time><b>Release checks</b><span>Next</span></div></div></div>
+      </section>
+
+      <section id="viewfinder" class="direction viewfinder" role="tabpanel">
+        <div class="scene"></div><span class="study-note">Direction study · illustrative data</span><span class="hud rec">● REC · PRIVATE</span><span class="hud zoom">DAY ━━━━━●━━ NOW</span><span class="hud counter">10:32:18</span>
+        <div class="copy"><span class="kicker">Immersive alternate</span><h2>Frame what matters now.</h2><p>The schedule is the wide shot. Focus narrows the frame to one block, while the next transition and every interruption stay safely at the edge.</p><div class="actions"><button class="action">Enter focus</button><span class="proof">Notes never leave your device</span></div></div>
+        <div class="frame"><div class="focus-card"><small>NOW · FROM TODAY</small><div class="ring"><div><strong>38:12</strong><br /><small>remaining</small></div></div><div class="next"><span>1 thing parked</span><span>Next: Lunch outside · 11:30</span></div></div></div>
+      </section>
+
+      <div class="notes">
+        <div class="note recommend"><strong>Recommendation — The Day Overlay.</strong> It makes Anchor’s unique plan-versus-lived mechanism visible, scales naturally from Mac workspace to iPhone agenda and History comparison, and gives the landing template a distinctive proof-led composition without fighting native controls.</div>
+        <div class="note"><strong>Departure Lines risk.</strong> Memorable and exceptionally clear at a glance, but its rigid all-caps rhythm could become tiring in daily operation and would need careful localization.</div>
+        <div class="note"><strong>Focus Viewfinder risk.</strong> Strongest cinematic landing and focus state, but the camera grammar explains execution better than schedule construction or review.</div>
+      </div>
+    </main>
+    <script>
+      const tabs = [...document.querySelectorAll('[role="tab"]')];
+      const select = (tab) => {
+        tabs.forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+        document.querySelectorAll('[role="tabpanel"]').forEach((panel) => panel.classList.toggle('active', panel.id === tab.dataset.target));
+      };
+      tabs.forEach((tab) => tab.addEventListener('click', () => select(tab)));
+      const requested = new URLSearchParams(location.search).get('direction');
+      const requestedTab = tabs.find((tab) => tab.dataset.target === requested);
+      if (requestedTab) select(requestedTab);
+    </script>
+  </body>
+</html>

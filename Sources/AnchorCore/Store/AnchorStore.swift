@@ -11,8 +11,10 @@ public enum AnchorStore {
         FocusSession.self,
         Distraction.self,
         MachineActivityDay.self,
+        AnchorPreferences.self,
         BehaviorProfile.self,
         ScheduleTemplate.self,
+        DayPlanConfirmation.self,
         PlanBlock.self,
         DivergenceEvent.self,
     ])

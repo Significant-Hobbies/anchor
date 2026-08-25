@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Anchor mobile-first re-roll</title>
+    <style>
+      * { box-sizing: border-box; }
+      :root { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
+      html, body { width: 100%; min-height: 100%; margin: 0; }
+      button { color: inherit; font: inherit; }
+      .screen { width: 100%; min-height: 100vh; position: relative; overflow: hidden; }
+      .status { height: 46px; padding: 14px 20px 0; display: flex; justify-content: space-between; font-size: 12px; font-weight: 750; }
+      .bottom { position: fixed; left: 0; right: 0; bottom: 0; height: 74px; display: grid; grid-template-columns: repeat(4, 1fr); z-index: 10; }
+      .bottom button { border: 0; background: transparent; display: grid; place-items: center; align-content: center; gap: 5px; font-size: 9px; }
+      .bottom b { font-size: 20px; line-height: 1; font-weight: 500; }
+      .add { position: fixed; z-index: 12; right: 18px; bottom: 89px; width: 56px; height: 56px; border: 0; display: grid; place-items: center; font-size: 25px; }
+
+      /* DAY SCORE -------------------------------------------------------- */
+      .score { background: #1f5fe8; color: #07132c; }
+      .score .status { color: white; }
+      .score .score-head { padding: 4px 18px 14px; display: grid; grid-template-columns: 1fr auto; align-items: end; }
+      .score .score-head h1 { margin: 0; font-size: 50px; line-height: .83; letter-spacing: -.055em; color: #fff; }
+      .score .score-head p { margin: 8px 0 0; color: #cfe0ff; font-size: 12px; }
+      .score .tempo { width: 72px; height: 72px; border: 2px solid #d6e4ff; border-radius: 50%; display: grid; place-items: center; text-align: center; color: white; }
+      .score .tempo strong { font-size: 21px; display: block; }
+      .score .tempo span { font-size: 8px; letter-spacing: .11em; }
+      .score .date-run { margin: 0 18px 13px; display: flex; gap: 18px; align-items: center; color: #c7d9ff; font-size: 11px; }
+      .score .date-run strong { color: #07132c; background: #fff; min-width: 38px; height: 34px; display: grid; place-items: center; border-radius: 50%; }
+      .score .staff { margin: 0 12px 90px; padding: 4px 0 16px; background: #f5f7f2; border: 3px solid #07132c; box-shadow: 9px 9px 0 #07132c; }
+      .score .measure { position: relative; min-height: 98px; padding: 13px 12px 11px 70px; border-bottom: 2px solid #07132c; background-image: repeating-linear-gradient(to bottom, transparent 0 13px, rgba(7,19,44,.18) 13px 14px); }
+      .score .measure:last-child { border-bottom: 0; }
+      .score .measure time { position: absolute; left: 10px; top: 14px; font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .score .phrase { position: relative; min-height: 68px; padding: 10px 12px; border: 2px solid #07132c; background: #fff; display: flex; justify-content: space-between; align-items: start; }
+      .score .phrase::before { content: ""; position: absolute; left: -15px; top: 16px; width: 13px; border-top: 3px solid #07132c; }
+      .score .phrase b { display: block; font-size: 15px; letter-spacing: -.02em; }
+      .score .phrase small { display: block; margin-top: 6px; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .score .phrase .note { width: 20px; height: 20px; border-radius: 50%; background: #07132c; color: white; display: grid; place-items: center; font-size: 9px; }
+      .score .phrase.now { color: white; background: #07132c; }
+      .score .phrase.now::after { content: "NOW"; position: absolute; right: -2px; bottom: -16px; font: 800 9px ui-monospace, Menlo, monospace; color: #07132c; letter-spacing: .08em; }
+      .score .phrase.break { background: #ffd2d8; }
+      .score .rest { width: 100%; min-height: 54px; background: transparent; border: 2px dashed #50607c; text-align: left; padding: 0 12px; font-weight: 750; }
+      .score .bottom { color: #a8c6ff; background: #07132c; }
+      .score .bottom .on { color: #07132c; background: #fff; }
+      .score .add { background: #f5f7f2; color: #07132c; border: 3px solid #07132c; border-radius: 50%; box-shadow: 5px 5px 0 #07132c; }
+
+      /* FOLDED DAY ------------------------------------------------------- */
+      .fold { background: #f4f3ed; color: #111820; }
+      .fold::before { content: ""; position: absolute; inset: 0; background: linear-gradient(150deg, transparent 0 24%, rgba(89,111,150,.12) 24% 24.4%, transparent 24.4% 51%, rgba(89,111,150,.12) 51% 51.4%, transparent 51.4%); pointer-events: none; }
+      .fold .fold-head { padding: 8px 20px 15px; }
+      .fold .fold-head h1 { margin: 0; font-size: 42px; line-height: .88; letter-spacing: -.045em; transform: skewX(-8deg); }
+      .fold .fold-head p { margin: 10px 0 0; color: #657181; font-size: 12px; }
+      .fold .fold-strip { display: flex; gap: 0; padding: 0 18px 14px; }
+      .fold .fold-date { height: 46px; flex: 1; border: 1px solid #8d98a7; background: rgba(255,255,255,.5); clip-path: polygon(12% 0,100% 0,88% 100%,0 100%); display: grid; place-items: center; align-content: center; font-size: 9px; }
+      .fold .fold-date b { font-size: 15px; }
+      .fold .fold-date.on { background: #2367ed; color: white; border-color: #2367ed; }
+      .fold .sheet { position: relative; margin: 0 14px 90px; padding: 8px 6px 14px; }
+      .fold .crease { position: relative; min-height: 105px; margin-top: -11px; padding: 17px 18px 13px 72px; clip-path: polygon(6% 0,96% 0,100% 50%,94% 100%,4% 100%,0 50%); border: 1px solid transparent; }
+      .fold .crease:nth-child(odd) { background: #fff; filter: drop-shadow(0 8px 8px rgba(37,49,67,.12)); }
+      .fold .crease:nth-child(even) { background: #e5ebf3; }
+      .fold .crease time { position: absolute; left: 18px; top: 20px; font: 700 10px ui-monospace, SFMono-Regular, Menlo, monospace; color: #6a7685; }
+      .fold .crease b { display: block; font-size: 17px; letter-spacing: -.025em; }
+      .fold .crease small { display: block; margin-top: 5px; font-size: 10px; color: #687585; }
+      .fold .crease .corner { position: absolute; right: 16px; top: 16px; font-size: 9px; color: #5b6877; }
+      .fold .crease.now { z-index: 3; min-height: 130px; background: #2367ed; color: white; transform: translateX(-4px); filter: drop-shadow(10px 12px 0 #bed2ff); }
+      .fold .crease.now time, .fold .crease.now small, .fold .crease.now .corner { color: #dce8ff; }
+      .fold .crease.interruption::after { content: "SUPPORT CALL · CAME TO YOU"; position: absolute; right: 16px; bottom: 12px; padding: 4px 6px; color: #8f1830; background: #ffd2d8; font: 800 8px ui-monospace, Menlo, monospace; }
+      .fold .fold-open { min-height: 68px; margin: 2px 22px; width: calc(100% - 44px); border: 1px dashed #7d8999; background: rgba(255,255,255,.45); clip-path: polygon(4% 0,96% 0,100% 50%,96% 100%,4% 100%,0 50%); font-weight: 750; }
+      .fold .bottom { background: rgba(244,243,237,.94); border-top: 1px solid #9aa5b3; color: #707c89; }
+      .fold .bottom .on { color: #2367ed; background: #dbe7ff; clip-path: polygon(12% 0,100% 0,88% 100%,0 100%); }
+      .fold .add { border: 0; background: #2367ed; color: white; clip-path: polygon(18% 0,100% 0,82% 100%,0 100%); }
+
+      /* POCKET OS -------------------------------------------------------- */
+      .pocket { --ink:#08142e; --paper:#fffdf7; --blue:#2567e8; background: var(--paper); color: var(--ink); image-rendering: pixelated; }
+      .pocket::before { content: ""; position: absolute; inset: 0; opacity: .14; background-image: radial-gradient(var(--ink) .7px, transparent .8px); background-size: 3px 3px; pointer-events: none; }
+      .pocket .status { border-bottom: 2px solid var(--ink); background: var(--paper); }
+      .pocket .os-bar { margin: 8px 10px 0; height: 34px; border: 2px solid var(--ink); background: var(--paper); display: grid; grid-template-columns: 36px 1fr 36px; align-items: center; text-align: center; font: 700 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .pocket .os-bar span:first-child, .pocket .os-bar span:last-child { font-size: 18px; }
+      .pocket .desktop { position: relative; margin: 10px 10px 86px; padding: 10px 8px 16px; border: 2px solid var(--ink); background: repeating-linear-gradient(135deg, rgba(8,20,46,.12) 0 1px, transparent 1px 3px); }
+      .pocket .window { position: relative; background: var(--paper); border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); }
+      .pocket .titlebar { height: 28px; padding: 4px 8px; color: white; background: var(--ink); display: flex; align-items: center; justify-content: space-between; font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .pocket .dates { display: grid; grid-template-columns: repeat(7,1fr); border-bottom: 2px solid var(--ink); }
+      .pocket .dates span { min-height: 42px; display: grid; place-items: center; font: 700 10px ui-monospace, Menlo, monospace; border-right: 1px solid var(--ink); }
+      .pocket .dates span:last-child { border: 0; }
+      .pocket .dates .on { color: white; background: var(--blue); }
+      .pocket .rows { padding: 8px; }
+      .pocket .row { min-height: 71px; display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 8px; border-bottom: 1px dashed var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .pocket .row time { font-size: 9px; }
+      .pocket .row b { font-size: 12px; display: block; }
+      .pocket .row small { display: block; margin-top: 3px; font-size: 8px; }
+      .pocket .row .stamp { padding: 3px 5px; border: 1px solid var(--ink); font-size: 8px; }
+      .pocket .row.now { margin: 6px -3px; padding: 0 3px; color: white; background: var(--blue); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+      .pocket .row.interrupted .stamp { color: #9b2238; border-color: #9b2238; background: #ffd2d8; }
+      .pocket .new-row { width: 100%; height: 48px; margin-top: 8px; border: 2px dashed var(--ink); background: var(--paper); font: 700 11px ui-monospace, Menlo, monospace; }
+      .pocket .bottom { background: var(--paper); border: 2px solid var(--ink); border-bottom: 0; }
+      .pocket .bottom button { border-right: 1px solid var(--ink); font-family: ui-monospace, Menlo, monospace; }
+      .pocket .bottom button:last-child { border-right: 0; }
+      .pocket .bottom .on { color: white; background: var(--ink); }
+      .pocket .add { border: 2px solid var(--ink); background: var(--paper); color: var(--ink); box-shadow: 4px 4px 0 var(--ink); border-radius: 0; }
+
+      @media (min-width: 600px) {
+        body { display: grid; place-items: center; padding: 24px; background: #dfe4ea; }
+        .screen { width: 390px; min-height: 844px; max-height: 844px; border-radius: 42px; box-shadow: 0 30px 80px rgba(18,27,42,.3); }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="screen" class="screen score">
+      <div class="status"><span>9:41</span><span>●●● ᯤ 100%</span></div>
+
+      <section class="score-only">
+        <header class="score-head"><div><h1>Day<br />score</h1><p>Tuesday 25 · the plan is still yours</p></div><div class="tempo"><div><strong>4h20</strong><span>FOCUS</span></div></div></header>
+        <div class="date-run"><span>M 24</span><strong>T 25</strong><span>W 26</span><span>T 27</span><span>F 28</span></div>
+        <div class="staff"><div class="measure"><time>8:10</time><div class="phrase"><div><b>Plan the launch</b><small>75 MIN · COMPLETE</small></div><span class="note">✓</span></div></div><div class="measure"><time>9:40</time><div class="phrase now"><div><b>Build the schedule view</b><small>38 MIN REMAINING</small></div><span class="note">▶</span></div></div><div class="measure"><time>10:20</time><div class="phrase break"><div><b>Support call</b><small>12 MIN · CAME TO YOU</small></div><span class="note">!</span></div></div><div class="measure"><time>11:30</time><div class="phrase"><div><b>Lunch outside</b><small>45 MIN · ENJOYMENT</small></div><span class="note">○</span></div></div><div class="measure"><time>12:20</time><button class="rest">＋ Compose this open time</button></div></div>
+      </section>
+
+      <section class="fold-only" hidden>
+        <header class="fold-head"><h1>Unfold<br />Tuesday.</h1><p>Pull one block open. The whole day makes room.</p></header>
+        <div class="fold-strip"><span class="fold-date"><small>M</small><b>24</b></span><span class="fold-date on"><small>T</small><b>25</b></span><span class="fold-date"><small>W</small><b>26</b></span><span class="fold-date"><small>T</small><b>27</b></span><span class="fold-date"><small>F</small><b>28</b></span></div>
+        <div class="sheet"><article class="crease"><time>8:10</time><b>Plan the launch</b><small>75 min · complete</small><span class="corner">FOLD 01</span></article><article class="crease now interruption"><time>9:40</time><b>Build the schedule view</b><small>38 min remaining · in focus</small><span class="corner">OPEN</span></article><article class="crease"><time>11:30</time><b>Lunch outside</b><small>45 min · enjoyment</small><span class="corner">NEXT</span></article><button class="fold-open">＋ Open 40 minutes here</button><article class="crease"><time>1:00</time><b>Release checks</b><small>85 min · focus</small><span class="corner">FOLD 04</span></article></div>
+      </section>
+
+      <section class="pocket-only" hidden>
+        <div class="os-bar"><span>▣</span><b>Anchor / Today</b><span>×</span></div>
+        <div class="desktop"><section class="window"><div class="titlebar"><span>Tuesday 25</span><span>Plan ≠ verdict</span></div><div class="dates"><span>M<br />24</span><span class="on">T<br />25</span><span>W<br />26</span><span>T<br />27</span><span>F<br />28</span><span>S<br />29</span><span>S<br />30</span></div><div class="rows"><article class="row"><time>8:10</time><div><b>Plan the launch</b><small>75 MIN</small></div><span class="stamp">DONE</span></article><article class="row now"><time>9:40</time><div><b>Build schedule</b><small>38 MIN LEFT</small></div><span class="stamp">NOW</span></article><article class="row interrupted"><time>10:20</time><div><b>Support call</b><small>12 MIN</small></div><span class="stamp">CAME TO YOU</span></article><article class="row"><time>11:30</time><div><b>Lunch outside</b><small>45 MIN</small></div><span class="stamp">NEXT</span></article><button class="new-row">＋ INSERT OPEN TIME</button></div></section></div>
+      </section>
+
+      <button class="add" aria-label="Add block">＋</button>
+      <nav class="bottom"><button><b>◎</b>Focus</button><button class="on"><b>▤</b>Today</button><button><b>↻</b>Habits</button><button><b>◴</b>History</button></nav>
+    </main>
+    <script>
+      const direction = new URLSearchParams(location.search).get('direction') || 'score';
+      const screen = document.querySelector('#screen');
+      screen.className = `screen ${direction}`;
+      document.querySelector('.score-only').hidden = direction !== 'score';
+      document.querySelector('.fold-only').hidden = direction !== 'fold';
+      document.querySelector('.pocket-only').hidden = direction !== 'pocket';
+    </script>
+  </body>
+</html>

@@ -5,6 +5,12 @@
 - `Apps/Shared/Assets.xcassets/AnchorOnboarding.imageset/` is Anchor's original
   interruption-first onboarding illustration, generated specifically for Anchor
   with OpenAI's built-in image-generation tool.
+- `Apps/Shared/Assets.xcassets/PatternDoodlesA.imageset/` and
+  `PatternDoodlesB.imageset/` are Anchor's 24 replacement pattern scenes. The
+  scenes were generated as transparent 4-by-3 sprite sheets in enum order.
+- `Apps/Shared/Assets.xcassets/DirectionDoodles.imageset/` is Anchor's eight
+  replacement life-direction scenes, generated as a transparent 4-by-2 sprite
+  sheet in enum order.
 
 ## Indulge material carried into Anchor
 
@@ -29,3 +35,11 @@ SwiftUI supplies selection state, copy, accessibility labels, Dynamic Type,
 Reduce Motion behavior, and transitions. Artwork is never the only carrier of
 meaning. Record any later imported source with its author, source, license,
 attribution requirements, modifications, and final repository path.
+
+## Provider identity
+
+- `Apps/Shared/Assets.xcassets/GoogleSignInMark.imageset/` contains Google's
+  standard multicolor G downloaded without modification from Google's official
+  Sign in with Google branding guidelines on 2026-08-25:
+  `https://developers.google.com/static/identity/images/g-logo.png`. It is used
+  only inside the labelled Continue with Google account button.

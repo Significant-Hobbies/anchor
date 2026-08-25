@@ -23,7 +23,12 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
         app.buttons["Schedule these habits"].click()
         XCTAssertTrue(app.staticTexts["Give each habit a real place."].waitForExistence(timeout: 4))
-        app.buttons["Save schedule and learn interruptions"].click()
+        app.buttons["Save week and continue"].click()
+
+        XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
+        XCTAssertTrue(app.buttons["anchor.hub.sign-in-google"].exists)
+        app.buttons["anchor.onboarding.hub-continue-locally"].click()
 
         XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 4))
 
@@ -55,6 +60,16 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Settings"].click()
 
         XCTAssertTrue(app.staticTexts["Significant Hobbies Hub"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Bring Anchor into your Hub"].exists)
+        XCTAssertTrue(app.radioButtons["System"].exists)
+        XCTAssertTrue(app.radioButtons["Light"].exists)
+        XCTAssertTrue(app.radioButtons["Dark"].exists)
+        app.radioButtons["Dark"].click()
+        XCTAssertTrue(
+            app.staticTexts["Uses the charcoal focus canvas on this device."]
+                .waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(app.staticTexts["This build stores appearance on this device only"].exists)
         XCTAssertTrue(app.staticTexts["Talk to your data"].exists)
         XCTAssertTrue(app.staticTexts["Database"].exists)
     }
