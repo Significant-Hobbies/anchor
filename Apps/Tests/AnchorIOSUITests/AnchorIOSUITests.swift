@@ -132,6 +132,38 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Morning walk"].waitForExistence(timeout: 4))
     }
 
+    func testBehaviorProfileSavesImmediatelyAndPersists() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-profile-ui-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launch()
+
+        app.tabBars.buttons["Habits"].tap()
+        let editor = app.buttons["anchor.habits.behavior-profile"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+
+        let shortVideos = app.buttons["Short videos"]
+        XCTAssertTrue(shortVideos.waitForExistence(timeout: 4))
+        shortVideos.tap()
+        XCTAssertTrue(app.staticTexts["anchor.profile.saved"].waitForExistence(timeout: 3))
+
+        let evidence = XCTAttachment(screenshot: app.screenshot())
+        evidence.name = "anchor-ios-patterns-saved"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+
+        app.buttons["Done"].tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 3))
+        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons["Habits"].tap()
+        XCTAssertTrue(editor.waitForExistence(timeout: 4))
+        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+    }
+
     func testSettingsKeepsMacOnlyDiagnosticsOffIPhone() {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-settings-ui-\(UUID().uuidString).store"

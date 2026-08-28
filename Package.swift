@@ -19,7 +19,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/Significant-Hobbies/significanthobbies.git",
-            revision: "e350a86b2c255861f528d5a22bca1196d5a2898e"
+            revision: "c9abc093c42174c4361774c4ed37ae5c882e276b"
         ),
     ],
     targets: [

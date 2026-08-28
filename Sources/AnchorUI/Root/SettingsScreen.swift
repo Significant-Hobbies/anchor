@@ -130,8 +130,8 @@ public struct SettingsScreen: View {
                 PreferenceDivider()
                 PreferenceActionRow(
                     systemImage: "sparkles.rectangle.stack",
-                    title: "View onboarding",
-                    detail: "Replay the plan, habit, focus, and interruption walkthrough.",
+                    title: "Replay onboarding",
+                    detail: "Run the current walkthrough again without changing your schedule or history.",
                     action: onShowOnboarding
                 )
             }
@@ -139,7 +139,7 @@ public struct SettingsScreen: View {
             PreferenceDivider()
             PreferenceActionRow(
                 systemImage: "arrow.triangle.branch",
-                title: "Edit patterns and alternatives",
+                title: "Edit patterns and replacements",
                 detail: behaviorProfileSummary
             ) { showsBehaviorProfile = true }
         }

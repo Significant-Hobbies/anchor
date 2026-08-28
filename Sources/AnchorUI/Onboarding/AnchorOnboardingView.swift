@@ -6,6 +6,7 @@ import SwiftUI
 public struct AnchorOnboardingView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.modelContext) private var context
     @Environment(\.anchorPlatformSync) private var platform
     @Query private var profiles: [BehaviorProfile]
@@ -109,11 +110,8 @@ public struct AnchorOnboardingView: View {
             }
         }
         .onAppear {
-            if ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_DEMO"] == "1" {
+            if isDemo {
                 let demoStep = demoInitialStep
-                savedUnifiedStep = demoStep.rawValue
-                savedGoal = ""
-                savedStep = 0
                 unifiedStep = demoStep
                 goal = ""
                 rehearsal = OnboardingRehearsal()
@@ -177,7 +175,7 @@ public struct AnchorOnboardingView: View {
                     .multilineTextAlignment(.center)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 138, maximum: 190), spacing: Space.sm)], spacing: Space.sm) {
+            LazyVGrid(columns: patternColumns, spacing: Space.sm) {
                 ForEach(BehaviorPattern.allCases, id: \.self) { pattern in
                     BehavioralArtworkTile(
                         pattern: pattern,
@@ -220,7 +218,7 @@ public struct AnchorOnboardingView: View {
                     .multilineTextAlignment(.center)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: Space.sm)], spacing: Space.sm) {
+            LazyVGrid(columns: directionColumns, spacing: Space.sm) {
                 ForEach(LifeDirection.allCases, id: \.self) { direction in
                     BehavioralArtworkTile(
                         direction: direction,
@@ -352,27 +350,12 @@ public struct AnchorOnboardingView: View {
                                 Text("Repeats")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(theme.textTertiary)
-                                HStack(spacing: Space.xxs) {
-                                    ForEach(ScheduleWeekday.allCases, id: \.self) { day in
-                                        Button {
-                                            if draft.weekdays.contains(day) {
-                                                draft.weekdays.remove(day)
-                                            } else {
-                                                draft.weekdays.insert(day)
-                                            }
-                                        } label: {
-                                            Text(day.shortLabel)
-                                                .frame(minWidth: 32, minHeight: 32)
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .tint(draft.weekdays.contains(day) ? theme.accent : theme.textTertiary)
-                                        .accessibilityLabel(day.label)
-                                        .accessibilityValue(
-                                            draft.weekdays.contains(day) ? "Selected" : "Not selected"
-                                        )
-                                        .accessibilityAddTraits(
-                                            draft.weekdays.contains(day) ? .isSelected : []
-                                        )
+                                ViewThatFits(in: .horizontal) {
+                                    HStack(spacing: Space.xxs) {
+                                        weekdayButtons(for: $draft)
+                                    }
+                                    LazyVGrid(columns: compactWeekdayColumns, alignment: .leading, spacing: Space.xxs) {
+                                        weekdayButtons(for: $draft)
                                     }
                                 }
                             }
@@ -399,6 +382,39 @@ public struct AnchorOnboardingView: View {
                 Button("Back") { moveUnified(to: .replacements) }
                     .buttonStyle(QuietButtonStyle())
             }
+        }
+    }
+
+    private var patternColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 138, maximum: 280), spacing: Space.sm)]
+    }
+
+    private var directionColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 150, maximum: 280), spacing: Space.sm)]
+    }
+
+    private var compactWeekdayColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(minimum: 44), spacing: Space.xxs), count: 4)
+    }
+
+    @ViewBuilder
+    private func weekdayButtons(for draft: Binding<HabitDraft>) -> some View {
+        ForEach(ScheduleWeekday.allCases, id: \.self) { day in
+            Button {
+                if draft.wrappedValue.weekdays.contains(day) {
+                    draft.wrappedValue.weekdays.remove(day)
+                } else {
+                    draft.wrappedValue.weekdays.insert(day)
+                }
+            } label: {
+                Text(day.shortLabel)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            .tint(draft.wrappedValue.weekdays.contains(day) ? theme.accent : theme.textTertiary)
+            .accessibilityLabel(day.label)
+            .accessibilityValue(draft.wrappedValue.weekdays.contains(day) ? "Selected" : "Not selected")
+            .accessibilityAddTraits(draft.wrappedValue.weekdays.contains(day) ? .isSelected : [])
         }
     }
 
@@ -707,7 +723,7 @@ public struct AnchorOnboardingView: View {
 
     private func beginRehearsal() {
         guard rehearsal.begin(goal: trimmedGoal) else { return }
-        savedGoal = rehearsal.goal
+        if !isDemo { savedGoal = rehearsal.goal }
         persist(step: .focusing)
         focusedField = nil
     }
@@ -722,9 +738,11 @@ public struct AnchorOnboardingView: View {
 
     private func complete() {
         guard persistProfile() else { return }
-        savedUnifiedStep = 0
-        savedGoal = ""
-        savedStep = 0
+        if !isDemo {
+            savedUnifiedStep = 0
+            savedGoal = ""
+            savedStep = 0
+        }
         onComplete()
     }
 
@@ -814,7 +832,7 @@ public struct AnchorOnboardingView: View {
 
     private func moveUnified(to step: UnifiedStep) {
         focusedField = nil
-        savedUnifiedStep = step.rawValue
+        if !isDemo { savedUnifiedStep = step.rawValue }
         withAnimation(reduceMotion ? .easeInOut(duration: 0.16) : Motion.gentle) {
             unifiedStep = step
         }
@@ -861,7 +879,11 @@ public struct AnchorOnboardingView: View {
     }
 
     private func persist(step: OnboardingRehearsal.Step) {
-        savedStep = step.rawValue
+        if !isDemo { savedStep = step.rawValue }
+    }
+
+    private var isDemo: Bool {
+        ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_DEMO"] == "1"
     }
 
     private func restore() {
@@ -883,6 +905,7 @@ public struct AnchorOnboardingView: View {
 
 struct BehavioralArtworkTile: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let artwork: BehavioralDoodleArtwork.Subject
     let title: String
     let isSelected: Bool
@@ -906,14 +929,14 @@ struct BehavioralArtworkTile: View {
         Button(action: action) {
             VStack(spacing: Space.xs) {
                 BehavioralDoodleArtwork(subject: artwork)
-                    .frame(height: 112)
+                    .frame(height: dynamicTypeSize.isAccessibilitySize ? 88 : 112)
                     .frame(maxWidth: .infinity)
                     .accessibilityHidden(true)
                 HStack(spacing: Space.xxs) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(theme.textPrimary)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")

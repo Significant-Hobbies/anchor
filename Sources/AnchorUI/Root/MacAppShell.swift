@@ -262,11 +262,6 @@ private struct MacRailDestination: View {
                         .font(.system(size: 14, weight: isSelected ? .semibold : .medium, design: .rounded))
                         .foregroundStyle(isSelected ? theme.textPrimary : theme.textSecondary)
                     Spacer(minLength: 0)
-                    if isSelected {
-                        Circle()
-                            .fill(theme.accent)
-                            .frame(width: 4, height: 4)
-                    }
                 }
             }
             .padding(.horizontal, presentation == .icons ? 0 : Space.xs)
@@ -275,14 +270,6 @@ private struct MacRailDestination: View {
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
                     .fill(backgroundColor)
             )
-            .overlay(alignment: .leading) {
-                if isSelected && presentation != .icons {
-                    Capsule()
-                        .fill(theme.accent)
-                        .frame(width: 3, height: 22)
-                        .offset(x: -metricsEdgeOffset)
-                }
-            }
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -297,8 +284,6 @@ private struct MacRailDestination: View {
         if isHovering { return theme.surfaceRaised.opacity(0.86) }
         return .clear
     }
-
-    private var metricsEdgeOffset: CGFloat { Space.xs + 1 }
 }
 
 private struct MacRailAction: View {
@@ -328,7 +313,11 @@ private struct MacRailAction: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-                    .fill(isSelected ? theme.surfaceRaised : (isHovering ? theme.surfaceRaised.opacity(0.86) : .clear))
+                    .fill(
+                        isSelected
+                            ? theme.accent.opacity(theme.isDark ? 0.15 : 0.1)
+                            : (isHovering ? theme.surfaceRaised.opacity(0.86) : .clear)
+                    )
             )
             .contentShape(.rect)
         }
@@ -336,6 +325,8 @@ private struct MacRailAction: View {
         .onHover { isHovering = $0 }
         .help(label)
         .accessibilityLabel(label)
+        .accessibilityValue(isSelected ? "Selected" : "")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

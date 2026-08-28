@@ -105,6 +105,37 @@ struct DrawnDayLanguageTests {
         #expect(!macApp.contains(".windowStyle(.hiddenTitleBar)"))
     }
 
+    @Test("Mac navigation uses one selected surface")
+    func macNavigationAvoidsStackedSelectionMarks() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let shell = try source("Sources/AnchorUI/Root/MacAppShell.swift", in: repository)
+
+        #expect(shell.contains(".fill(backgroundColor)"))
+        #expect(!shell.contains("metricsEdgeOffset"))
+        #expect(!shell.contains("if isSelected && presentation != .icons"))
+    }
+
+    @Test("Onboarding QA cannot consume the owner's first-run state")
+    func onboardingDemoKeepsPersistentTourStateUntouched() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let root = try source("Sources/AnchorUI/Root/RootView.swift", in: repository)
+        let onboarding = try source(
+            "Sources/AnchorUI/Onboarding/AnchorOnboardingView.swift",
+            in: repository
+        )
+
+        #expect(root.contains("anchor.product-tour.seen.v3"))
+        #expect(root.contains("if !shouldForceOnboarding"))
+        #expect(onboarding.contains("if !isDemo { savedUnifiedStep = step.rawValue }"))
+        #expect(onboarding.contains("if !isDemo { savedStep = step.rawValue }"))
+    }
+
     private func source(_ path: String, in repository: URL) throws -> String {
         try String(contentsOf: repository.appending(path: path), encoding: .utf8)
     }

@@ -161,6 +161,33 @@ final class AnchorMacUITests: XCTestCase {
     }
 
     @MainActor
+    func testBehaviorProfileSavesImmediatelyAndPersists() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "behavior-profile")
+        app.launch()
+
+        app.buttons["Habits"].click()
+        let editor = app.buttons["anchor.habits.behavior-profile"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.click()
+
+        let shortVideos = app.buttons["Short videos"]
+        XCTAssertTrue(shortVideos.waitForExistence(timeout: 4))
+        shortVideos.click()
+        XCTAssertTrue(app.staticTexts["anchor.profile.saved"].waitForExistence(timeout: 3))
+        app.buttons["Done"].click()
+        XCTAssertTrue(editor.waitForExistence(timeout: 3))
+        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+
+        app.terminate()
+        app.launch()
+        app.buttons["Habits"].click()
+        XCTAssertTrue(editor.waitForExistence(timeout: 4))
+        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+    }
+
+    @MainActor
     func testSeededHistoryExposesReviewInterruptionsTrendsAndExports() throws {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"

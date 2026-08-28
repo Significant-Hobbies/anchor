@@ -1,12 +1,12 @@
 {
-  "originHash" : "3085d8a15917eafe654b3eda341946d70407788395a33c6787ee3ec9de51f4cd",
+  "originHash" : "b22c0cfc11f4766ab3dd921711722f80e40bf4bb34f1d38ac5dc2bff3aa1ec96",
   "pins" : [
     {
       "identity" : "significanthobbies",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Significant-Hobbies/significanthobbies.git",
       "state" : {
-        "revision" : "e350a86b2c255861f528d5a22bca1196d5a2898e"
+        "revision" : "c9abc093c42174c4361774c4ed37ae5c882e276b"
       }
     }
   ],

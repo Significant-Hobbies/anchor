@@ -367,7 +367,7 @@ public struct RootView: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     // The product tour changed materially with the schedule/habit overhaul.
     // A versioned key ensures existing owners see this tour once as well.
-    @AppStorage("anchor.product-tour.seen.v2") private var unifiedOnboardingSeen = false
+    @AppStorage("anchor.product-tour.seen.v3") private var unifiedOnboardingSeen = false
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
     @State private var tab: AnchorTab = .focus
@@ -481,7 +481,9 @@ public struct RootView: View {
     }
 
     private func finishOnboarding(openFocus: Bool) {
-        unifiedOnboardingSeen = true
+        if !shouldForceOnboarding {
+            unifiedOnboardingSeen = true
+        }
         forcedOnboardingFinished = true
         presentsOnboarding = false
         if openFocus { tab = .focus }

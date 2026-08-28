@@ -2,9 +2,9 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Anchor product and day-planning experience",
+  "target": "Build 18 owner first-run and product polish",
   "surfaceMode": "operate",
-  "mode": "overhaul",
+  "mode": "preserve",
   "register": "product",
   "context": {
     "product": "PRODUCT.md",
@@ -31,8 +31,8 @@
       }
     ],
     "selected": "doodle-scene",
-    "approval": "approved",
-    "before": "artifacts/design/unified-day/day-macos-wide.jpeg",
+    "approval": "not-required",
+    "before": "artifacts/design/anchor-mac-focus.jpeg",
     "contract": {
       "purpose": "Help a person plan a realistic day, follow the current intention, capture what changes it, and learn why the day lived differed from the day planned.",
       "purposeSource": "PRODUCT.md and site-health publicDirectory.projects.anchor.purposeContract",
@@ -100,19 +100,35 @@
       {
         "width": 208,
         "path": "artifacts/design/final-evidence-watch-focus-20260827.png"
+      },
+      {
+        "width": 390,
+        "path": "artifacts/design/build18/anchor-ios-patterns-saved-390.png"
+      },
+      {
+        "width": 768,
+        "path": "artifacts/design/build18/anchor-mac-focus-768.png"
+      },
+      {
+        "width": 1440,
+        "path": "artifacts/design/build18/anchor-mac-focus-1440.png"
+      },
+      {
+        "width": 1440,
+        "path": "artifacts/design/build18/anchor-mac-patterns-saved-1440.png"
       }
     ],
     "projectCheck": {
-      "command": "swift test; release anchor-mcp --diagnose; DebugLocal xcodebuild for macOS, iOS Simulator, and watchOS Simulator; stable-Xcode iOS UI journeys; seven isolated macOS UI journeys; ios-landings pnpm check and responsive review",
+      "command": "swift test; DebugLocal Mac and iOS builds; focused Mac and iPhone onboarding and persistence UI journeys; Google browser-cancellation callback acceptance; design-workflow check",
       "status": "pass",
-      "note": "All 153 package tests, the 8/8 distraction and 4/4 goal diagnostic, and DebugLocal macOS, iOS, and watchOS builds pass. On a fresh iOS 26.5 simulator, all four UI journeys reached their passing assertions. Seven isolated native Mac journeys now pass together, covering Focus persistence, Today scheduling and review, usual-week routines, habits, History and exports, Mini Timer, onboarding, and Settings. Fresh Today, Focus, Habits, History, and Watch renders were inspected directly; ios-landings passes all eight product builds and required routes, plus Anchor review at 390, 768, and 1440 pixels."
+      "note": "All 155 package and source-contract tests pass. The Mac persistence and full onboarding journeys pass, and the iPhone persistence journey passes through a terminate and relaunch. DebugLocal Mac and iOS builds resolve PersonalSyncKit at c9abc09; the iOS build also compiles the embedded watch app. The Safari/XPC Google cancellation callback returns to a live Anchor process without a crash. Fresh owner-path renders were inspected at 390, 768, and 1440 points."
     },
     "critique": {
-      "score": 32,
+      "score": 35,
       "maximum": 40
     },
     "audit": {
-      "score": 18,
+      "score": 19,
       "maximum": 20
     },
     "unresolved": {
@@ -129,6 +145,6 @@
   },
   "ownerFeedback": {
     "decision": "keep",
-    "note": "Round 0 rejected: the Day Overlay and Focus Viewfinder felt too simple and basic; Departure Lines had welcome authorship but its literal depot-board execution did not earn selection. Round 1 was rejected as too funky. The owner pinned the world to simple, premium, and doodle-first, selected Doodle Scene as the structural base, rejected the first repeated selector drawings, and asked for neutral chrome so authored colour could pop. The owner approved the implemented direction on 2026-08-25 and requested one final button refinement. Primary, quiet, and transport controls now share shallow physical depth and settle-on-press feedback. Dark is now the shared product default, with one iCloud-backed System, Light, or Dark choice for every Anchor device. The owner then asked for signup inside onboarding, a stronger Settings account experience, a real Google mark, and verified top-toolbar behavior; the shared Hub panel and responsive six-stage onboarding now carry that direction. The final account composition is viewport-centered, uses compact secondary actions, and leaves Mac window chrome entirely to the native title bar."
+    "note": "Round 0 rejected: the Day Overlay and Focus Viewfinder felt too simple and basic; Departure Lines had welcome authorship but its literal depot-board execution did not earn selection. Round 1 was rejected as too funky. The owner pinned the world to simple, premium, and doodle-first, selected Doodle Scene as the structural base, rejected the first repeated selector drawings, and asked for neutral chrome so authored colour could pop. The owner approved the implemented direction on 2026-08-25 and requested one final button refinement. Primary, quiet, and transport controls now share shallow physical depth and settle-on-press feedback. Dark is now the shared product default, with one iCloud-backed System, Light, or Dark choice for every Anchor device. The owner then asked for signup inside onboarding, a stronger Settings account experience, a real Google mark, and verified top-toolbar behavior; the shared Hub panel and responsive six-stage onboarding now carry that direction. The final account composition is viewport-centered, uses compact secondary actions, and leaves Mac window chrome entirely to the native title bar. On 2026-08-29 the owner said the aesthetic should be preserved, while rejecting the glossy blue icon, missing owner onboarding, invisible behavior-profile persistence, crashing Google callback, and stacked Mac selection cues. Build 18 keeps the visual world and closes those trust breaks with the paper-and-ink Anchor face, versioned replay-safe onboarding, persistent auto-save feedback, isolated browser callback handling, and one selected rail surface."
   }
 }

@@ -78,6 +78,8 @@ public struct HabitsScreen: View {
                     .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("anchor.habits.behavior-profile")
+                .accessibilityValue(profileSummary)
 
                 if let readyHabit = readyHabits.first {
                     progressionPrompt(for: readyHabit)
