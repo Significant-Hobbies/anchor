@@ -54,8 +54,11 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
   source is installed, launched, and running on the physical iPhone with the
   CloudKit, app-group, Watch, and Live Activity capabilities intact. The iPad is
   unavailable, and direct Watch acceptance still requires Developer Mode on the
-  Watch. Stable Xcode 26.6 cannot run UI automation against the phone's iOS 27
-  DeviceSupport image, so the real cross-device journey remains open.
+  Watch. The owner accepted Mac and iPhone as the current rollout scope, so
+  physical iPad/Watch acceptance is deferred rather than a release gate. Stable
+  Xcode 26.6 cannot run UI automation against the phone's iOS 27 DeviceSupport
+  image; no physical cross-device journey is claimed. Fresh CLI inspection
+  confirms Anchor 1.0 (17) is installed on both the Mac and physical iPhone.
 
 - **2026-08-28** — Released Anchor `1.0 (14)` from source commit `068f70e` after
   the complete Mac accessibility pass. Seven isolated native macOS journeys pass together across
