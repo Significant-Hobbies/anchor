@@ -34,6 +34,33 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-08-29** — Released Anchor `1.0 (18)` from source commit `0da9c7c`
+  after the owner's first real product pass. Existing owners receive the current
+  replay-safe onboarding once, release/demo runs no longer consume first-run
+  state, Patterns and replacements save on every change with a persistent
+  success/error footer, and the Mac rail uses one selected surface. The glossy
+  blue ring icon is replaced by the paper-and-ink Anchor face, including all
+  Mac, iPhone, and Watch sizes. PersonalSyncKit revision `c9abc09` keeps the
+  AuthenticationServices callback off the account model's main actor; the exact
+  Safari/XPC cancel callback now returns to a live Mac app without a crash.
+  Dynamic Type behavior grids adapt toward one column and onboarding weekday
+  controls meet the 44-point minimum. All 155 package/source-contract tests,
+  the Mac onboarding and Mac/iPhone persistence UI journeys, 8/8 distraction
+  and 4/4 goal diagnostics, and the 35/40 design plus 19/20 native audit gates
+  pass. The 39 MB Apple Distribution IPA has SHA-256
+  `6c2b79245245def62da6f894dc5c5f57bb5afa67ce8b439af286bdaa0377dcf6`;
+  delivery `802eda17-a80c-4f32-88bf-e614afdaa52d` is `VALID`, assigned to the
+  internal `Personal Testing` group, and embeds the Watch and Live Activity
+  targets with Production CloudKit and the shared app group. Apple notarization
+  `e93ea2ac-16c7-4fc9-960f-5c9e1f1664c5` is accepted. The stapled DMG passes
+  Gatekeeper with SHA-256
+  `a11ba803276731d8ca55b2965e9c66b185878765c9dc8afabb2028e75bae8983`;
+  landing source `ec484d9` and Pages deployment `cad294e7` serve those exact
+  bytes at the custom-domain download. Build 18 is installed and running in
+  `/Applications`, with build 17 preserved recoverably in Trash. The exact-source
+  development build is installed on the paired physical iPhone; launch proof is
+  still pending because the phone remained locked during both CLI attempts.
+
 - **2026-08-28** — Released Anchor `1.0 (17)` from source commit `7dddf1f`.
   The release adds full weekday names and selected-state values to onboarding's
   recurrence controls; all 153 shared tests, the focused macOS onboarding UI
@@ -271,13 +298,13 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | **Installed and running as notarized 1.0 (17)**; public DMG passes stapler, Gatekeeper, Developer ID, hardened-runtime, Production CloudKit/APNs, and app-group verification |
-| Anchor for iOS | **App Store Connect 1.0 (17) is VALID, APP_STORE_ELIGIBLE, assigned to Personal Testing, and Waiting for Review**; an exact-source development-signed 1.0 (17) is installed and running on the physical iPhone, while the physical iPad remains unavailable |
-| Anchor for watchOS | Embedded in accepted build 1.0 (17) with Production CloudKit and APNs; simulator launch passes, while physical-Watch inspection and installation require Developer Mode to be enabled on the paired Watch |
+| Anchor for macOS | **Installed and running as notarized 1.0 (18)**; public DMG passes stapler, Gatekeeper, Developer ID, hardened-runtime, Production CloudKit/APNs, and app-group verification |
+| Anchor for iOS | **App Store Connect 1.0 (18) is VALID, APP_STORE_ELIGIBLE, and assigned to Personal Testing**; an exact-source development-signed 1.0 (18) is installed on the physical iPhone, where launch is pending only on the device being unlocked; the physical iPad remains unavailable |
+| Anchor for watchOS | Embedded in accepted build 1.0 (18) with Production CloudKit and APNs; simulator compilation passes, while physical-Watch inspection and installation require Developer Mode to be enabled on the paired Watch |
 | `anchor-mcp` | Working repo-built stdio MCP server, 10 tools; not bundled or advertised by the signed Mac app until protected-store access has an app-mediated design |
 | Landing pages | **Live at `anchor.significanthobbies.com` from `ios-landings` commit `b010889`**, with current schedule proof and the verified Mac download |
-| macOS DMG | **Build 17 is Developer ID signed, hardened, notarized, stapled, Gatekeeper-accepted, and publicly downloadable** |
-| iOS/watchOS IPA | **App Store Connect accepted and internally assigned 1.0 (17)**, including Watch and Live Activity targets; App Review and physical acceptance are pending |
+| macOS DMG | **Build 18 is Developer ID signed, hardened, notarized, stapled, Gatekeeper-accepted, and publicly downloadable** |
+| iOS/watchOS IPA | **App Store Connect accepted and internally assigned 1.0 (18)**, including Watch and Live Activity targets; the first App Review submission and final physical acceptance remain pending |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
