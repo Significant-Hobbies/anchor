@@ -33,6 +33,15 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 ## Timeline
 
+- **2026-08-28** — Prepared Anchor `1.0 (14)` for the complete Mac accessibility
+  and release pass. Seven isolated native macOS journeys pass together across
+  Focus, Today scheduling and review, usual-week routines, Habits, History and
+  exports, Mini Timer, onboarding, and Settings. The run fixed schedule-row
+  actions and usual-week Add/Done controls that were not reachable through the
+  macOS accessibility tree. All 153 shared tests and the 8/8 distraction plus
+  4/4 goal on-device diagnostic remain green. Build 14 has not yet replaced the
+  accepted build 13 or the installed Mac build 12.
+
 - **2026-08-25** — Prepared Anchor `1.0 (13)` as the doodle-first product
   overhaul release candidate. Mac and iPhone remain thin shells over the same
   `AnchorUI` product root, with the same four surfaces, onboarding, Settings,
@@ -45,11 +54,27 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
   Production APNs and CloudKit, the shared app group, Sign in with Apple, and
   `get-task-allow=false`. The verified IPA is preserved locally as
   `dist/Anchor-1.0-13.ipa` (SHA-256 `7e770abc7ac1b46ba8b6b3934bb47dc9c281efe353417e80b06f522487f49c3a`).
-  Automated App Store Connect delivery is blocked only by Xcode's missing valid
-  account session for team `8F7LXHTJZR`; re-authentication or Transporter upload
-  is the remaining release gate. macOS XCUITest on the Xcode 27 beta host
-  currently fails to foreground the app before its first assertion and is not
-  counted as passing.
+  App Store Connect delivery `30da6599-484e-40f2-8617-c44948f58a03` completed
+  through the API-key CLI path after a stable-Xcode rebuild; Apple reports the
+  build as `VALID` and `APP_STORE_ELIGIBLE`. A live App Store Connect API check
+  on 2026-08-28 confirmed build 13 is assigned to the internal `Personal
+  Testing` group. Physical-iPhone installation and the signed Mac-to-iPhone
+  acceptance journey remain open. On 2026-08-28 the reachable
+  physical iPhone was confirmed to have Anchor 1.0 (11), while the exact current
+  source built successfully as development-signed 1.0 (13), including the Watch
+  companion, for that device. The development build is not substituted for the
+  accepted TestFlight artifact. On macOS, all 153 shared tests, the 8/8 + 4/4
+  on-device diagnostic, and seven isolated native UI journeys now pass. The
+  native suite covers Focus persistence; one-off scheduling, untimed completion,
+  day review, and relaunch; usual-week routines and behavior habits; seeded
+  History, interruptions, Trends, and every export entry point; Mini Timer;
+  onboarding; and Settings. The expanded run exposed and fixed two Mac
+  accessibility gaps: schedule-row actions and the usual-week Add/Done controls
+  were not reachable through the accessibility tree. A fresh stable-Xcode
+  `ReleaseDirect` archive of build 13 verifies as a universal Developer ID app
+  with hardened runtime, Production CloudKit/APNs, the shared app group, and no
+  debug entitlement. It was not installed, packaged, notarized, or published;
+  `/Applications/Anchor.app` remains build 12.
 
 - **2026-08-24** — Released the unified four-surface source as Anchor `1.0
   (12)`. The Apple Distribution iPhone archive, embedded Watch app, Production
@@ -218,13 +243,13 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | **Installed and running as 1.0 (12)**; signed Developer ID build with Production CloudKit and APNs |
-| Anchor for iOS | **App Store Connect 1.0 (12) uploaded and processing**; internal TestFlight assignment pending |
-| Anchor for watchOS | Embedded in uploaded build 1.0 (12) with Production CloudKit and APNs; processing and final physical interaction pending |
-| `anchor-mcp` | Working stdio MCP server, 10 tools; merged daily review is covered by local tests |
+| Anchor for macOS | **Installed and running as 1.0 (12)**; current 1.0 (14) source passes the complete Mac QA suite, but has not replaced the installed app |
+| Anchor for iOS | **App Store Connect 1.0 (13) is VALID, APP_STORE_ELIGIBLE, and assigned to Personal Testing**; the reachable physical iPhone still has 1.0 (11), so the TestFlight upgrade remains pending |
+| Anchor for watchOS | Embedded in accepted build 1.0 (13) with Production CloudKit and APNs; the paired physical Watch is available but direct developer inspection is blocked because Developer Mode is disabled |
+| `anchor-mcp` | Working repo-built stdio MCP server, 10 tools; not bundled or advertised by the signed Mac app until protected-store access has an app-mediated design |
 | Landing pages | **Live** at `anchor.significanthobbies.com` (Pages project `anchor-landing`), built from the shared `ios-landings` factory |
 | macOS DMG | **Build 12 signed** Developer ID, hardened runtime — not notarised |
-| iOS/watchOS IPA | **App Store Connect 1.0 (12) uploaded**, including Watch and Live Activity targets; processing/internal-group assignment pending |
+| iOS/watchOS IPA | **App Store Connect accepted and internally assigned 1.0 (13)**, including Watch and Live Activity targets; physical acceptance pending |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
@@ -283,17 +308,21 @@ Open work is tracked in
 
 Known gaps carried forward:
 
-- **Final build-12 physical acceptance remains pending**: Production has all six
-  Anchor model types and the release registers for APNs and reconciles remote
-  imports. Build 12 is processing in App Store Connect; confirm internal-group
-  assignment and install it before the last open-app Mac–iPhone pause/end round
-  trip.
-- **Physical Watch interaction remains pending**: watchOS Developer Mode is
-  disabled, so build 9 must be opened on the Watch itself for final pause/end
-  verification.
+- **Final build-13 physical acceptance remains pending**: Apple has accepted the
+  Production-entitled IPA as `VALID` and `APP_STORE_ELIGIBLE`, but the reachable
+  physical iPhone still has build 11. Install build 13 from the confirmed
+  `Personal Testing` assignment, then run the last open-app Mac–iPhone
+  plan/focus/pause/end round trip without exposing distraction text.
+- **Physical Watch interaction remains pending**: the paired Watch is available,
+  but watchOS Developer Mode is disabled. Install the accepted embedded companion
+  through TestFlight before the final remote-control verification.
 - **macOS App Store distribution remains unverified**: the Developer ID build is
   signed, installed, and running, but an entitlement-complete Mac App Store
   archive has not been made.
-- **DMG is signed but not notarised**. Build 1.0 (9) is valid in App Store
-  Connect; internal `Personal Testing` assignment remains to be confirmed.
+- **The current-source macOS DMG is not built or notarised**. The installed and
+  preserved DMG is build 12; rebuild build 14 before notarising or publishing it.
+- **The MCP helper is developer-only on macOS**. A raw bundled CLI cannot carry
+  the app's provisioning profile, and macOS denies it direct access to the
+  protected app-group store. Ship an app-mediated bridge before restoring MCP
+  setup to Settings.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).

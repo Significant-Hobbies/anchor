@@ -3,6 +3,7 @@
   "version": 1,
   "project": "anchor",
   "target": "Anchor product and day-planning experience",
+  "surfaceMode": "operate",
   "mode": "overhaul",
   "register": "product",
   "context": {
@@ -31,7 +32,20 @@
     ],
     "selected": "doodle-scene",
     "approval": "approved",
-    "before": "artifacts/design/unified-day/day-macos-wide.jpeg"
+    "before": "artifacts/design/unified-day/day-macos-wide.jpeg",
+    "contract": {
+      "purpose": "Help a person plan a realistic day, follow the current intention, capture what changes it, and learn why the day lived differed from the day planned.",
+      "purposeSource": "PRODUCT.md and site-health publicDirectory.projects.anchor.purposeContract",
+      "canonicalPurpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
+      "purposeAlignment": "match",
+      "driftNote": "",
+      "audience": "A person moving between Mac, iPhone, and Apple Watch who wants a deliberate day rather than another task list.",
+      "job": "Build or confirm today's schedule, focus the current block, capture interruptions without friction, and review planned versus lived time.",
+      "thesis": "The Drawn Day pairs calm native controls with authored doodles so planning feels human while schedule state stays precise.",
+      "system": "Neutral paper and charcoal surfaces, native SF typography, a chronological day rail, one high-contrast action, warm interruption-origin colors, and one purposeful doodle per primary surface.",
+      "signature": "The same drawn-day line moves from the Today schedule into Focus context and returns as the planned-versus-lived trace in History.",
+      "risk": "Doodle-first personality can crowd an operating surface; each screen limits art to one purposeful scene that yields to controls and collapses as density rises."
+    }
   },
   "evidence": {
     "screenshots": [
@@ -66,12 +80,32 @@
       {
         "width": 1440,
         "path": "artifacts/design/anchor-mac-hub-onboarding-1440.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/final-evidence-ios-today-20260827.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/final-evidence-ios-focus-20260827.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/final-evidence-ios-habits-20260827.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/final-evidence-ios-history-20260827.png"
+      },
+      {
+        "width": 208,
+        "path": "artifacts/design/final-evidence-watch-focus-20260827.png"
       }
     ],
     "projectCheck": {
-      "command": "swift test; xcodebuild DebugLocal for macOS and iOS Simulator (including watch dependency); focused macOS onboarding UI test; focused iOS onboarding and toolbar UI test attempts; manual Mac and iOS account walkthroughs",
+      "command": "swift test; release anchor-mcp --diagnose; DebugLocal xcodebuild for macOS, iOS Simulator, and watchOS Simulator; stable-Xcode iOS UI journeys; seven isolated macOS UI journeys; ios-landings pnpm check and responsive review",
       "status": "pass",
-      "note": "All 152 package tests and both native DebugLocal builds pass. The macOS onboarding UI journey passed through the Hub stage. The final iOS UI-test repeat hung before app launch in the Xcode 27 beta harness and was stopped; a Maestro fallback could not start because Java is not installed. Final iPhone and Mac account renders were inspected directly at 402, 768, 1100, and 1440-point widths; the Mac shell uses the standard native title bar and traffic-light controls."
+      "note": "All 153 package tests, the 8/8 distraction and 4/4 goal diagnostic, and DebugLocal macOS, iOS, and watchOS builds pass. On a fresh iOS 26.5 simulator, all four UI journeys reached their passing assertions. Seven isolated native Mac journeys now pass together, covering Focus persistence, Today scheduling and review, usual-week routines, habits, History and exports, Mini Timer, onboarding, and Settings. Fresh Today, Focus, Habits, History, and Watch renders were inspected directly; ios-landings passes all eight product builds and required routes, plus Anchor review at 390, 768, and 1440 pixels."
     },
     "critique": {
       "score": 32,
@@ -88,6 +122,9 @@
     "detector": {
       "posture": "advisory",
       "findings": []
+    },
+    "comprehension": {
+      "status": "not-applicable"
     }
   },
   "ownerFeedback": {

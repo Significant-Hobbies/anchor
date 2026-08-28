@@ -119,8 +119,9 @@ restricted iCloud and app-group entitlements remain intact.
 
 ## Talking to your data
 
-Anchor ships an MCP server, so an AI client can query your history directly
-rather than making you export a file first.
+The repository builds an MCP server for developer use, so an AI client can query
+your history directly rather than making you export a file first. It is not
+currently bundled with the signed Mac app.
 
 ```bash
 swift build -c release

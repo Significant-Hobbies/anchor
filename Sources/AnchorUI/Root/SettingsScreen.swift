@@ -6,12 +6,9 @@ import AnchorCore
 import SwiftData
 import SwiftUI
 
-#if os(macOS)
-import AppKit
-#endif
-
-/// Small on purpose: what the app is doing with your data, and how to point an
-/// AI at it. No preferences that change the product's mind for you.
+/// Small on purpose: what the app is doing with your data and the few choices
+/// that change how Anchor feels. No preferences that change the product's mind
+/// for you.
 public struct SettingsScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
@@ -24,9 +21,6 @@ public struct SettingsScreen: View {
     private var preferences: [AnchorPreferences]
     @State private var showsBehaviorProfile = false
     @State private var appearanceSaveError: String?
-    #if os(macOS)
-    @State private var didCopy = false
-    #endif
     private let storeKind: AnchorStore.StoreKind
     private let onShowOnboarding: (() -> Void)?
 
@@ -37,18 +31,6 @@ public struct SettingsScreen: View {
         self.storeKind = storeKind
         self.onShowOnboarding = onShowOnboarding
     }
-
-    #if os(macOS)
-    private var mcpCommand: String {
-        "codex mcp add anchor -- \(mcpBinaryPath)"
-    }
-
-    /// Ships inside the app bundle, so the path is stable per install.
-    private var mcpBinaryPath: String {
-        Bundle.main.url(forAuxiliaryExecutable: "anchor-mcp")?.path
-            ?? Bundle.main.bundleURL.appending(path: "Contents/MacOS/anchor-mcp").path
-    }
-    #endif
 
     public var body: some View {
         ScrollView {
@@ -94,9 +76,6 @@ public struct SettingsScreen: View {
             hubPreferences
             privacyPreferences
             dataPreferences
-            #if os(macOS)
-            advancedPreferences
-            #endif
         }
         .frame(maxWidth: .infinity, alignment: .top)
     }
@@ -269,35 +248,6 @@ public struct SettingsScreen: View {
         }
     }
 
-    #if os(macOS)
-    private var advancedPreferences: some View {
-        PreferenceGroup("Local tools", subtitle: "Optional ways to work with your own data") {
-            PreferenceInfoRow(
-                systemImage: "terminal",
-                title: "Talk to your data",
-                detail: "Register Anchor’s read-only MCP server with Codex or another local client."
-            )
-            PreferenceDivider()
-            VStack(alignment: .leading, spacing: Space.sm) {
-                Text(mcpCommand)
-                    .font(.system(.caption, design: .monospaced))
-                    .foregroundStyle(theme.textPrimary)
-                    .textSelection(.enabled)
-                    .padding(Space.xs)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
-                Button {
-                    copy(mcpCommand)
-                } label: {
-                    Label(didCopy ? "Copied" : "Copy command", systemImage: didCopy ? "checkmark" : "doc.on.doc")
-                }
-                .buttonStyle(QuietButtonStyle(expands: false))
-            }
-            .padding(Space.md)
-        }
-    }
-    #endif
-
     private var selectedAppearance: AnchorAppearance {
         AnchorPreferencesPolicy.appearance(in: preferences)
     }
@@ -380,17 +330,6 @@ public struct SettingsScreen: View {
         }
     }
 
-    #if os(macOS)
-    private func copy(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        didCopy = true
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            didCopy = false
-        }
-    }
-    #endif
 }
 
 private struct SettingsIntro: View {

@@ -789,7 +789,7 @@ public struct AnalyticsScreen: View {
             VStack(alignment: .leading, spacing: Space.sm) {
                 SectionHeader(
                     "Export",
-                    subtitle: "Or ask an AI directly — Anchor ships an MCP server"
+                    subtitle: "Your history, in formats you control"
                 )
                 FlowRow(spacing: Space.xs) {
                     ForEach(ExportFormat.allCases) { format in
@@ -801,7 +801,7 @@ public struct AnalyticsScreen: View {
                         .buttonStyle(.plain)
                     }
                 }
-                Text("The MCP server exposes your history to Codex and other clients, read-only and on this machine. Codex Computer History can add its own activity context without Anchor uploading raw activity.")
+                Text("Exports stay on this device until you choose where to save or share them.")
                     .font(.system(size: 11))
                     .foregroundStyle(theme.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)

@@ -5,13 +5,18 @@ Two ways out of the app: files you can open, and a server an AI can query.
 ## MCP server
 
 `anchor-mcp` speaks JSON-RPC 2.0 over stdio — the transport MCP clients expect.
-It opens the same SwiftData store the app writes, with CloudKit off (a short-lived
-CLI has no entitlements and only needs the local file).
+The repository builds it as a developer tool; it is not currently bundled with
+the signed Mac app. macOS protects Anchor's app-group store, so a terminal or MCP
+client may need user-granted Full Disk Access before the tool can read that store.
+The server opens it with CloudKit off and never writes to it.
 
 ```bash
 swift build -c release
 codex mcp add anchor -- "$PWD/.build/release/anchor-mcp"
 ```
+
+Anchor deliberately does not show this command in Settings until the release app
+can provide a signed, app-mediated bridge to its protected store.
 
 ### Tools
 

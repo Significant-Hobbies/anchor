@@ -426,6 +426,7 @@ struct PlanScreen: View {
 
 private struct PlanBlockRow: View {
     @Environment(\.anchorTheme) private var theme
+    @State private var showsActions = false
     let block: PlanBlock
     let linkedSession: FocusSession?
     let hasDifferentActiveSession: Bool
@@ -478,25 +479,30 @@ private struct PlanBlockRow: View {
             }
             Spacer(minLength: Space.xs)
 
-            Menu {
-                if linkedSession?.isActive == true {
-                    Button("Open timer", action: onOpenFocus)
-                } else if block.state == .planned {
-                    if !hasDifferentActiveSession {
-                        Button("Start now", action: onStart)
-                    }
-                    Button("Edit or move", action: onEdit)
-                    Button("Finished without timing", action: onComplete)
+            #if os(macOS)
+            Button { showsActions.toggle() } label: {
+                actionIcon
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showsActions, arrowEdge: .trailing) {
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    actionChoices
                 }
-                Button("Explain a change", action: onExplain)
-            } label: {
-                Image(systemName: stateSymbol)
-                    .font(.title3)
-                    .foregroundStyle(stateTint)
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
+                .padding(Space.xs)
+                .frame(minWidth: 190)
+                .anchorTheme()
             }
             .accessibilityLabel(actionLabel)
+            .accessibilityIdentifier("anchor.today.block-actions")
+            #else
+            Menu {
+                actionChoices
+            } label: {
+                actionIcon
+            }
+            .accessibilityLabel(actionLabel)
+            .accessibilityIdentifier("anchor.today.block-actions")
+            #endif
         }
         .padding(.horizontal, Space.sm)
         .padding(.vertical, Space.xs)
@@ -513,6 +519,34 @@ private struct PlanBlockRow: View {
         .shadow(color: .black.opacity(isCurrent ? (theme.isDark ? 0.22 : 0.07) : 0), radius: 12, y: 5)
         .padding(.vertical, 3)
         .accessibilityElement(children: .contain)
+    }
+
+    private var actionIcon: some View {
+        Label(actionLabel, systemImage: stateSymbol)
+            .labelStyle(.iconOnly)
+            .font(.title3)
+            .foregroundStyle(stateTint)
+            .frame(width: 44, height: 44)
+            .contentShape(.rect)
+    }
+
+    @ViewBuilder
+    private var actionChoices: some View {
+        if linkedSession?.isActive == true {
+            Button("Open timer") { choose(onOpenFocus) }
+        } else if block.state == .planned {
+            if !hasDifferentActiveSession {
+                Button("Start now") { choose(onStart) }
+            }
+            Button("Edit or move") { choose(onEdit) }
+            Button("Finished without timing") { choose(onComplete) }
+        }
+        Button("Explain a change") { choose(onExplain) }
+    }
+
+    private func choose(_ action: () -> Void) {
+        showsActions = false
+        action()
     }
 
     private var stateSymbol: String {
@@ -1007,11 +1041,29 @@ struct RoutineManager: View {
             }
             .navigationTitle("Your usual week")
             .toolbar {
+                #if !os(macOS)
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add", systemImage: "plus") { showsNewTemplate = true }
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                #endif
             }
+            #if os(macOS)
+            .safeAreaInset(edge: .bottom) {
+                HStack(spacing: Space.sm) {
+                    Button("Add usual-week item", systemImage: "plus") {
+                        showsNewTemplate = true
+                    }
+                    .buttonStyle(PrimaryButtonStyle(expands: false))
+                    Spacer()
+                    Button("Done") { dismiss() }
+                        .buttonStyle(QuietButtonStyle(expands: false))
+                }
+                .padding(.horizontal, Space.md)
+                .padding(.vertical, Space.xs)
+                .background(.bar)
+            }
+            #endif
             .sheet(isPresented: $showsNewTemplate) {
                 PlanBlockEditor(initialDay: Date(), startsRecurring: true) {
                     saveError = nil
