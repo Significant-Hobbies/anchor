@@ -50,9 +50,12 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
   `APP_STORE_ELIGIBLE`, assigned to the internal `Personal Testing` group, and
   App Review submission `60c30230-1948-4068-bcc8-9e95cfebf294` is Waiting for
   Review. Build 16's automated `ITMS-90111` rejection was resolved by rebuilding
-  with stable Xcode 26.6. Physical iPhone, iPad, and Watch acceptance remains
-  open: the iPhone and Watch are paired but the phone is not reachable, and the
-  iPad is unavailable.
+  with stable Xcode 26.6. A registered-device build from the exact build-17
+  source is installed, launched, and running on the physical iPhone with the
+  CloudKit, app-group, Watch, and Live Activity capabilities intact. The iPad is
+  unavailable, and direct Watch acceptance still requires Developer Mode on the
+  Watch. Stable Xcode 26.6 cannot run UI automation against the phone's iOS 27
+  DeviceSupport image, so the real cross-device journey remains open.
 
 - **2026-08-28** — Released Anchor `1.0 (14)` from source commit `068f70e` after
   the complete Mac accessibility pass. Seven isolated native macOS journeys pass together across
@@ -266,8 +269,8 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 | Surface | State |
 | --- | --- |
 | Anchor for macOS | **Installed and running as notarized 1.0 (17)**; public DMG passes stapler, Gatekeeper, Developer ID, hardened-runtime, Production CloudKit/APNs, and app-group verification |
-| Anchor for iOS | **App Store Connect 1.0 (17) is VALID, APP_STORE_ELIGIBLE, assigned to Personal Testing, and Waiting for Review**; physical TestFlight installation remains pending because the paired iPhone is not reachable and the iPad is unavailable |
-| Anchor for watchOS | Embedded in accepted build 1.0 (17) with Production CloudKit and APNs; simulator launch passes, while physical-Watch installation remains pending through the paired but unreachable iPhone |
+| Anchor for iOS | **App Store Connect 1.0 (17) is VALID, APP_STORE_ELIGIBLE, assigned to Personal Testing, and Waiting for Review**; an exact-source development-signed 1.0 (17) is installed and running on the physical iPhone, while the physical iPad remains unavailable |
+| Anchor for watchOS | Embedded in accepted build 1.0 (17) with Production CloudKit and APNs; simulator launch passes, while physical-Watch inspection and installation require Developer Mode to be enabled on the paired Watch |
 | `anchor-mcp` | Working repo-built stdio MCP server, 10 tools; not bundled or advertised by the signed Mac app until protected-store access has an app-mediated design |
 | Landing pages | **Live at `anchor.significanthobbies.com` from `ios-landings` commit `b010889`**, with current schedule proof and the verified Mac download |
 | macOS DMG | **Build 17 is Developer ID signed, hardened, notarized, stapled, Gatekeeper-accepted, and publicly downloadable** |
