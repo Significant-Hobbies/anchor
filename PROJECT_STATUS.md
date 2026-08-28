@@ -29,9 +29,29 @@ the first-party PersonalSyncKit package:
 - **PersonalSyncKit** — optional Better Auth connection plus a durable
   Cloudflare session-summary outbox; distraction notes are excluded by contract
 
-Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
+Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
+26.6 (`17F113`) and team `8F7LXHTJZR`.
 
 ## Timeline
+
+- **2026-08-28** — Released Anchor `1.0 (17)` from source commit `7dddf1f`.
+  The release adds full weekday names and selected-state values to onboarding's
+  recurrence controls; all 153 shared tests, the focused macOS onboarding UI
+  test, macOS/iOS/watchOS builds, and the 8/8 distraction plus 4/4 goal
+  on-device diagnostic pass. Installed-app inspection confirms that Monday
+  changes from `Selected` to `Not selected` immediately, with the same contract
+  on all seven days. The Developer ID Mac app is installed in `/Applications`,
+  notarization `37ade8d4-64d9-42d0-9e13-6dff60da0a16` is accepted, and the
+  stapled public DMG passes Gatekeeper with SHA-256
+  `dcab7bbf132ad1b7d40e96284eacace97c46bfc8ea93d8af8b5fafc8e941bd5f`.
+  Landing source `b010889` is deployed on the custom domain and its download is
+  byte-for-byte identical. Apple delivery
+  `df93b218-63b6-43dd-8d9a-f585e3479c41` is `VALID` and
+  `APP_STORE_ELIGIBLE`, assigned to the internal `Personal Testing` group, and
+  App Review submission `60c30230-1948-4068-bcc8-9e95cfebf294` is Waiting for
+  Review. Build 16's automated `ITMS-90111` rejection was resolved by rebuilding
+  with stable Xcode 26.6. Physical iPhone, iPad, and Watch acceptance remains
+  open because all three devices are currently offline.
 
 - **2026-08-28** — Released Anchor `1.0 (14)` from source commit `068f70e` after
   the complete Mac accessibility pass. Seven isolated native macOS journeys pass together across
@@ -244,13 +264,13 @@ Requires macOS 26 / iOS 26 / watchOS 26 and Xcode 27. Team `8F7LXHTJZR`.
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | **Installed and running as notarized 1.0 (14)**; public DMG passes stapler, Gatekeeper, Developer ID, hardened-runtime, Production CloudKit/APNs, and app-group verification |
-| Anchor for iOS | **App Store Connect 1.0 (14) is VALID, APP_STORE_ELIGIBLE, and assigned to Personal Testing**; the reachable physical iPhone still has 1.0 (11), so the TestFlight upgrade remains pending |
-| Anchor for watchOS | Embedded in accepted build 1.0 (14) with Production CloudKit and APNs; the paired physical Watch is available but direct developer inspection is blocked because Developer Mode is disabled |
+| Anchor for macOS | **Installed and running as notarized 1.0 (17)**; public DMG passes stapler, Gatekeeper, Developer ID, hardened-runtime, Production CloudKit/APNs, and app-group verification |
+| Anchor for iOS | **App Store Connect 1.0 (17) is VALID, APP_STORE_ELIGIBLE, assigned to Personal Testing, and Waiting for Review**; physical TestFlight installation remains pending while the iPhone is offline |
+| Anchor for watchOS | Embedded in accepted build 1.0 (17) with Production CloudKit and APNs; simulator launch passes, while paired physical-Watch installation remains pending because the device is offline |
 | `anchor-mcp` | Working repo-built stdio MCP server, 10 tools; not bundled or advertised by the signed Mac app until protected-store access has an app-mediated design |
-| Landing pages | **Live at `anchor.significanthobbies.com` from `ios-landings` commit `4766470`**, with current schedule proof and the verified Mac download |
-| macOS DMG | **Build 14 is Developer ID signed, hardened, notarized, stapled, Gatekeeper-accepted, and publicly downloadable** |
-| iOS/watchOS IPA | **App Store Connect accepted and internally assigned 1.0 (14)**, including Watch and Live Activity targets; physical acceptance pending |
+| Landing pages | **Live at `anchor.significanthobbies.com` from `ios-landings` commit `b010889`**, with current schedule proof and the verified Mac download |
+| macOS DMG | **Build 17 is Developer ID signed, hardened, notarized, stapled, Gatekeeper-accepted, and publicly downloadable** |
+| iOS/watchOS IPA | **App Store Connect accepted and internally assigned 1.0 (17)**, including Watch and Live Activity targets; App Review and physical acceptance are pending |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
 `8F7LXHTJZR`. **iOS and watchOS produce signed device builds** against an
