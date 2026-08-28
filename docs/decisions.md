@@ -228,16 +228,15 @@ owned identity for another package's visual language.
 - **CloudKit sync is unverified end-to-end.** Entitlements, container and app
   group are wired, and iOS and watchOS build signed against them. Two-device sync
   has not been exercised — that needs signed builds on real hardware.
-- **macOS signed builds are blocked** on registering this Mac in the developer
-  account. `DebugLocal` is the workaround until then.
-- **The DMG is signed but not notarised.** Gatekeeper warns on other Macs until
-  an app-specific password is stored with `xcrun notarytool store-credentials`
-  and the release script is re-run with `ANCHOR_NOTARY_PROFILE`.
+- **Mac App Store distribution is not configured.** The public Mac beta uses a
+  Developer ID build with Production CloudKit and the app group. Build 14 is
+  notarized, stapled, Gatekeeper-accepted, and published from Anchor's landing.
 - **The app icon is generated, not hand-drawn.** `scripts/make-icon.py` renders
   the ring mark; it reads well down to 16px but a designer could do better.
-- **The MCP server reads the store directly.** Fine for concurrent reads under
-  SQLite WAL, but it means the binary and the app must agree on store location.
-  They share `AnchorStore.storeURL()` for exactly this reason.
+- **The MCP server is a developer tool, not a bundled app feature.** A terminal
+  process cannot inherit the app's provisioning profile and may be denied access
+  to the protected app-group store. Restoring in-app setup requires the signed,
+  app-mediated bridge tracked in GitHub issue #41.
 - **Watch demo data can't be seeded by environment variable.** `SIMCTL_CHILD_*`
   does not reach a watchOS simulator app, so the watch UI was verified by copying
   a store the Mac had written into the simulator's app-group container — which is
