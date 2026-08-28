@@ -245,6 +245,13 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
         app.buttons["Schedule these habits"].click()
         XCTAssertTrue(app.staticTexts["Give each habit a real place."].waitForExistence(timeout: 4))
+
+        let monday = app.buttons["Monday"]
+        XCTAssertTrue(monday.waitForExistence(timeout: 2))
+        XCTAssertEqual(monday.value as? String, "Selected")
+        monday.click()
+        XCTAssertEqual(monday.value as? String, "Not selected")
+
         app.buttons["Save week and continue"].click()
 
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 4))

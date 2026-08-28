@@ -366,6 +366,13 @@ public struct AnchorOnboardingView: View {
                                         }
                                         .buttonStyle(.bordered)
                                         .tint(draft.weekdays.contains(day) ? theme.accent : theme.textTertiary)
+                                        .accessibilityLabel(day.label)
+                                        .accessibilityValue(
+                                            draft.weekdays.contains(day) ? "Selected" : "Not selected"
+                                        )
+                                        .accessibilityAddTraits(
+                                            draft.weekdays.contains(day) ? .isSelected : []
+                                        )
                                     }
                                 }
                             }
