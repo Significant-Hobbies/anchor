@@ -18,7 +18,7 @@ const value = (flag) => {
 };
 
 if (has("--help")) {
-  console.log(`Usage: review-readiness.mjs [options]\n\n  --full                           Run non-disruptive native builds and visual catalog\n  --allow-disruptive-local-ui      Also drive local Mac/iPhone UI (isolated workers only)\n  --policy-checked YYYY-MM-DD      Record current Apple policy refresh\n  --archive /path/Anchor.xcarchive Inspect an exact release archive\n  --physical-iphone-observed       Current build launched on owner iPhone\n  --authenticated-data-observed   Fresh signed-in account has clean provenance\n  --simulator-name NAME            Override stable iPhone simulator\n  --developer-dir PATH             Override stable Xcode Developer directory`);
+  console.log(`Usage: review-readiness.mjs [options]\n\n  --full                           Run non-disruptive native builds and visual catalog\n  --allow-disruptive-local-ui      Also drive local Mac/iPhone UI (isolated workers only)\n  --policy-checked YYYY-MM-DD      Record current Apple policy refresh\n  --archive /path/Anchor.xcarchive Inspect an exact release archive\n  --isolated-ui-observed           Hosted Mac and iPhone suites passed for this commit\n  --production-cloudkit-observed   Current schema imported/exported in Production\n  --physical-iphone-observed       Current build launched on owner iPhone\n  --authenticated-data-observed   Fresh signed-in account has clean provenance\n  --simulator-name NAME            Override stable iPhone simulator\n  --developer-dir PATH             Override stable Xcode Developer directory`);
   process.exit(0);
 }
 
@@ -116,6 +116,12 @@ function manualGates() {
   } else {
     addResult("policy-current", "Current Apple policy sources refreshed", "manual", "supply --policy-checked after opening all official sources");
   }
+  addResult(
+    "production-cloudkit",
+    "Current schema imports and exports against Production CloudKit",
+    has("--production-cloudkit-observed") ? "pass" : "manual",
+    has("--production-cloudkit-observed") ? "candidate-observed" : "production schema evidence not supplied"
+  );
   addResult(
     "authenticated-data",
     "Fresh authenticated account has clean history provenance",
@@ -232,13 +238,15 @@ if (full) {
       ]
     );
   } else {
-    addResult("mac-ui", "Complete macOS UI suite passes", "manual", "run the isolated GitHub workflow; local UI remains intentionally disabled");
-    addResult("ios-ui", "Complete iPhone UI suite passes", "manual", "run the isolated GitHub workflow; local UI remains intentionally disabled");
+    const isolatedUIObserved = has("--isolated-ui-observed");
+    addResult("mac-ui", "Complete macOS UI suite passes", isolatedUIObserved ? "pass" : "manual", isolatedUIObserved ? "isolated workflow observed" : "run the isolated GitHub workflow; local UI remains intentionally disabled");
+    addResult("ios-ui", "Complete iPhone UI suite passes", isolatedUIObserved ? "pass" : "manual", isolatedUIObserved ? "isolated workflow observed" : "run the isolated GitHub workflow; local UI remains intentionally disabled");
   }
 } else {
   addResult("visual-catalog", "Every primary surface renders offscreen", "manual", "rerun with --full");
-  addResult("mac-ui", "Complete macOS UI suite passes", "manual", "run the isolated GitHub workflow");
-  addResult("ios-ui", "Complete iPhone UI suite passes", "manual", "run the isolated GitHub workflow");
+  const isolatedUIObserved = has("--isolated-ui-observed");
+  addResult("mac-ui", "Complete macOS UI suite passes", isolatedUIObserved ? "pass" : "manual", isolatedUIObserved ? "isolated workflow observed" : "run the isolated GitHub workflow");
+  addResult("ios-ui", "Complete iPhone UI suite passes", isolatedUIObserved ? "pass" : "manual", isolatedUIObserved ? "isolated workflow observed" : "run the isolated GitHub workflow");
 }
 
 if (archivePath) {

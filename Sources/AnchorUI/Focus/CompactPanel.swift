@@ -292,9 +292,7 @@ struct CompactCapture: View {
             Button(isReturningFromPause ? "Nothing — just a break" : "Cancel") {
                 controller.dismissCapture()
             }
-            .buttonStyle(.plain)
-            .font(.system(size: 11))
-            .foregroundStyle(theme.textTertiary)
+            .buttonStyle(QuietButtonStyle(expands: false))
         }
         .onAppear { focused = true }
     }

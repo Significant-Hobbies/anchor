@@ -313,6 +313,7 @@ struct PlanScreen: View {
                 Text(habitStatusCopy(habit, placed: placed, isDone: isDone))
                     .font(.caption)
                     .foregroundStyle(theme.textSecondary)
+                    .accessibilityIdentifier("anchor.today.habit.status")
             }
         }
     }
@@ -1594,6 +1595,8 @@ private struct DayComparison: View {
         .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg).strokeBorder(theme.hairline))
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("anchor.history.day-comparison")
+        .accessibilityValue(observedSummary)
     }
 
     private func metric(_ label: String, _ value: String, _ tint: Color) -> some View {

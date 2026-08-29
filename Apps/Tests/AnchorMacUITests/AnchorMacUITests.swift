@@ -94,10 +94,9 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["History"].click()
         XCTAssertTrue(app.radioButtons["Day review"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["Reviewing today"].exists)
-        XCTAssertTrue(
-            app.descendants(matching: .any).matching(NSPredicate(format: "value CONTAINS %@", "1 untimed"))
-                .firstMatch.waitForExistence(timeout: 3)
-        )
+        let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
+        XCTAssertTrue(comparison.waitForExistence(timeout: 3))
+        XCTAssertTrue(String(describing: comparison.value).contains("1 untimed"))
 
         app.terminate()
         app.launch()
@@ -225,7 +224,10 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["anchor.today.habit.place"].click()
         XCTAssertTrue(app.staticTexts["Place habit"].waitForExistence(timeout: 3))
         app.buttons["Save"].click()
-        XCTAssertTrue(element(containing: "Placed at", in: app).waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Placed at"))
+                .firstMatch.waitForExistence(timeout: 4)
+        )
 
         keepScreenshot(app, named: "anchor-build19-mac-flexible-habits-today")
     }
@@ -252,7 +254,10 @@ final class AnchorMacUITests: XCTestCase {
         firstTitle.click()
         firstTitle.typeText("\(firstDay) planning")
         app.buttons["Save"].click()
-        XCTAssertTrue(element(containing: "\(firstDay) planning", in: app).waitForExistence(timeout: 4))
+        XCTAssertTrue(
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(firstDay) planning"))
+                .firstMatch.waitForExistence(timeout: 4)
+        )
 
         let secondDay = app.radioButtons.matching(NSPredicate(format: "value == 0")).firstMatch
         let secondDayName = secondDay.label
@@ -265,8 +270,14 @@ final class AnchorMacUITests: XCTestCase {
         secondTitle.click()
         secondTitle.typeText("\(secondDayName) planning")
         app.buttons["Save"].click()
-        XCTAssertTrue(element(containing: "\(secondDayName) planning", in: app).waitForExistence(timeout: 4))
-        XCTAssertFalse(element(containing: "\(firstDay) planning", in: app).isHittable)
+        XCTAssertTrue(
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(secondDayName) planning"))
+                .firstMatch.waitForExistence(timeout: 4)
+        )
+        XCTAssertFalse(
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(firstDay) planning"))
+                .firstMatch.isHittable
+        )
 
         keepScreenshot(app, named: "anchor-build19-mac-weekday-schedule")
     }
@@ -322,8 +333,8 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Sessions"].exists)
 
         app.radioButtons["Trends"].click()
-        XCTAssertTrue(element(containing: "Focused", in: app).waitForExistence(timeout: 5))
-        XCTAssertTrue(element(containing: "Completed", in: app).exists)
+        XCTAssertTrue(app.staticTexts["When you focus"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Weekday rhythm"].exists)
 
         let export = element(containing: "Export", in: app)
         let scrollView = app.scrollViews.firstMatch
@@ -451,10 +462,16 @@ final class AnchorMacUITests: XCTestCase {
                 .waitForExistence(timeout: 3)
         )
         // The AuthenticationServices sheet is remote-hosted inside Anchor's
-        // accessibility tree, so Escape is delivered through the host app.
-        app.typeKey(.escape, modifierFlags: [])
+        // accessibility tree. Prefer its explicit Cancel action; Escape is the
+        // keyboard fallback when the host does not expose that action.
+        let cancel = app.buttons["Cancel"].firstMatch
+        if cancel.waitForExistence(timeout: 5) {
+            cancel.click()
+        } else {
+            app.typeKey(.escape, modifierFlags: [])
+        }
 
-        XCTAssertTrue(google.waitForExistence(timeout: 5))
+        XCTAssertTrue(google.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].exists)
         XCTAssertEqual(app.state, .runningForeground)
     }

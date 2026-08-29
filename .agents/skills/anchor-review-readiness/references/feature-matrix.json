@@ -37,6 +37,24 @@
       ]
     },
     {
+      "id": "hub-account-deletion",
+      "name": "Connected accounts can initiate permanent deletion in app",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Sources/AnchorUI/Account/HubAccountPanel.swift", "contains": "anchor.hub.delete-account"},
+        {"file": "Tests/AnchorCoreTests/AnchorPlatformRecordTests.swift", "contains": "Account deletion uses the authenticated Better Auth endpoint"}
+      ]
+    },
+    {
+      "id": "required-reason-manifests",
+      "name": "Every UserDefaults-linked executable carries the required-reason manifest",
+      "platforms": ["macOS", "iOS", "watchOS"],
+      "evidence": [
+        {"file": "Apps/project.yml", "contains": "Shared/PrivacyInfo.xcprivacy"},
+        {"file": "Apps/Shared/PrivacyInfo.xcprivacy", "contains": "NSPrivacyAccessedAPICategoryUserDefaults"}
+      ]
+    },
+    {
       "id": "focus-loop",
       "name": "Start, pause, resume, capture, end, and persist focus",
       "platforms": ["macOS", "iOS"],

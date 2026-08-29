@@ -51,7 +51,10 @@ Add `--archive /absolute/path/to/Anchor.xcarchive` only for the exact candidate
 being qualified. Add `--physical-iphone-observed` only after the current build
 has actually launched on the owner's phone. Add
 `--authenticated-data-observed` only after a fresh authenticated account has
-been observed without unexplained old history.
+been observed without unexplained old history. Add `--isolated-ui-observed`
+only after the complete hosted Mac and iPhone workflow passes for the exact
+commit. Add `--production-cloudkit-observed` only after the current SwiftData
+schema imports and exports successfully against Production CloudKit.
 
 The helper uses the XcodeBuildMCP CLI for native builds and isolated Mac/iPhone
 test execution when MCP tools are not loaded in the current agent session. If the MCP server is loaded,
