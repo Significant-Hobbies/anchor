@@ -226,13 +226,8 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(placeHabitTitle.waitForExistence(timeout: 3))
         app.buttons["Save"].click()
         XCTAssertTrue(placeHabitTitle.waitForNonExistence(timeout: 4))
-        let habitStatus = app.descendants(matching: .any)["anchor.today.habit.status"]
-        XCTAssertTrue(habitStatus.waitForExistence(timeout: 4))
-        let placedStatus = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "label BEGINSWITH %@", "Placed at"),
-            object: habitStatus
-        )
-        XCTAssertEqual(XCTWaiter.wait(for: [placedStatus], timeout: 4), .completed)
+        XCTAssertTrue(app.buttons["anchor.today.habit.place"].waitForNonExistence(timeout: 4))
+        XCTAssertTrue(element(containing: "Placed at", in: app).waitForExistence(timeout: 4))
 
         keepScreenshot(app, named: "anchor-build19-mac-flexible-habits-today")
     }
