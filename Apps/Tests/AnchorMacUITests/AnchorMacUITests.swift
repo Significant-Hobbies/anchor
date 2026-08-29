@@ -222,8 +222,10 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(element(containing: "Completed today", in: app).waitForExistence(timeout: 3))
         app.buttons["anchor.today.habit.undo"].click()
         app.buttons["anchor.today.habit.place"].click()
-        XCTAssertTrue(app.staticTexts["Place habit"].waitForExistence(timeout: 3))
+        let placeHabitTitle = app.staticTexts["Place habit"]
+        XCTAssertTrue(placeHabitTitle.waitForExistence(timeout: 3))
         app.buttons["Save"].click()
+        XCTAssertTrue(placeHabitTitle.waitForNonExistence(timeout: 4))
         let habitStatus = app.descendants(matching: .any)["anchor.today.habit.status"]
         XCTAssertTrue(habitStatus.waitForExistence(timeout: 4))
         XCTAssertTrue(habitStatus.label.hasPrefix("Placed at"))
@@ -371,6 +373,9 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(miniTimer.staticTexts["What pulled you away?"].waitForExistence(timeout: 3))
         XCTAssertTrue(miniTimer.buttons["Nothing — just a break"].waitForExistence(timeout: 3))
         miniTimer.typeKey(.escape, modifierFlags: [])
+        app.typeKey("0", modifierFlags: .command)
+        XCTAssertTrue(miniTimer.waitForExistence(timeout: 3))
+        XCTAssertTrue(miniTimer.buttons["End"].waitForExistence(timeout: 3))
         miniTimer.buttons["End"].click()
         XCTAssertTrue(miniTimer.staticTexts["Set your anchor"].waitForExistence(timeout: 3))
     }
