@@ -6,6 +6,14 @@ import Testing
 
 @Suite("Significant Hobbies Hub status")
 struct HubSyncStatusTests {
+    @Test("Test stores disable external session synchronization")
+    func testStoresCannotReachHubSessions() {
+        #expect(AnchorExternalSyncPolicy.allowsSessionSynchronization(environment: [:]))
+        #expect(!AnchorExternalSyncPolicy.allowsSessionSynchronization(environment: ["ANCHOR_DEMO_DATA": "1"]))
+        #expect(!AnchorExternalSyncPolicy.allowsSessionSynchronization(environment: ["ANCHOR_ONBOARDING_DEMO": "1"]))
+        #expect(!AnchorExternalSyncPolicy.allowsSessionSynchronization(environment: ["ANCHOR_STORE_PATH": "/tmp/anchor-test.store"]))
+    }
+
     @Test
     func classifiesExpiredOfflineAndServiceFailures() {
         #expect(

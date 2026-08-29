@@ -1,0 +1,78 @@
+name: Anchor native review
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: anchor-native-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Isolated Mac and iPhone journeys
+    runs-on: macos-26-arm64
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      CATALOG_OUTPUT: ${{ runner.temp }}/anchor-visual-catalog
+
+    steps:
+      - name: Check out Anchor
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: command -v xcodegen >/dev/null || brew install xcodegen
+
+      - name: Verify shared package
+        run: |
+          swift test
+          swift build
+          ./.build/debug/anchor-mcp --diagnose
+
+      - name: Generate Xcode project
+        working-directory: Apps
+        run: xcodegen generate
+
+      - name: Render every primary surface offscreen
+        run: scripts/render-visual-catalog.sh "$CATALOG_OUTPUT"
+
+      - name: Run complete macOS UI suite
+        run: |
+          npx -y xcodebuildmcp@2.7.0 macos test \
+            --project-path Apps/Anchor.xcodeproj \
+            --scheme "Anchor (macOS)" \
+            --configuration DebugLocal \
+            --derived-data-path "$RUNNER_TEMP/DerivedData-Mac-UI" \
+            --output json
+
+      - name: Run complete iPhone UI suite
+        run: |
+          npx -y xcodebuildmcp@2.7.0 simulator test \
+            --project-path Apps/Anchor.xcodeproj \
+            --scheme "Anchor (iOS)" \
+            --configuration DebugLocal \
+            --simulator-name "iPhone 17 Pro" \
+            --derived-data-path "$RUNNER_TEMP/DerivedData-iOS-UI" \
+            --output json
+
+      - name: Build watch companion
+        run: |
+          xcodebuild \
+            -project Apps/Anchor.xcodeproj \
+            -scheme "Anchor (watchOS)" \
+            -configuration DebugLocal \
+            -destination "generic/platform=watchOS Simulator" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData-Watch" \
+            build
+
+      - name: Upload page catalog and native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchor-native-review-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/anchor-visual-catalog
+            ~/Library/Developer/XcodeBuildMCP/workspaces/**/logs
+            ~/Library/Developer/XcodeBuildMCP/workspaces/**/result-bundles

@@ -99,13 +99,26 @@ struct MenuBarLabel: View {
             let seconds = controller.session?.account.isOpenEnded == true
                 ? controller.elapsed
                 : controller.remaining
-            Label {
+            HStack(spacing: 4) {
+                anchorMark
+                if controller.isPaused {
+                    Image(systemName: "pause.fill")
+                        .font(.system(size: 8, weight: .bold))
+                }
                 Text(Format.clock(seconds)).monospacedDigit()
-            } icon: {
-                Image(systemName: controller.isPaused ? "pause.circle" : "scope")
             }
+            .accessibilityLabel(controller.isPaused ? "Anchor paused, \(Format.clock(seconds))" : "Anchor running, \(Format.clock(seconds))")
         } else {
-            Image(systemName: "scope")
+            anchorMark
+                .accessibilityLabel("Anchor")
         }
+    }
+
+    private var anchorMark: some View {
+        Image("MenuBarIcon")
+            .resizable()
+            .renderingMode(.template)
+            .scaledToFit()
+            .frame(width: 16, height: 16)
     }
 }

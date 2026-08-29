@@ -1,0 +1,17 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "28E413D9-B587-41D3-9D7C-3D903BC6F842",
+        "deviceName" : "Anchor Evidence Stable iPhone 20260828",
+        "exportedFileName" : "F734F394-51E2-4C85-B016-3449D31D72E3.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "anchor-build19-ios-flexible-habits-today_0_C628F96F-BDA9-46EC-B2D9-4F0361C43241.png",
+        "timestamp" : 1788005472.264
+      }
+    ],
+    "testIdentifier" : "AnchorIOSUITests/testHabitsCanBeAddedEditedAndRescheduled()",
+    "testIdentifierURL" : "test://com.apple.xcode/Anchor/AnchorIOSUITests/AnchorIOSUITests/testHabitsCanBeAddedEditedAndRescheduled"
+  }
+]

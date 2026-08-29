@@ -9,6 +9,7 @@ struct PlanScreen: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
+    @Query(sort: \HabitCompletion.updatedAt, order: .reverse) private var habitCompletions: [HabitCompletion]
     @Query(sort: \DayPlanConfirmation.updatedAt, order: .reverse) private var confirmations: [DayPlanConfirmation]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
@@ -17,6 +18,7 @@ struct PlanScreen: View {
     @State private var editorSeed: EditorSeed?
     @State private var showsRoutines = false
     @State private var editingBlock: PlanBlock?
+    @State private var placingHabit: ScheduleTemplate?
     @State private var explainingBlock: PlanBlock?
     @State private var loadError: String?
     @State private var checkInDeferredInSession = false
@@ -44,6 +46,10 @@ struct PlanScreen: View {
                     dailyCheckIn
                 } else if todayConfirmation?.decision == .adjusted {
                     todayOnlyStatus
+                }
+
+                if !todayHabits.isEmpty {
+                    todayHabitsSection
                 }
 
                 if !blocks.isEmpty {
@@ -148,6 +154,14 @@ struct PlanScreen: View {
             PlanBlockEditor(initialDay: today, block: block) { refresh() }
                 .anchorTheme()
         }
+        .sheet(item: $placingHabit) { habit in
+            PlanBlockEditor(
+                initialDay: today,
+                suggestedStart: habit.habitSuggestedStart(on: today) ?? suggestedStart,
+                placingHabit: habit
+            ) { refresh() }
+                .anchorTheme()
+        }
         .sheet(item: $explainingBlock) { block in
             DivergenceEditor(block: block) { kind, note in
                 let originalState = block.state
@@ -197,7 +211,15 @@ struct PlanScreen: View {
         )
     }
 
-    private var activeTemplates: [ScheduleTemplate] { templates.filter { !$0.isArchived } }
+    private var activeTemplates: [ScheduleTemplate] {
+        templates.filter { !$0.isArchived && !$0.isBehaviorHabit }
+    }
+
+    private var todayHabits: [ScheduleTemplate] {
+        templates
+            .filter { $0.isActiveBehaviorHabit && $0.applies(to: today) }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
 
     private var todayConfirmation: DayPlanConfirmation? {
         confirmations.first { Calendar.current.isDate($0.day, inSameDayAs: today) }
@@ -237,6 +259,130 @@ struct PlanScreen: View {
             }
         }
         .accessibilityIdentifier("anchor.today.daily-check-in")
+    }
+
+    private var todayHabitsSection: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            SectionHeader(
+                "Today’s habits",
+                subtitle: "Finish one as it happens, or give it a place in the day"
+            )
+            VStack(spacing: Space.xs) {
+                ForEach(todayHabits) { habit in
+                    todayHabitRow(habit)
+                }
+            }
+        }
+        .accessibilityIdentifier("anchor.today.habits")
+    }
+
+    private func todayHabitRow(_ habit: ScheduleTemplate) -> some View {
+        let placed = placedBlock(for: habit)
+        let direct = directCompletion(for: habit)
+        let isDone = placed?.state == .completed || direct?.isCompleted == true
+
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: Space.sm) {
+                habitIdentity(habit, placed: placed, isDone: isDone)
+                Spacer(minLength: Space.sm)
+                habitActions(habit, placed: placed, direct: direct, isDone: isDone)
+            }
+            VStack(alignment: .leading, spacing: Space.sm) {
+                habitIdentity(habit, placed: placed, isDone: isDone)
+                habitActions(habit, placed: placed, direct: direct, isDone: isDone)
+            }
+        }
+        .padding(Space.md)
+        .background(theme.surface, in: .rect(cornerRadius: Radius.md))
+        .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("anchor.today.habit.\(habit.id.uuidString)")
+    }
+
+    private func habitIdentity(_ habit: ScheduleTemplate, placed: PlanBlock?, isDone: Bool) -> some View {
+        HStack(spacing: Space.sm) {
+            Image(systemName: isDone ? "checkmark" : (habit.lifeDirection?.symbolName ?? "leaf"))
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(isDone ? theme.positive : theme.accent)
+                .frame(width: 34, height: 34)
+                .background((isDone ? theme.positive : theme.accent).opacity(0.11), in: .circle)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(habit.title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+                Text(habitStatusCopy(habit, placed: placed, isDone: isDone))
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func habitActions(
+        _ habit: ScheduleTemplate,
+        placed: PlanBlock?,
+        direct: HabitCompletion?,
+        isDone: Bool
+    ) -> some View {
+        if isDone {
+            HStack(spacing: Space.xs) {
+                Label("Done", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(theme.positive)
+                if placed == nil && direct?.isCompleted == true {
+                    Button("Undo") { setHabitCompleted(false, habit: habit) }
+                        .buttonStyle(QuietButtonStyle(expands: false))
+                        .accessibilityIdentifier("anchor.today.habit.undo")
+                }
+            }
+        } else if let placed {
+            Button("Done", systemImage: "checkmark") { complete(placed) }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .accessibilityIdentifier("anchor.today.habit.done")
+        } else {
+            HStack(spacing: Space.xs) {
+                Button("Done", systemImage: "checkmark") { setHabitCompleted(true, habit: habit) }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .accessibilityIdentifier("anchor.today.habit.done")
+                Button("Place", systemImage: "calendar.badge.plus") { placingHabit = habit }
+                    .buttonStyle(PrimaryButtonStyle(expands: false))
+                    .accessibilityIdentifier("anchor.today.habit.place")
+            }
+        }
+    }
+
+    private func habitStatusCopy(_ habit: ScheduleTemplate, placed: PlanBlock?, isDone: Bool) -> String {
+        if isDone { return "Completed today" }
+        if let placed {
+            return "Placed at \(placed.plannedStart.formatted(date: .omitted, time: .shortened))"
+        }
+        if let suggested = habit.habitSuggestedStart(on: today) {
+            return "Suggested around \(suggested.formatted(date: .omitted, time: .shortened)) · available all day"
+        }
+        return "Any time today"
+    }
+
+    private func placedBlock(for habit: ScheduleTemplate) -> PlanBlock? {
+        allBlocks
+            .filter { $0.templateID == habit.id }
+            .filter { Calendar.current.isDate($0.templateOccurrenceDay ?? $0.plannedStart, inSameDayAs: today) }
+            .max { $0.updatedAt < $1.updatedAt }
+    }
+
+    private func directCompletion(for habit: ScheduleTemplate) -> HabitCompletion? {
+        habitCompletions
+            .filter { $0.habitID == habit.id && Calendar.current.isDate($0.day, inSameDayAs: today) }
+            .max { $0.updatedAt < $1.updatedAt }
+    }
+
+    private func setHabitCompleted(_ completed: Bool, habit: ScheduleTemplate) {
+        do {
+            try HabitDayService(context: context).setCompleted(completed, habitID: habit.id, on: today)
+            loadError = nil
+        } catch {
+            context.rollback()
+            loadError = "Anchor could not save that habit. Nothing else changed."
+        }
     }
 
     @ViewBuilder
@@ -700,7 +846,6 @@ struct PlanBlockEditor: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query private var allTemplates: [ScheduleTemplate]
     @State private var title = ""
     @State private var details = ""
     @State private var plannedStart: Date
@@ -709,12 +854,15 @@ struct PlanBlockEditor: View {
     @State private var flexibility: ScheduleFlexibility = .flexible
     @State private var repeats = false
     @State private var weekdays: Set<ScheduleWeekday>
+    @State private var usesSuggestedTime = false
     @State private var direction: LifeDirection?
     @State private var behaviorPattern: BehaviorPattern?
     @State private var saveError: String?
     private let block: PlanBlock?
     private let template: ScheduleTemplate?
+    private let placingHabit: ScheduleTemplate?
     private let isBehaviorHabit: Bool
+    private let initialDay: Date
     private let onSave: () -> Void
 
     init(
@@ -722,11 +870,13 @@ struct PlanBlockEditor: View {
         suggestedStart: Date? = nil,
         block: PlanBlock? = nil,
         template: ScheduleTemplate? = nil,
+        placingHabit: ScheduleTemplate? = nil,
         startsRecurring: Bool = false,
         startsBehaviorHabit: Bool = false,
         onSave: @escaping () -> Void
     ) {
         let calendar = Calendar.current
+        let sourceTemplate = template ?? placingHabit
         let suggested = block?.plannedStart
             ?? template.flatMap {
                 calendar.date(
@@ -743,19 +893,22 @@ struct PlanBlockEditor: View {
                 of: initialDay
             )
             ?? initialDay
-        _title = State(initialValue: block?.title ?? template?.title ?? "")
-        _details = State(initialValue: block?.details ?? template?.details ?? "")
+        _title = State(initialValue: block?.title ?? sourceTemplate?.title ?? "")
+        _details = State(initialValue: block?.details ?? sourceTemplate?.details ?? "")
         _plannedStart = State(initialValue: suggested)
-        _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? template?.plannedSeconds ?? 1_800) / 60))
-        _kind = State(initialValue: startsBehaviorHabit ? .routine : (block?.kind ?? template?.kind ?? .focus))
-        _flexibility = State(initialValue: block?.flexibility ?? template?.flexibility ?? .flexible)
+        _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? 1_800) / 60))
+        _kind = State(initialValue: startsBehaviorHabit ? .routine : (block?.kind ?? sourceTemplate?.kind ?? .focus))
+        _flexibility = State(initialValue: block?.flexibility ?? sourceTemplate?.flexibility ?? .flexible)
         _repeats = State(initialValue: template != nil || startsRecurring || startsBehaviorHabit)
         _weekdays = State(initialValue: template?.weekdays ?? [ScheduleWeekday(day: suggested)])
-        _direction = State(initialValue: block?.lifeDirection ?? template?.lifeDirection)
-        _behaviorPattern = State(initialValue: block?.behaviorPattern ?? template?.behaviorPattern)
+        _usesSuggestedTime = State(initialValue: template?.habitUsesSuggestedTime ?? false)
+        _direction = State(initialValue: block?.lifeDirection ?? sourceTemplate?.lifeDirection)
+        _behaviorPattern = State(initialValue: block?.behaviorPattern ?? sourceTemplate?.behaviorPattern)
         self.block = block
         self.template = template
+        self.placingHabit = placingHabit
         self.isBehaviorHabit = startsBehaviorHabit || template?.isBehaviorHabit == true
+        self.initialDay = initialDay
         self.onSave = onSave
     }
 
@@ -814,31 +967,44 @@ struct PlanBlockEditor: View {
 
                 Card(padding: Space.lg) {
                     VStack(alignment: .leading, spacing: Space.md) {
-                        editorLabel("Time", detail: "A useful edge, not a promise carved in stone")
-                        HStack(spacing: Space.lg) {
-                            VStack(alignment: .leading, spacing: Space.xxs) {
-                                Text("STARTS").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
-                                DatePicker("Starts", selection: $plannedStart)
-                                    .labelsHidden()
+                        if isBehaviorHabit {
+                            editorLabel("When", detail: "A suggestion, never a reservation")
+                            Toggle("Suggest a time", isOn: $usesSuggestedTime)
+                                .tint(theme.accent)
+                            if usesSuggestedTime {
+                                DatePicker("Around", selection: $plannedStart, displayedComponents: .hourAndMinute)
                             }
-                            VStack(alignment: .leading, spacing: Space.xxs) {
-                                Text("DURATION").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
-                                Stepper("\(minutes) min", value: $minutes, in: 5...240, step: 5)
-                                    .font(.subheadline.weight(.semibold))
-                                    .monospacedDigit()
+                            Text("The habit stays available all day. You can complete it directly or place it into Today when the day takes shape.")
+                                .font(.caption)
+                                .foregroundStyle(theme.textTertiary)
+                        } else {
+                            editorLabel("Time", detail: placingHabit == nil ? "A useful edge, not a promise carved in stone" : "Choose where this belongs today")
+                            HStack(spacing: Space.lg) {
+                                VStack(alignment: .leading, spacing: Space.xxs) {
+                                    Text("STARTS").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
+                                    DatePicker("Starts", selection: $plannedStart)
+                                        .labelsHidden()
+                                }
+                                VStack(alignment: .leading, spacing: Space.xxs) {
+                                    Text("DURATION").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
+                                    Stepper("\(minutes) min", value: $minutes, in: 5...240, step: 5)
+                                        .font(.subheadline.weight(.semibold))
+                                        .monospacedDigit()
+                                }
+                                Spacer(minLength: 0)
                             }
-                            Spacer(minLength: 0)
+                            Picker("Flexibility", selection: $flexibility) {
+                                ForEach(ScheduleFlexibility.allCases, id: \.self) { Text($0.label).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
                         }
-                        Picker("Flexibility", selection: $flexibility) {
-                            ForEach(ScheduleFlexibility.allCases, id: \.self) { Text($0.label).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
                     }
                 }
 
-                Card(padding: Space.lg) {
+                if placingHabit == nil {
+                    Card(padding: Space.lg) {
                     VStack(alignment: .leading, spacing: Space.md) {
-                    editorLabel("Rhythm", detail: "Make this a gentle default when it repeats")
+                    editorLabel(isBehaviorHabit ? "Days" : "Rhythm", detail: isBehaviorHabit ? "When this should be available" : "Make this a gentle default when it repeats")
                     if block == nil && template == nil && !isBehaviorHabit {
                         Toggle("Repeat weekly", isOn: $repeats)
                             .tint(theme.accent)
@@ -865,6 +1031,7 @@ struct PlanBlockEditor: View {
                         }
                     }
                     }
+                    }
                 }
                 }
                 .padding(Space.lg)
@@ -872,7 +1039,7 @@ struct PlanBlockEditor: View {
                 .frame(maxWidth: .infinity)
             }
             .background(theme.canvas)
-            .navigationTitle(isBehaviorHabit ? (template == nil ? "New habit" : "Edit habit") : (template != nil ? "Edit usual week" : (block == nil ? (repeats ? "New usual-week item" : "New block") : "Edit block")))
+            .navigationTitle(placingHabit != nil ? "Place habit" : (isBehaviorHabit ? (template == nil ? "New habit" : "Edit habit") : (template != nil ? "Edit usual week" : (block == nil ? (repeats ? "New usual-week item" : "New block") : "Edit block"))))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -931,6 +1098,15 @@ struct PlanBlockEditor: View {
                     ))
                 }
                 try context.save()
+            } else if let placingHabit {
+                _ = try HabitDayService(context: context).place(
+                    placingHabit,
+                    on: initialDay,
+                    at: plannedStart,
+                    plannedSeconds: minutes * 60,
+                    title: trimmed,
+                    details: details
+                )
             } else if let template {
                 template.title = trimmed
                 template.details = details
@@ -942,16 +1118,14 @@ struct PlanBlockEditor: View {
                 template.flexibility = flexibility
                 template.lifeDirection = direction
                 template.behaviorPattern = behaviorPattern
+                if isBehaviorHabit { template.habitUsesSuggestedTime = usesSuggestedTime }
                 template.updatedAt = Date()
-                try DayPlanService(context: context).reconcileFutureBlocks(for: template)
-            } else if repeats {
                 if isBehaviorHabit {
-                    let activeHabitCount = allTemplates.filter(\.isActiveBehaviorHabit).count
-                    guard HabitPolicy().canAdd(activeHabitCount: activeHabitCount) else {
-                        saveError = "All five habit slots are in use. Build a seven-occurrence streak, then upgrade or graduate one first."
-                        return
-                    }
+                    try context.save()
+                } else {
+                    try DayPlanService(context: context).reconcileFutureBlocks(for: template)
                 }
+            } else if repeats {
                 let template = ScheduleTemplate(
                     title: trimmed,
                     details: details,
@@ -963,11 +1137,14 @@ struct PlanBlockEditor: View {
                     behaviorPattern: behaviorPattern,
                     lifeDirection: direction,
                     isBehaviorHabit: isBehaviorHabit,
+                    habitUsesSuggestedTime: isBehaviorHabit && usesSuggestedTime,
                     habitLevelStartedAt: isBehaviorHabit ? Date() : nil
                 )
                 context.insert(template)
                 try context.save()
-                _ = try DayPlanService(context: context).materialize(day: plannedStart)
+                if !isBehaviorHabit {
+                    _ = try DayPlanService(context: context).materialize(day: plannedStart)
+                }
             } else {
                 context.insert(PlanBlock(
                     title: trimmed,
@@ -999,19 +1176,58 @@ struct RoutineManager: View {
     @State private var editingTemplate: ScheduleTemplate?
     @State private var showsNewTemplate = false
     @State private var saveError: String?
+    @State private var selectedWeekday = ScheduleWeekday(day: Date())
     let onChange: () -> Void
 
-    private var activeTemplates: [ScheduleTemplate] { templates.filter { !$0.isArchived } }
+    private var activeTemplates: [ScheduleTemplate] {
+        templates.filter { !$0.isArchived && !$0.isBehaviorHabit }
+    }
+    private var selectedTemplates: [ScheduleTemplate] {
+        activeTemplates
+            .filter { $0.weekdays.contains(selectedWeekday) }
+            .sorted { lhs, rhs in
+                if lhs.startMinutesFromMidnight == rhs.startMinutesFromMidnight {
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+                return lhs.startMinutesFromMidnight < rhs.startMinutesFromMidnight
+            }
+    }
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        Picker("Weekday", selection: $selectedWeekday) {
+                            ForEach(ScheduleWeekday.allCases, id: \.self) { day in
+                                Text(day.shortLabel)
+                                    .tag(day)
+                                    .accessibilityLabel(day.label)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("anchor.routine.weekday-picker")
+
+                        Text("\(selectedTemplates.count) usual \(selectedTemplates.count == 1 ? "item" : "items") on \(selectedWeekday.label)")
+                            .font(.caption)
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                } header: {
+                    Text("Choose a day to shape")
+                }
+
                 if let saveError {
                     Label(saveError, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(theme.negative)
                         .accessibilityIdentifier("anchor.routine.save-error")
                 }
-                ForEach(activeTemplates) { template in
+                Section(selectedWeekday.label) {
+                if selectedTemplates.isEmpty {
+                    Label("Nothing usual yet — add the first item for this day.", systemImage: "calendar.badge.plus")
+                        .foregroundStyle(theme.textSecondary)
+                }
+                ForEach(selectedTemplates) { template in
                     Button { editingTemplate = template } label: {
                         VStack(alignment: .leading, spacing: Space.xxs) {
                             Text(template.title)
@@ -1033,17 +1249,13 @@ struct RoutineManager: View {
                         Button("Stop repeating", role: .destructive) { archive(template) }
                     }
                 }
-            }
-            .overlay {
-                if activeTemplates.isEmpty {
-                    ContentUnavailableView("No recurring routines", systemImage: "repeat", description: Text("Create one from Add a block and turn on Repeat weekly."))
                 }
             }
             .navigationTitle("Your usual week")
             .toolbar {
                 #if !os(macOS)
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Add", systemImage: "plus") { showsNewTemplate = true }
+                    Button("Add to \(selectedWeekday.label)", systemImage: "plus") { showsNewTemplate = true }
                 }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
                 #endif
@@ -1051,7 +1263,7 @@ struct RoutineManager: View {
             #if os(macOS)
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: Space.sm) {
-                    Button("Add usual-week item", systemImage: "plus") {
+                    Button("Add to \(selectedWeekday.label)", systemImage: "plus") {
                         showsNewTemplate = true
                     }
                     .buttonStyle(PrimaryButtonStyle(expands: false))
@@ -1065,7 +1277,7 @@ struct RoutineManager: View {
             }
             #endif
             .sheet(isPresented: $showsNewTemplate) {
-                PlanBlockEditor(initialDay: Date(), startsRecurring: true) {
+                PlanBlockEditor(initialDay: date(for: selectedWeekday), startsRecurring: true) {
                     saveError = nil
                     onChange()
                 }
@@ -1079,6 +1291,9 @@ struct RoutineManager: View {
                 .anchorTheme()
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 560, idealWidth: 680, minHeight: 480, idealHeight: 620)
+        #endif
     }
 
     private func archive(_ template: ScheduleTemplate) {
@@ -1097,6 +1312,15 @@ struct RoutineManager: View {
         let day = Calendar.current.startOfDay(for: Date())
         let time = Calendar.current.date(byAdding: .minute, value: template.startMinutesFromMidnight, to: day) ?? day
         return time.formatted(date: .omitted, time: .shortened)
+    }
+
+    private func date(for weekday: ScheduleWeekday) -> Date {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let todayIndex = ScheduleWeekday(day: today, calendar: calendar).rawValue
+        let offset = (weekday.rawValue - todayIndex + ScheduleWeekday.allCases.count)
+            % ScheduleWeekday.allCases.count
+        return calendar.date(byAdding: .day, value: offset, to: today) ?? today
     }
 }
 

@@ -8,8 +8,19 @@ import SwiftData
 @MainActor
 @Observable
 public final class AnchorPlatformSync {
+    /// Use the service's canonical application origin directly. Starting OAuth
+    /// on the marketing-domain redirect splits browser cookies and callbacks
+    /// across two hosts, which makes native Google sign-in unnecessarily
+    /// fragile.
+    public static let identityURL = URL(string: "https://live.significanthobbies.com")!
+    /// iCloud is Anchor's bidirectional source of truth. Hub is deliberately an
+    /// outbound summary view, so signing in can never inject old Hub sessions
+    /// into the local planner or history.
+    nonisolated public static let importsRemoteSessions = false
+
     private let context: ModelContext
     private let connection: PersonalPlatformConnection?
+    private let sessionSynchronizationEnabled: Bool
     private let receiptStore: HubSyncReceiptStore
     public let account: PersonalAccountModel?
     public private(set) var isSyncing = false
@@ -19,9 +30,11 @@ public final class AnchorPlatformSync {
     public init(
         context: ModelContext,
         enabled: Bool = true,
+        sessionSynchronizationEnabled: Bool = AnchorExternalSyncPolicy.allowsSessionSynchronization(),
         receiptStore: HubSyncReceiptStore = HubSyncReceiptStore()
     ) {
         self.context = context
+        self.sessionSynchronizationEnabled = sessionSynchronizationEnabled
         self.receiptStore = receiptStore
         receipt = receiptStore.load()
         guard enabled else {
@@ -37,15 +50,27 @@ public final class AnchorPlatformSync {
             domain: .anchor,
             keychainService: "com.significanthobbies.anchor.personal-platform",
             supportDirectory: AnchorStore.storeURL().deletingLastPathComponent(),
-            deviceId: deviceId
+            deviceId: deviceId,
+            identityURL: Self.identityURL
         )
         self.connection = connection
         account = connection.map {
-            PersonalAccountModel(identity: $0.identity, callbackScheme: "anchor")
+            PersonalAccountModel(
+                identity: $0.identity,
+                callbackScheme: "anchor",
+                identityURL: Self.identityURL
+            )
         }
     }
 
     public func restoreAndSynchronize() async {
+        // Demo and redirected-store launches are isolated QA worlds. They may
+        // still render the optional account UI, but must not inspect the
+        // owner's shared Keychain or restore a production Hub session.
+        guard sessionSynchronizationEnabled else {
+            pendingCount = 0
+            return
+        }
         let hadBearer = await hasBearerToken()
         await account?.restore()
         await refreshPendingCount()
@@ -73,6 +98,10 @@ public final class AnchorPlatformSync {
     }
 
     public func synchronize(announcing _: Bool = false) async {
+        guard sessionSynchronizationEnabled else {
+            pendingCount = 0
+            return
+        }
         guard let connection, account?.isSignedIn == true, !isSyncing else {
             await refreshPendingCount()
             return
@@ -82,8 +111,7 @@ public final class AnchorPlatformSync {
         do {
             try await enqueueFinishedSessions(using: connection)
             pendingCount = await connection.sync.pendingMutationCount()
-            let changes = try await connection.sync.synchronize()
-            try apply(changes)
+            _ = try await connection.sync.synchronize()
             pendingCount = await connection.sync.pendingMutationCount()
             receipt.recordSuccess(at: Date())
             receiptStore.save(receipt)
@@ -124,19 +152,15 @@ public final class AnchorPlatformSync {
         }
     }
 
-    private func apply(_ changes: [SyncChange]) throws {
-        let existing = try context.fetch(FetchDescriptor<FocusSession>())
-        for change in changes {
-            let id = AnchorPlatformRecord.stableUUID(change.id)
-            if change.operation == .delete {
-                if let session = existing.first(where: { $0.id == id }) { context.delete(session) }
-                continue
-            }
-            guard !existing.contains(where: { $0.id == id }),
-                  let session = AnchorPlatformRecord.decode(change) else { continue }
-            context.insert(session)
-        }
-        if context.hasChanges { try context.save() }
+}
+
+public enum AnchorExternalSyncPolicy {
+    public static func allowsSessionSynchronization(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        environment["ANCHOR_DEMO_DATA"] != "1"
+            && environment["ANCHOR_ONBOARDING_DEMO"] != "1"
+            && environment["ANCHOR_STORE_PATH"]?.isEmpty != false
     }
 }
 

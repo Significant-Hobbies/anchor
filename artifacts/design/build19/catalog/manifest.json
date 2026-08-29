@@ -1,0 +1,133 @@
+{
+  "generatedAt" : "2026-08-29T12:43:46Z",
+  "pages" : [
+    {
+      "file" : "focus-phone.png",
+      "height" : 874,
+      "name" : "focus-phone",
+      "width" : 402
+    },
+    {
+      "file" : "focus-mac.png",
+      "height" : 800,
+      "name" : "focus-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "today-phone.png",
+      "height" : 874,
+      "name" : "today-phone",
+      "width" : 402
+    },
+    {
+      "file" : "today-mac.png",
+      "height" : 800,
+      "name" : "today-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "habits-phone.png",
+      "height" : 874,
+      "name" : "habits-phone",
+      "width" : 402
+    },
+    {
+      "file" : "habits-mac.png",
+      "height" : 800,
+      "name" : "habits-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "history-day-phone.png",
+      "height" : 874,
+      "name" : "history-day-phone",
+      "width" : 402
+    },
+    {
+      "file" : "history-day-mac.png",
+      "height" : 800,
+      "name" : "history-day-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "history-interruptions-mac.png",
+      "height" : 800,
+      "name" : "history-interruptions-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "history-interruptions-phone.png",
+      "height" : 874,
+      "name" : "history-interruptions-phone",
+      "width" : 402
+    },
+    {
+      "file" : "history-trends-mac.png",
+      "height" : 800,
+      "name" : "history-trends-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "history-trends-phone.png",
+      "height" : 874,
+      "name" : "history-trends-phone",
+      "width" : 402
+    },
+    {
+      "file" : "settings-phone.png",
+      "height" : 874,
+      "name" : "settings-phone",
+      "width" : 402
+    },
+    {
+      "file" : "settings-mac.png",
+      "height" : 800,
+      "name" : "settings-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "onboarding-phone.png",
+      "height" : 874,
+      "name" : "onboarding-phone",
+      "width" : 402
+    },
+    {
+      "file" : "onboarding-mac.png",
+      "height" : 800,
+      "name" : "onboarding-mac",
+      "width" : 1200
+    },
+    {
+      "file" : "compact-panel.png",
+      "height" : 230,
+      "name" : "compact-panel",
+      "width" : 300
+    },
+    {
+      "file" : "editor-block-mac.png",
+      "height" : 760,
+      "name" : "editor-block-mac",
+      "width" : 720
+    },
+    {
+      "file" : "editor-habit-mac.png",
+      "height" : 760,
+      "name" : "editor-habit-mac",
+      "width" : 720
+    },
+    {
+      "file" : "editor-patterns-mac.png",
+      "height" : 760,
+      "name" : "editor-patterns-mac",
+      "width" : 760
+    },
+    {
+      "file" : "editor-metadata-mac.png",
+      "height" : 680,
+      "name" : "editor-metadata-mac",
+      "width" : 660
+    }
+  ],
+  "renderPlatform" : "macOS offscreen render of shared Anchor surfaces",
+  "store" : "ephemeral in-memory demo data"
+}

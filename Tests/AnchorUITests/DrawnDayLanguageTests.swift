@@ -118,6 +118,59 @@ struct DrawnDayLanguageTests {
         #expect(!shell.contains("if isSelected && presentation != .icons"))
     }
 
+    @Test("Mac menu bar uses the Anchor mark")
+    func menuBarUsesBrandedTemplateArtwork() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let macApp = try source("Apps/Mac/AnchorMacApp.swift", in: repository)
+        let asset = try source(
+            "Apps/Shared/Assets.xcassets/MenuBarIcon.imageset/Contents.json",
+            in: repository
+        )
+
+        #expect(macApp.contains("Image(\"MenuBarIcon\")"))
+        #expect(!macApp.contains("Image(systemName: controller.isPaused ? \"pause.circle\" : \"scope\")"))
+        #expect(asset.contains("template-rendering-intent"))
+        #expect(asset.contains("menu-bar-anchor.svg"))
+    }
+
+    @Test("Visual review stays offscreen and History keeps one visible section control")
+    func visualReviewDoesNotDriveTheWorkingMac() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let history = try source(
+            "Sources/AnchorUI/Planning/FourSurfaceScreens.swift",
+            in: repository
+        )
+        let project = try source("Apps/project.yml", in: repository)
+        let catalog = try source(
+            "Apps/VisualCatalog/AnchorVisualCatalogApp.swift",
+            in: repository
+        )
+        let catalogSheets = try source(
+            "Sources/AnchorUI/VisualCatalog/AnchorVisualCatalogSheet.swift",
+            in: repository
+        )
+        let workflow = try source(".github/workflows/native-review.yml", in: repository)
+
+        #expect(history.contains("Picker(\"History section\""))
+        #expect(history.contains(".labelsHidden()"))
+        #expect(project.contains("AnchorVisualCatalog:"))
+        #expect(project.contains("LSUIElement: true"))
+        #expect(catalog.contains("AnchorStore.makeContainer(kind: .inMemory)"))
+        #expect(catalog.contains("NSHostingView(rootView:"))
+        #expect(catalogSheets.contains("case blockEditor"))
+        #expect(catalogSheets.contains("case habitEditor"))
+        #expect(catalogSheets.contains("case behaviorProfile"))
+        #expect(catalogSheets.contains("case metadataLibrary"))
+        #expect(workflow.contains("workflow_dispatch:"))
+        #expect(workflow.contains("Run complete macOS UI suite"))
+    }
+
     @Test("Onboarding QA cannot consume the owner's first-run state")
     func onboardingDemoKeepsPersistentTourStateUntouched() throws {
         let repository = URL(fileURLWithPath: #filePath)
@@ -130,10 +183,24 @@ struct DrawnDayLanguageTests {
             in: repository
         )
 
-        #expect(root.contains("anchor.product-tour.seen.v3"))
+        #expect(root.contains("anchor.product-tour.seen.v4"))
         #expect(root.contains("if !shouldForceOnboarding"))
+        #expect(!root.contains("controller.hasSession || shouldSkipOnboarding"))
+        #expect(onboarding.contains("anchor.onboarding.unified-step.v2"))
         #expect(onboarding.contains("if !isDemo { savedUnifiedStep = step.rawValue }"))
         #expect(onboarding.contains("if !isDemo { savedStep = step.rawValue }"))
+    }
+
+    @Test("Google account connection uses the canonical identity origin")
+    func googleConnectionAvoidsTheMarketingRedirect() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sync = try source("Sources/AnchorCore/Store/AnchorPlatformSync.swift", in: repository)
+
+        #expect(sync.contains("https://live.significanthobbies.com"))
+        #expect(sync.contains("identityURL: Self.identityURL"))
     }
 
     private func source(_ path: String, in repository: URL) throws -> String {

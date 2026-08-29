@@ -110,7 +110,7 @@ final class AnchorMacUITests: XCTestCase {
     }
 
     @MainActor
-    func testUsualWeekAndHabitMaterialiseAndPersist() throws {
+    func testUsualWeekMaterialisesWhileHabitStaysFlexibleAndPersists() throws {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "usual-week")
@@ -121,7 +121,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(setup.waitForExistence(timeout: 5))
         setup.click()
         XCTAssertTrue(app.staticTexts["Your usual week"].waitForExistence(timeout: 3))
-        let addRoutine = app.buttons["Add usual-week item"]
+        let addRoutine = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Add to ")).firstMatch
         XCTAssertTrue(addRoutine.waitForExistence(timeout: 3))
         addRoutine.click()
 
@@ -142,7 +142,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertFalse(app.otherElements["anchor.today.daily-check-in"].exists)
 
         app.buttons["Habits"].click()
-        XCTAssertTrue(app.staticTexts["Habits in practice"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["This week"].waitForExistence(timeout: 4))
         app.buttons["Add a habit"].click()
         let habitTitle = app.textFields["What will you do?"]
         XCTAssertTrue(habitTitle.waitForExistence(timeout: 3))
@@ -157,6 +157,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(element(containing: "Mac reset walk", in: app).waitForExistence(timeout: 4))
         app.buttons["Today"].click()
         XCTAssertTrue(app.staticTexts["Mac weekly planning"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["Mac reset walk"].waitForExistence(timeout: 4))
     }
 
@@ -185,6 +186,119 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Habits"].click()
         XCTAssertTrue(editor.waitForExistence(timeout: 4))
         XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+    }
+
+    @MainActor
+    func testHabitsCanBeAddedEditedAndRescheduled() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "habit-management")
+        app.launch()
+
+        app.buttons["Habits"].click()
+        XCTAssertTrue(app.buttons["anchor.habits.add"].waitForExistence(timeout: 5))
+        app.buttons["anchor.habits.add"].click()
+        let title = app.textFields["What will you do?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        title.click()
+        title.typeText("Two-day reset")
+        app.buttons["Save"].click()
+
+        XCTAssertTrue(element(containing: "Two-day reset", in: app).waitForExistence(timeout: 4))
+        XCTAssertTrue(element(containing: "this week", in: app).exists)
+        XCTAssertTrue(element(containing: "Any time", in: app).exists)
+        XCTAssertTrue(app.buttons["Edit"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["Adjust"].firstMatch.exists)
+        app.buttons["Edit"].firstMatch.click()
+        let editedTitle = app.textFields["What will you do?"]
+        editedTitle.click()
+        editedTitle.typeKey("a", modifierFlags: .command)
+        editedTitle.typeText("Two-day reset edited")
+        app.buttons["Save"].click()
+        XCTAssertTrue(element(containing: "Two-day reset edited", in: app).waitForExistence(timeout: 4))
+
+        app.buttons["Today"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 4))
+        app.buttons["anchor.today.habit.done"].click()
+        XCTAssertTrue(element(containing: "Completed today", in: app).waitForExistence(timeout: 3))
+        app.buttons["anchor.today.habit.undo"].click()
+        app.buttons["anchor.today.habit.place"].click()
+        XCTAssertTrue(app.staticTexts["Place habit"].waitForExistence(timeout: 3))
+        app.buttons["Save"].click()
+        XCTAssertTrue(element(containing: "Placed at", in: app).waitForExistence(timeout: 3))
+
+        keepScreenshot(app, named: "anchor-build19-mac-flexible-habits-today")
+    }
+
+    @MainActor
+    func testEveryWeekdayCanHaveADifferentSchedule() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "weekday-schedules")
+        app.launch()
+
+        app.buttons["Today"].click()
+        app.buttons["Set up usual week"].click()
+        XCTAssertTrue(app.radioButtons["Monday"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.radioButtons["Sunday"].exists)
+
+        let selectedDay = app.radioButtons.matching(NSPredicate(format: "value == 1")).firstMatch
+        XCTAssertTrue(selectedDay.waitForExistence(timeout: 3))
+        let firstDay = selectedDay.label
+        let addFirstDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Add to ")).firstMatch
+        XCTAssertTrue(addFirstDay.waitForExistence(timeout: 3))
+        addFirstDay.click()
+        let firstTitle = app.textFields["What will you do?"]
+        firstTitle.click()
+        firstTitle.typeText("\(firstDay) planning")
+        app.buttons["Save"].click()
+        XCTAssertTrue(element(containing: "\(firstDay) planning", in: app).waitForExistence(timeout: 4))
+
+        let secondDay = app.radioButtons.matching(NSPredicate(format: "value == 0")).firstMatch
+        let secondDayName = secondDay.label
+        secondDay.click()
+        XCTAssertTrue(app.staticTexts["0 usual items on \(secondDayName)"].waitForExistence(timeout: 2))
+        let addSecondDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Add to ")).firstMatch
+        XCTAssertTrue(addSecondDay.waitForExistence(timeout: 3))
+        addSecondDay.click()
+        let secondTitle = app.textFields["What will you do?"]
+        secondTitle.click()
+        secondTitle.typeText("\(secondDayName) planning")
+        app.buttons["Save"].click()
+        XCTAssertTrue(element(containing: "\(secondDayName) planning", in: app).waitForExistence(timeout: 4))
+        XCTAssertFalse(element(containing: "\(firstDay) planning", in: app).isHittable)
+
+        keepScreenshot(app, named: "anchor-build19-mac-weekday-schedule")
+    }
+
+    @MainActor
+    func testProjectsAndTagsCanBeManaged() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "metadata-library")
+        app.launch()
+
+        app.buttons["Settings"].click()
+        let manage = app.buttons["anchor.settings.manage-metadata"]
+        for _ in 0..<6 where !manage.exists { app.scrollViews.firstMatch.swipeUp() }
+        XCTAssertTrue(manage.waitForExistence(timeout: 3))
+        manage.click()
+
+        let project = app.textFields["anchor.metadata.new-project"]
+        project.click()
+        project.typeText("Launch")
+        app.buttons["anchor.metadata.add-project"].click()
+        let tag = app.textFields["anchor.metadata.new-tag"]
+        tag.click()
+        tag.typeText("Deep work")
+        app.buttons["anchor.metadata.add-tag"].click()
+
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.exists)
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Deep work")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["Archive Launch"].exists)
+        XCTAssertTrue(app.buttons["Archive Deep work"].exists)
+
+        keepScreenshot(app, named: "anchor-build19-mac-projects-tags")
     }
 
     @MainActor
@@ -270,8 +384,8 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Show me how Anchor protects it"].click()
 
         XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
-        app.buttons["Schedule these habits"].click()
-        XCTAssertTrue(app.staticTexts["Give each habit a real place."].waitForExistence(timeout: 4))
+        app.buttons["Shape these habits"].click()
+        XCTAssertTrue(app.staticTexts["Choose when each habit is available."].waitForExistence(timeout: 4))
 
         let monday = app.buttons["Monday"]
         XCTAssertTrue(monday.waitForExistence(timeout: 2))
@@ -279,7 +393,7 @@ final class AnchorMacUITests: XCTestCase {
         monday.click()
         XCTAssertEqual(monday.value as? String, "Not selected")
 
-        app.buttons["Save week and continue"].click()
+        app.buttons["Save habits and continue"].click()
 
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 4))
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
@@ -301,6 +415,48 @@ final class AnchorMacUITests: XCTestCase {
             app.staticTexts["anchor.onboarding.platform-guidance"]
                 .waitForExistence(timeout: 2)
         )
+    }
+
+    @MainActor
+    func testExistingPlannerDataStillShowsCurrentOnboarding() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_DEMO_DATA"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] =
+            URL(fileURLWithPath: "/tmp", isDirectory: true)
+                .appendingPathComponent("anchor-mac-existing-owner-\(UUID().uuidString).store")
+                .path
+        app.launchArguments += ["-anchor.product-tour.seen.v4", "NO"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Plan the day. Learn what moved it."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Return to Anchor"].exists)
+    }
+
+    @MainActor
+    func testGoogleSignInStartsAndCancelsWithoutLosingTheAccountStep() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_DEMO"] = "1"
+        app.launchEnvironment["ANCHOR_ONBOARDING_INITIAL_STEP"] = "account"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] =
+            URL(fileURLWithPath: "/tmp", isDirectory: true)
+                .appendingPathComponent("anchor-mac-google-auth-\(UUID().uuidString).store")
+                .path
+        app.launch()
+
+        let google = app.buttons["anchor.hub.sign-in-google"]
+        XCTAssertTrue(google.waitForExistence(timeout: 5))
+        google.click()
+        XCTAssertTrue(
+            app.activityIndicators["anchor.hub.sign-in-google"]
+                .waitForExistence(timeout: 3)
+        )
+        // The AuthenticationServices sheet is remote-hosted inside Anchor's
+        // accessibility tree, so Escape is delivered through the host app.
+        app.typeKey(.escape, modifierFlags: [])
+
+        XCTAssertTrue(google.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].exists)
+        XCTAssertEqual(app.state, .runningForeground)
     }
 
     @MainActor
@@ -334,6 +490,14 @@ final class AnchorMacUITests: XCTestCase {
         URL(fileURLWithPath: "/tmp", isDirectory: true)
             .appendingPathComponent("anchor-mac-\(name)-\(UUID().uuidString).store")
             .path
+    }
+
+    @MainActor
+    private func keepScreenshot(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     @MainActor

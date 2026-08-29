@@ -4,7 +4,7 @@
 #
 #   ./scripts/release-mac.sh
 #
-# Produces dist/Anchor-<version>.dmg, signed with the Developer ID certificate
+# Produces dist/Anchor-<version>-<build>.dmg, signed with the Developer ID certificate
 # and built with the hardened runtime, which is what notarisation requires.
 #
 # Notarisation is opt-in because it needs credentials this repo does not carry.
@@ -33,7 +33,9 @@ STAGE="$BUILD_DIR/stage"
 
 VERSION=$(/usr/bin/awk -F'"' '/MARKETING_VERSION/ {print $2; exit}' Apps/project.yml)
 VERSION="${VERSION:-1.0}"
-DMG="$DIST/Anchor-$VERSION.dmg"
+BUILD_NUMBER=$(/usr/bin/awk -F'"' '/CURRENT_PROJECT_VERSION/ {print $2; exit}' Apps/project.yml)
+BUILD_NUMBER="${BUILD_NUMBER:-unknown}"
+DMG="$DIST/Anchor-$VERSION-$BUILD_NUMBER.dmg"
 
 echo "==> Anchor $VERSION — direct-download release"
 
@@ -49,7 +51,12 @@ command -v xcodegen >/dev/null && (cd Apps && xcodegen generate >/dev/null)
 # `com.apple.security.get-task-allow` debug entitlement, and notarisation
 # rejects any app carrying it.
 echo "==> Archiving ($CONFIG)"
-rm -rf "$BUILD_DIR" && mkdir -p "$STAGE" "$DIST"
+if [ -e "$BUILD_DIR" ]; then
+  PREVIOUS_BUILD_DIR="$BUILD_DIR.previous-$(date -u +%Y%m%dT%H%M%SZ)"
+  mv "$BUILD_DIR" "$PREVIOUS_BUILD_DIR"
+  echo "   preserved previous build at $PREVIOUS_BUILD_DIR"
+fi
+mkdir -p "$STAGE" "$DIST"
 ARCHIVE="$BUILD_DIR/Anchor.xcarchive"
 xcodebuild archive -project Apps/Anchor.xcodeproj \
   -scheme "Anchor (macOS)" \
@@ -131,7 +138,11 @@ sys.exit(1 if problems else 0)
 echo "==> Packaging DMG"
 cp -R "$APP" "$STAGE/Anchor.app"
 ln -s /Applications "$STAGE/Applications"
-rm -f "$DMG"
+if [ -e "$DMG" ]; then
+  PREVIOUS_DMG="$DMG.previous-$(date -u +%Y%m%dT%H%M%SZ)"
+  mv "$DMG" "$PREVIOUS_DMG"
+  echo "   preserved previous DMG at $PREVIOUS_DMG"
+fi
 hdiutil create -volname "Anchor" -srcfolder "$STAGE" -ov -format UDZO "$DMG" | tail -1
 
 echo "==> Signing DMG"

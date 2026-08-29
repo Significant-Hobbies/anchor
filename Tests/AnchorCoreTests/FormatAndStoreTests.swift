@@ -56,7 +56,7 @@ struct AnchorStoreTests {
     @Test("An in-memory container is usable and isolated")
     func inMemoryContainer() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)
-        #expect(container.schema.entities.count == 12)
+        #expect(container.schema.entities.count == 13)
     }
 
     @Test("The schema carries the complete CloudKit-safe model set")
@@ -64,7 +64,7 @@ struct AnchorStoreTests {
         let names = Set(AnchorStore.schema.entities.map(\.name))
         #expect(names == [
             "Project", "SavedTag", "Goal", "FocusSession", "Distraction", "MachineActivityDay",
-            "AnchorPreferences", "BehaviorProfile", "ScheduleTemplate", "DayPlanConfirmation",
+            "AnchorPreferences", "BehaviorProfile", "ScheduleTemplate", "HabitCompletion", "DayPlanConfirmation",
             "PlanBlock", "DivergenceEvent",
         ])
     }

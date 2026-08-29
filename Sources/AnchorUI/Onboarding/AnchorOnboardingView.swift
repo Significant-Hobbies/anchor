@@ -10,9 +10,9 @@ public struct AnchorOnboardingView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.anchorPlatformSync) private var platform
     @Query private var profiles: [BehaviorProfile]
-    @AppStorage("anchor.onboarding.unified-step.v1") private var savedUnifiedStep = 0
-    @AppStorage("anchor.onboarding.goal.v1") private var savedGoal = ""
-    @AppStorage("anchor.onboarding.step.v1") private var savedStep = 0
+    @AppStorage("anchor.onboarding.unified-step.v2") private var savedUnifiedStep = 0
+    @AppStorage("anchor.onboarding.goal.v2") private var savedGoal = ""
+    @AppStorage("anchor.onboarding.step.v2") private var savedStep = 0
     @State private var unifiedStep: UnifiedStep = .welcome
     @State private var selectedPatterns: Set<BehaviorPattern> = []
     @State private var desiredDirections: Set<LifeDirection> = []
@@ -49,6 +49,7 @@ public struct AnchorOnboardingView: View {
         var pattern: BehaviorPattern?
         var title: String
         var time: Date
+        var usesSuggestedTime: Bool
         var minutes: Int
         var weekdays: Set<ScheduleWeekday>
         var flexibility: ScheduleFlexibility
@@ -258,7 +259,7 @@ public struct AnchorOnboardingView: View {
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
-                Text("Anchor suggests a small replacement for every direction you chose. Keep up to five; the rest of your schedule stays unlimited.")
+                Text("Anchor suggests a small replacement for every direction you chose. Keep the ones that genuinely fit.")
                     .font(.body)
                     .foregroundStyle(theme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -305,7 +306,7 @@ public struct AnchorOnboardingView: View {
             }
 
             VStack(spacing: Space.sm) {
-                Button(habitDrafts.contains(where: \.isSelected) ? "Schedule these habits" : "Continue without habits") {
+                Button(habitDrafts.contains(where: \.isSelected) ? "Shape these habits" : "Continue without habits") {
                     moveUnified(to: .schedule)
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -319,11 +320,11 @@ public struct AnchorOnboardingView: View {
         VStack(spacing: Space.lg) {
             onboardingProgress("4 OF 6 · YOUR WEEK")
             VStack(spacing: Space.xs) {
-                Text("Give each habit a real place.")
+                Text("Choose when each habit is available.")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
-                Text("These recurring blocks will appear in Today, and Focus will automatically put the right one in front of you.")
+                Text("An exact time is optional. Habits stay available in Today until you complete or place them.")
                     .font(.body)
                     .foregroundStyle(theme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -339,12 +340,10 @@ public struct AnchorOnboardingView: View {
                                 TextField("Habit name", text: $draft.title)
                                     .font(.headline)
                             }
-                            DatePicker("Starts", selection: $draft.time, displayedComponents: .hourAndMinute)
-                            Stepper("\(draft.minutes) minutes", value: $draft.minutes, in: 5...120, step: 5)
-                            Picker("Flexibility", selection: $draft.flexibility) {
-                                ForEach(ScheduleFlexibility.allCases, id: \.self) { option in
-                                    Text(option.label).tag(option)
-                                }
+                            Toggle("Suggest a time", isOn: $draft.usesSuggestedTime)
+                                .tint(theme.accent)
+                            if draft.usesSuggestedTime {
+                                DatePicker("Around", selection: $draft.time, displayedComponents: .hourAndMinute)
                             }
                             VStack(alignment: .leading, spacing: Space.xxs) {
                                 Text("Repeats")
@@ -374,7 +373,7 @@ public struct AnchorOnboardingView: View {
 
             VStack(spacing: Space.sm) {
                 profileSaveFailure
-                Button("Save week and continue") {
+                Button("Save habits and continue") {
                     if persistHabitSchedule() { moveUnified(to: .account) }
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -737,7 +736,8 @@ public struct AnchorOnboardingView: View {
     }
 
     private func complete() {
-        guard persistProfile() else { return }
+        // Choices and the generated habit schedule are saved before rehearsal
+        // begins. The final call-to-action only needs to leave onboarding.
         if !isDemo {
             savedUnifiedStep = 0
             savedGoal = ""
@@ -761,10 +761,11 @@ public struct AnchorOnboardingView: View {
                     pattern: patterns.isEmpty ? nil : patterns[index % patterns.count],
                     title: suggestion.title,
                     time: Calendar.current.date(byAdding: .minute, value: suggestion.startMinutesFromMidnight, to: startOfDay) ?? startOfDay,
+                    usesSuggestedTime: true,
                     minutes: suggestion.plannedMinutes,
                     weekdays: Set(ScheduleWeekday.allCases),
                     flexibility: .flexible,
-                    isSelected: index < HabitPolicy.maximumActiveHabits
+                    isSelected: true
                 )
             }
     }
@@ -772,10 +773,6 @@ public struct AnchorOnboardingView: View {
     private func persistHabitSchedule() -> Bool {
         guard persistProfile() else { return false }
         let selectedDrafts = habitDrafts.filter(\.isSelected)
-        guard selectedDrafts.count <= HabitPolicy.maximumActiveHabits else {
-            profileSaveError = "Choose at most five habits to practice at once."
-            return false
-        }
         do {
             let existing = try context.fetch(FetchDescriptor<ScheduleTemplate>())
             let calendar = Calendar.current
@@ -802,11 +799,11 @@ public struct AnchorOnboardingView: View {
                 template.behaviorPattern = draft.pattern
                 template.lifeDirection = draft.direction
                 template.isBehaviorHabit = true
+                template.habitUsesSuggestedTime = draft.usesSuggestedTime
                 template.habitLevelStartedAt = template.habitLevelStartedAt ?? Date()
                 template.updatedAt = Date()
             }
             try context.save()
-            _ = try DayPlanService(context: context).materialize(day: Date())
             profileSaveError = nil
             return true
         } catch {
@@ -820,10 +817,6 @@ public struct AnchorOnboardingView: View {
         guard let index = habitDrafts.firstIndex(where: { $0.id == id }) else { return }
         if habitDrafts[index].isSelected {
             habitDrafts[index].isSelected = false
-            return
-        }
-        guard habitDrafts.filter(\.isSelected).count < HabitPolicy.maximumActiveHabits else {
-            profileSaveError = "Five habits is the limit. Skip one before choosing another."
             return
         }
         habitDrafts[index].isSelected = true

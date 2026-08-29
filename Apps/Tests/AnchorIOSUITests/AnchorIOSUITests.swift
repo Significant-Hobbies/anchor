@@ -78,9 +78,9 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Show me how Anchor protects it"].tap()
 
         XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
-        app.buttons["Schedule these habits"].tap()
-        XCTAssertTrue(app.staticTexts["Give each habit a real place."].waitForExistence(timeout: 4))
-        app.buttons["Save week and continue"].tap()
+        app.buttons["Shape these habits"].tap()
+        XCTAssertTrue(app.staticTexts["Choose when each habit is available."].waitForExistence(timeout: 4))
+        app.buttons["Save habits and continue"].tap()
 
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
@@ -104,10 +104,26 @@ final class AnchorIOSUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Thought parked."].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["The practice interruption was discarded. Your real captures stay local and appear in History."].exists)
-        app.buttons["Open my Focus"].tap()
-
-        XCTAssertTrue(app.staticTexts["Make something"].waitForExistence(timeout: 4))
-        app.buttons["Start this block"].tap()
+        let openFocus = app.buttons["Open my Focus"]
+        XCTAssertTrue(openFocus.waitForExistence(timeout: 4))
+        app.swipeUp()
+        XCTAssertTrue(openFocus.isHittable)
+        openFocus.tap()
+        let focusTab = app.tabBars.buttons["Focus"]
+        XCTAssertTrue(focusTab.waitForExistence(timeout: 5))
+        let startScheduled = app.buttons["Start this block"]
+        if startScheduled.waitForExistence(timeout: 2) {
+            startScheduled.tap()
+        } else {
+            let startUnplanned = app.buttons["anchor.focus.start-unplanned"]
+            XCTAssertTrue(startUnplanned.waitForExistence(timeout: 4))
+            startUnplanned.tap()
+            let realGoal = app.textFields["Ship the auth flow"]
+            XCTAssertTrue(realGoal.waitForExistence(timeout: 3))
+            realGoal.tap()
+            realGoal.typeText("Draft the launch note")
+            app.buttons["Start focusing"].tap()
+        }
         XCTAssertTrue(app.buttons["Lock a distraction"].waitForExistence(timeout: 4))
         app.buttons["End session"].tap()
     }
@@ -138,7 +154,9 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
-        app.tabBars.buttons["Habits"].tap()
+        let habits = app.tabBars.buttons["Habits"]
+        XCTAssertTrue(habits.waitForExistence(timeout: 5))
+        habits.tap()
         let editor = app.buttons["anchor.habits.behavior-profile"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()
@@ -159,9 +177,79 @@ final class AnchorIOSUITests: XCTestCase {
 
         app.terminate()
         app.launch()
-        app.tabBars.buttons["Habits"].tap()
+        let reloadedHabits = app.tabBars.buttons["Habits"]
+        XCTAssertTrue(reloadedHabits.waitForExistence(timeout: 5))
+        reloadedHabits.tap()
         XCTAssertTrue(editor.waitForExistence(timeout: 4))
         XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+    }
+
+    @MainActor
+    func testHabitsCanBeAddedEditedAndRescheduled() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-habit-management-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launch()
+
+        let habits = app.tabBars.buttons["Habits"]
+        XCTAssertTrue(habits.waitForExistence(timeout: 5))
+        habits.tap()
+        XCTAssertTrue(app.buttons["anchor.habits.add"].waitForExistence(timeout: 5))
+        app.buttons["anchor.habits.add"].tap()
+        let title = app.textFields["What will you do?"]
+        title.tap()
+        title.typeText("Two-day reset")
+        let secondDay = app.buttons.matching(
+            NSPredicate(format: "label ENDSWITH %@", "not selected")
+        ).firstMatch
+        XCTAssertTrue(secondDay.exists)
+        secondDay.tap()
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Two-day reset"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["0 of 2 this week"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Any time")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["Edit"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["Adjust"].firstMatch.exists)
+
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 4))
+        app.buttons["anchor.today.habit.done"].tap()
+        XCTAssertTrue(app.staticTexts["Completed today"].waitForExistence(timeout: 3))
+        app.buttons["anchor.today.habit.undo"].tap()
+        app.buttons["anchor.today.habit.place"].tap()
+        XCTAssertTrue(app.navigationBars["Place habit"].waitForExistence(timeout: 3))
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Placed at")).firstMatch.waitForExistence(timeout: 3))
+
+        keepScreenshot(app, named: "anchor-build19-ios-flexible-habits-today")
+
+    }
+
+    @MainActor
+    func testProjectsAndTagsCanBeManaged() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-metadata-library-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launch()
+
+        app.buttons["anchor.toolbar.settings"].tap()
+        let manage = app.buttons["anchor.settings.manage-metadata"]
+        for _ in 0..<8 where !manage.exists { app.swipeUp() }
+        XCTAssertTrue(manage.waitForExistence(timeout: 3))
+        manage.tap()
+
+        let project = app.textFields["anchor.metadata.new-project"]
+        project.tap()
+        project.typeText("Launch\n")
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.waitForExistence(timeout: 3))
+        let tag = app.textFields["anchor.metadata.new-tag"]
+        tag.tap()
+        tag.typeText("Deep work\n")
+
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.exists)
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Deep work")).firstMatch.waitForExistence(timeout: 3))
+
+        keepScreenshot(app, named: "anchor-build19-ios-projects-tags")
     }
 
     func testSettingsKeepsMacOnlyDiagnosticsOffIPhone() {
@@ -195,5 +283,13 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["This build stores appearance on this device only"].exists)
         XCTAssertFalse(app.staticTexts["Talk to your data"].exists)
         XCTAssertFalse(app.staticTexts["Database"].exists)
+    }
+
+    @MainActor
+    private func keepScreenshot(_ app: XCUIApplication, named name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

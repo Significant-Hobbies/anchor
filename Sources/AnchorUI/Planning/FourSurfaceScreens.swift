@@ -24,6 +24,7 @@ public struct HabitsScreen: View {
     @Query private var profiles: [BehaviorProfile]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
     @Query(sort: \PlanBlock.plannedStart) private var planBlocks: [PlanBlock]
+    @Query(sort: \HabitCompletion.updatedAt, order: .reverse) private var habitCompletions: [HabitCompletion]
     @State private var showsProfile = false
     @State private var showsNewHabit = false
     @State private var editingTemplate: ScheduleTemplate?
@@ -34,6 +35,10 @@ public struct HabitsScreen: View {
 
     private var activeTemplates: [ScheduleTemplate] {
         templates.filter(\.isActiveBehaviorHabit)
+    }
+
+    private var pausedTemplates: [ScheduleTemplate] {
+        templates.filter { $0.isBehaviorHabit && $0.archivedAt != nil && $0.graduatedAt == nil }
     }
 
     private var readyHabits: [ScheduleTemplate] {
@@ -51,7 +56,7 @@ public struct HabitsScreen: View {
                     "HabitsDoodle",
                     eyebrow: "Habits",
                     title: "Redraw the pattern",
-                    message: "Notice what keeps pulling you, choose a better direction, then give it a real place in the week."
+                    message: "Choose what you want to make room for. Keep it available, then place it when the day takes shape."
                 )
 
                 Button { showsProfile = true } label: {
@@ -93,78 +98,51 @@ public struct HabitsScreen: View {
 
                 VStack(alignment: .leading, spacing: Space.sm) {
                     HStack(alignment: .firstTextBaseline) {
-                        SectionHeader("Habits in practice", subtitle: "Behavior changes stay small; the rest of your schedule is unlimited")
+                        SectionHeader("This week", subtitle: "The promise is the days you chose—not every day by default")
                         Spacer(minLength: Space.sm)
-                        Text("\(activeTemplates.count) / \(HabitPolicy.maximumActiveHabits)")
+                        Text("\(activeTemplates.count) active")
                             .font(.caption.weight(.bold).monospacedDigit())
                             .foregroundStyle(theme.accent)
                     }
                     if activeTemplates.isEmpty {
                         EmptyStateView(
                             symbol: "repeat",
-                            title: "No habits scheduled yet",
-                            message: "Add one at a time and Anchor will place it into the days you choose."
+                            title: "No habits yet",
+                            message: "Add a small intention for the days it matters. Time is optional."
                         )
                     } else {
-                        VStack(spacing: 0) {
+                        VStack(spacing: Space.sm) {
                             ForEach(activeTemplates) { template in
-                                Button {
-                                    if streak(for: template) >= HabitPolicy.upgradeStreak {
-                                        upgradingTemplate = template
-                                    } else {
-                                        editingTemplate = template
-                                    }
-                                } label: {
-                                    HStack(spacing: Space.sm) {
-                                        Image(systemName: template.lifeDirection?.symbolName ?? "repeat")
-                                            .foregroundStyle(theme.accent)
-                                            .frame(width: 28)
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(template.title)
-                                                .font(.body.weight(.semibold))
-                                                .foregroundStyle(theme.textPrimary)
-                                            Text("\(routineTime(template)) · \(template.weekdays.map(\.shortLabel).joined(separator: " "))")
-                                                .font(.caption)
-                                                .foregroundStyle(theme.textSecondary)
-                                        }
-                                        Spacer()
-                                        VStack(alignment: .trailing, spacing: 3) {
-                                            Text("\(streak(for: template)) / \(HabitPolicy.upgradeStreak)")
-                                                .font(.caption.weight(.bold).monospacedDigit())
-                                                .foregroundStyle(streak(for: template) >= HabitPolicy.upgradeStreak ? theme.positive : theme.textTertiary)
-                                            Text(streak(for: template) >= HabitPolicy.upgradeStreak ? "Ready" : "streak")
-                                                .font(.caption2)
-                                                .foregroundStyle(theme.textTertiary)
-                                        }
-                                        Image(systemName: "chevron.right")
-                                            .foregroundStyle(theme.textTertiary)
-                                    }
-                                    .padding(.vertical, Space.sm)
-                                    .contentShape(.rect)
-                                }
-                                .buttonStyle(.plain)
-                                if template.id != activeTemplates.last?.id {
-                                    Divider().overlay(theme.hairline)
-                                }
+                                habitCard(template)
                             }
                         }
-                        .padding(.horizontal, Space.md)
-                        .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
-                        .overlay(RoundedRectangle(cornerRadius: Radius.lg).strokeBorder(theme.hairline))
                     }
                 }
 
-                HStack(spacing: Space.sm) {
-                    Button(activeTemplates.count >= HabitPolicy.maximumActiveHabits ? "Five habits in practice" : "Add a habit") {
-                        showsNewHabit = true
-                    }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(activeTemplates.count >= HabitPolicy.maximumActiveHabits)
+                Button("Add a habit", systemImage: "plus") {
+                    showsNewHabit = true
                 }
-                if activeTemplates.count >= HabitPolicy.maximumActiveHabits && readyHabits.isEmpty {
-                    Text("Complete seven scheduled occurrences in a row. Then Anchor will offer an upgrade or help you graduate one to make room.")
-                        .font(.footnote)
-                        .foregroundStyle(theme.textTertiary)
+                .buttonStyle(PrimaryButtonStyle())
+                .accessibilityIdentifier("anchor.habits.add")
+
+                if !pausedTemplates.isEmpty {
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        SectionHeader("Paused", subtitle: "Kept for later without crowding this week")
+                        ForEach(pausedTemplates) { template in
+                            HStack(spacing: Space.sm) {
+                                Image(systemName: "pause.circle")
+                                    .foregroundStyle(theme.textTertiary)
+                                Text(template.title)
+                                    .foregroundStyle(theme.textPrimary)
+                                Spacer()
+                                Button("Resume") { resume(template) }
+                                    .buttonStyle(QuietButtonStyle(expands: false))
+                            }
+                            .padding(Space.md)
+                            .background(theme.surface, in: .rect(cornerRadius: Radius.md))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
+                        }
+                    }
                 }
             }
             .padding(Space.lg)
@@ -196,17 +174,108 @@ public struct HabitsScreen: View {
         return "\(patterns) pattern\(patterns == 1 ? "" : "s") · \(directions) direction\(directions == 1 ? "" : "s")"
     }
 
-    private func routineTime(_ template: ScheduleTemplate) -> String {
+    private func habitTiming(_ template: ScheduleTemplate) -> String {
+        guard template.habitUsesSuggestedTime else { return "Any time" }
         let start = Calendar.current.startOfDay(for: Date())
         let time = Calendar.current.date(byAdding: .minute, value: template.startMinutesFromMidnight, to: start) ?? start
-        return time.formatted(date: .omitted, time: .shortened)
+        return "Suggested \(time.formatted(date: .omitted, time: .shortened))"
     }
 
     private func streak(for template: ScheduleTemplate) -> Int {
         HabitPolicy().streak(
             for: template.habitSchedule(),
-            blocks: planBlocks.map { $0.snapshot() }
+            blocks: planBlocks.map { $0.snapshot() },
+            completions: habitCompletions.map { $0.snapshot() }
         )
+    }
+
+    private func weeklyProgress(for template: ScheduleTemplate) -> HabitPolicy.WeeklyProgress {
+        HabitPolicy().weeklyProgress(
+            for: template.habitSchedule(),
+            blocks: planBlocks.map { $0.snapshot() },
+            completions: habitCompletions.map { $0.snapshot() }
+        )
+    }
+
+    private func habitCard(_ template: ScheduleTemplate) -> some View {
+        let progress = weeklyProgress(for: template)
+        let currentStreak = streak(for: template)
+        return VStack(alignment: .leading, spacing: Space.md) {
+            HStack(alignment: .top, spacing: Space.sm) {
+                Image(systemName: template.lifeDirection?.symbolName ?? "repeat")
+                    .font(.headline)
+                    .foregroundStyle(theme.accent)
+                    .frame(width: 36, height: 36)
+                    .background(theme.accent.opacity(0.12), in: .circle)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(template.title)
+                        .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
+                    Text("\(habitTiming(template)) · \(template.weekdays.sorted { $0.rawValue < $1.rawValue }.map(\.compactLabel).joined(separator: ", "))")
+                        .font(.caption)
+                        .foregroundStyle(theme.textSecondary)
+                }
+                Spacer(minLength: Space.sm)
+                Menu {
+                    Button("Pause habit", systemImage: "pause") { pause(template) }
+                    Button("Graduate habit", systemImage: "checkmark.seal") { graduate(template) }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 32, height: 32)
+                        .contentShape(.rect)
+                }
+                .menuIndicator(.hidden)
+                .accessibilityLabel("More actions for \(template.title)")
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: Space.md) {
+                    habitProgress(progress, streak: currentStreak)
+                    Spacer(minLength: 0)
+                    habitActions(template)
+                }
+                VStack(alignment: .leading, spacing: Space.sm) {
+                    habitProgress(progress, streak: currentStreak)
+                    habitActions(template)
+                }
+            }
+        }
+        .padding(Space.md)
+        .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
+        .overlay(RoundedRectangle(cornerRadius: Radius.lg).strokeBorder(theme.hairline))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("anchor.habits.card.\(template.id.uuidString)")
+    }
+
+    private func habitProgress(_ progress: HabitPolicy.WeeklyProgress, streak: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(progress.completed) of \(progress.scheduled) this week")
+                .font(.title3.weight(.semibold).monospacedDigit())
+                .foregroundStyle(theme.textPrimary)
+            Text(habitProgressHint(streak: streak))
+                .font(.caption)
+                .foregroundStyle(streak >= HabitPolicy.upgradeStreak ? theme.positive : theme.textTertiary)
+        }
+    }
+
+    private func habitProgressHint(streak: Int) -> String {
+        guard streak < HabitPolicy.upgradeStreak else {
+            return "Enough evidence to adjust the rhythm"
+        }
+        guard streak > 0 else {
+            return "Adjust whenever you want; Anchor will suggest changes after a steady run"
+        }
+        let remaining = HabitPolicy.upgradeStreak - streak
+        return "\(remaining) more completion\(remaining == 1 ? "" : "s") before Anchor suggests a change"
+    }
+
+    private func habitActions(_ template: ScheduleTemplate) -> some View {
+        HStack(spacing: Space.xs) {
+            Button("Edit", systemImage: "pencil") { editingTemplate = template }
+                .buttonStyle(QuietButtonStyle(expands: false))
+            Button("Adjust", systemImage: "slider.horizontal.3") { upgradingTemplate = template }
+                .buttonStyle(QuietButtonStyle(expands: false))
+        }
     }
 
     private func progressionPrompt(for template: ScheduleTemplate) -> some View {
@@ -221,7 +290,7 @@ public struct HabitsScreen: View {
                         Text("\(template.title) is ready for what’s next")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(theme.textPrimary)
-                        Text("You completed seven scheduled occurrences in a row. Make this habit a little stronger, or make room for something new.")
+                        Text("You completed this on seven scheduled days. Keep it, adjust the rhythm, or add something new alongside it.")
                             .font(.subheadline)
                             .foregroundStyle(theme.textSecondary)
                     }
@@ -237,9 +306,9 @@ public struct HabitsScreen: View {
 
     @ViewBuilder
     private func progressionButtons(for template: ScheduleTemplate) -> some View {
-        Button("Upgrade this habit") { upgradingTemplate = template }
+        Button("Adjust this habit") { upgradingTemplate = template }
             .buttonStyle(PrimaryButtonStyle())
-        Button(activeTemplates.count >= HabitPolicy.maximumActiveHabits ? "Graduate & add new" : "Add a new habit") {
+        Button("Add another habit") {
             prepareNewHabit(after: template)
         }
         .buttonStyle(QuietButtonStyle())
@@ -249,21 +318,42 @@ public struct HabitsScreen: View {
 
     private func prepareNewHabit(after template: ScheduleTemplate) {
         do {
-            if activeTemplates.count >= HabitPolicy.maximumActiveHabits {
-                template.graduatedAt = Date()
-                template.archivedAt = Date()
-                template.updatedAt = Date()
-                try DayPlanService(context: context).reconcileFutureBlocks(for: template)
-            } else {
-                template.lastProgressPromptedAt = Date()
-                template.updatedAt = Date()
-                try context.save()
-            }
+            template.lastProgressPromptedAt = Date()
+            template.updatedAt = Date()
+            try context.save()
             progressionError = nil
             showsNewHabit = true
         } catch {
             context.rollback()
-            progressionError = "Anchor could not make room for the new habit. Nothing was changed."
+            progressionError = "Anchor could not prepare the new habit. Nothing was changed."
+        }
+    }
+
+    private func pause(_ template: ScheduleTemplate) {
+        template.archivedAt = Date()
+        persistScheduleChange(template, failure: "Anchor could not pause that habit.")
+    }
+
+    private func resume(_ template: ScheduleTemplate) {
+        template.archivedAt = nil
+        template.habitLevelStartedAt = Date()
+        persistScheduleChange(template, failure: "Anchor could not resume that habit.")
+    }
+
+    private func graduate(_ template: ScheduleTemplate) {
+        template.graduatedAt = Date()
+        template.archivedAt = Date()
+        persistScheduleChange(template, failure: "Anchor could not graduate that habit.")
+    }
+
+    private func persistScheduleChange(_ template: ScheduleTemplate, failure: String) {
+        template.updatedAt = Date()
+        do {
+            try DayPlanService(context: context).reconcileFutureBlocks(for: template)
+            progressionError = nil
+        } catch {
+            context.rollback()
+            progressionError = failure
         }
     }
 
@@ -298,9 +388,9 @@ private struct HabitUpgradeSheet: View {
                 VStack(alignment: .leading, spacing: Space.lg) {
                     DoodleScene(
                         "HabitsDoodle",
-                        eyebrow: "LEVEL \(template.habitVersion + 1)",
-                        title: "A little more, not a whole new life",
-                        message: "Choose one concrete change. The next seven scheduled occurrences begin a fresh streak.",
+                        eyebrow: "RHYTHM",
+                        title: "Change only what helps",
+                        message: "Make this available on one more day, or leave it exactly as it is.",
                         compact: true
                     )
                     if let saveError {
@@ -308,18 +398,9 @@ private struct HabitUpgradeSheet: View {
                             .font(.footnote)
                             .foregroundStyle(theme.negative)
                     }
-                    Button { applyDurationUpgrade() } label: {
-                        upgradeRow(
-                            title: "Add five minutes",
-                            detail: "\(template.plannedSeconds / 60) → \(template.plannedSeconds / 60 + 5) minutes",
-                            symbol: "timer"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
                     if !availableDays.isEmpty {
                         VStack(alignment: .leading, spacing: Space.sm) {
-                            Text("Or add one day")
+                            Text("Make it available one more day")
                                 .font(.headline)
                                 .foregroundStyle(theme.textPrimary)
                             FlowRow(spacing: Space.xs) {
@@ -330,6 +411,12 @@ private struct HabitUpgradeSheet: View {
                                 }
                             }
                         }
+                    } else {
+                        EmptyStateView(
+                            symbol: "calendar.badge.checkmark",
+                            title: "Already available every day",
+                            message: "Keep the rhythm, or use Edit to change its days and suggested time."
+                        )
                     }
                 }
                 .padding(Space.lg)
@@ -337,7 +424,7 @@ private struct HabitUpgradeSheet: View {
                 .frame(maxWidth: .infinity)
             }
             .background(theme.canvas)
-            .navigationTitle("Upgrade \(template.title)")
+            .navigationTitle("Adjust \(template.title)")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Not now") { dismiss() } }
             }
@@ -345,31 +432,6 @@ private struct HabitUpgradeSheet: View {
         #if os(macOS)
         .frame(minWidth: 520, idealWidth: 620, minHeight: 430, idealHeight: 560)
         #endif
-    }
-
-    private func upgradeRow(title: String, detail: String, symbol: String) -> some View {
-        HStack(spacing: Space.md) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .foregroundStyle(theme.accent)
-                .frame(width: 42, height: 42)
-                .background(theme.accent.opacity(0.12), in: .circle)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline).foregroundStyle(theme.textPrimary)
-                Text(detail).font(.subheadline).foregroundStyle(theme.textSecondary)
-            }
-            Spacer()
-            Image(systemName: "arrow.right")
-                .foregroundStyle(theme.textTertiary)
-        }
-        .padding(Space.md)
-        .background(theme.surface, in: .rect(cornerRadius: Radius.md))
-        .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
-    }
-
-    private func applyDurationUpgrade() {
-        template.plannedSeconds += 5 * 60
-        persistUpgrade()
     }
 
     private func applyDayUpgrade(_ day: ScheduleWeekday) {
@@ -398,13 +460,15 @@ public struct HistoryScreen: View {
     @Environment(\.anchorTheme) private var theme
     @State private var section: Section = .day
 
-    public init() {}
+    public init(section: Section = .day) {
+        _section = State(initialValue: section)
+    }
 
-    private enum Section: String, CaseIterable, Identifiable {
+    public enum Section: String, CaseIterable, Identifiable, Sendable {
         case day = "Day review"
         case interruptions = "Interruptions"
         case trends = "Trends"
-        var id: String { rawValue }
+        public var id: String { rawValue }
     }
 
     public var body: some View {
@@ -413,6 +477,7 @@ public struct HistoryScreen: View {
                 ForEach(Section.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .padding(.horizontal, Space.lg)
             .padding(.top, Space.sm)
             .padding(.bottom, Space.xs)

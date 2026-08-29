@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Build 18 owner first-run and product polish",
+  "target": "Build 19 flexible habits, non-disruptive visual QA, and branded Mac menu bar",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
@@ -116,15 +116,47 @@
       {
         "width": 1440,
         "path": "artifacts/design/build18/anchor-mac-patterns-saved-1440.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/build19/anchor-ios-habits-402.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/build19/anchor-ios-projects-tags-402.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/build19/flexible-habits-ios/F734F394-51E2-4C85-B016-3449D31D72E3.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/build19/catalog/habits-phone.png"
+      },
+      {
+        "width": 1200,
+        "path": "artifacts/design/build19/catalog/habits-mac.png"
+      },
+      {
+        "width": 402,
+        "path": "artifacts/design/build19/catalog/history-day-phone.png"
+      },
+      {
+        "width": 760,
+        "path": "artifacts/design/build19/catalog/editor-patterns-mac.png"
+      },
+      {
+        "width": 660,
+        "path": "artifacts/design/build19/catalog/editor-metadata-mac.png"
       }
     ],
     "projectCheck": {
-      "command": "swift test; DebugLocal Mac and iOS builds; focused Mac and iPhone onboarding and persistence UI journeys; Google browser-cancellation callback acceptance; design-workflow check",
+      "command": "swift test; hidden 21-surface visual catalog; non-interactive iPhone and watchOS builds; anchor-mcp --diagnose; design-workflow check",
       "status": "pass",
-      "note": "All 155 package and source-contract tests pass. The Mac persistence and full onboarding journeys pass, and the iPhone persistence journey passes through a terminate and relaunch. DebugLocal Mac and iOS builds resolve PersonalSyncKit at c9abc09; the iOS build also compiles the embedded watch app. The Safari/XPC Google cancellation callback returns to a live Anchor process without a crash. Fresh owner-path renders were inspected at 390, 768, and 1440 points."
+      "note": "All 147 package and source-contract tests pass. A hidden LSUIElement catalog renders 21 real Focus, Today, Habits, History, Settings, onboarding, compact-timer, and editor surfaces from an in-memory store without activating a window. Every output was inspected individually. History no longer exposes a duplicate picker label; habit progress uses the chosen weekly denominator, clear weekday names, always-available adjustment, and a non-duplicated overflow menu. iPhone and watchOS DebugLocal builds pass without launching UI. Interactive UI remains an explicit isolated-runner gate."
     },
     "critique": {
-      "score": 35,
+      "score": 36,
       "maximum": 40
     },
     "audit": {
@@ -145,6 +177,6 @@
   },
   "ownerFeedback": {
     "decision": "keep",
-    "note": "Round 0 rejected: the Day Overlay and Focus Viewfinder felt too simple and basic; Departure Lines had welcome authorship but its literal depot-board execution did not earn selection. Round 1 was rejected as too funky. The owner pinned the world to simple, premium, and doodle-first, selected Doodle Scene as the structural base, rejected the first repeated selector drawings, and asked for neutral chrome so authored colour could pop. The owner approved the implemented direction on 2026-08-25 and requested one final button refinement. Primary, quiet, and transport controls now share shallow physical depth and settle-on-press feedback. Dark is now the shared product default, with one iCloud-backed System, Light, or Dark choice for every Anchor device. The owner then asked for signup inside onboarding, a stronger Settings account experience, a real Google mark, and verified top-toolbar behavior; the shared Hub panel and responsive six-stage onboarding now carry that direction. The final account composition is viewport-centered, uses compact secondary actions, and leaves Mac window chrome entirely to the native title bar. On 2026-08-29 the owner said the aesthetic should be preserved, while rejecting the glossy blue icon, missing owner onboarding, invisible behavior-profile persistence, crashing Google callback, and stacked Mac selection cues. Build 18 keeps the visual world and closes those trust breaks with the paper-and-ink Anchor face, versioned replay-safe onboarding, persistent auto-save feedback, isolated browser callback handling, and one selected rail surface."
+    "note": "Round 0 rejected: the Day Overlay and Focus Viewfinder felt too simple and basic; Departure Lines had welcome authorship but its literal depot-board execution did not earn selection. Round 1 was rejected as too funky. The owner pinned the world to simple, premium, and doodle-first, selected Doodle Scene as the structural base, rejected the first repeated selector drawings, and asked for neutral chrome so authored colour could pop. The owner approved the implemented direction on 2026-08-25 and requested one final button refinement. Primary, quiet, and transport controls now share shallow physical depth and settle-on-press feedback. Dark is now the shared product default, with one iCloud-backed System, Light, or Dark choice for every Anchor device. The owner then asked for signup inside onboarding, a stronger Settings account experience, a real Google mark, and verified top-toolbar behavior; the shared Hub panel and responsive six-stage onboarding now carry that direction. The final account composition is viewport-centered, uses compact secondary actions, and leaves Mac window chrome entirely to the native title bar. On 2026-08-29 the owner said the aesthetic should be preserved, while rejecting the glossy blue icon, missing owner onboarding, invisible behavior-profile persistence, crashing Google callback, and stacked Mac selection cues. Build 18 keeps the visual world and closes those trust breaks with the paper-and-ink Anchor face, versioned replay-safe onboarding, persistent auto-save feedback, isolated browser callback handling, and one selected rail surface. Build 19 stays in that preserve lane: habits are flexible daily intentions with optional time suggestions, honest untimed completion, deliberate placement into Today, and progress tied to chosen days rather than seven calendar days; projects, tags, and every weekday retain direct native management. The Mac menu bar now carries a simplified monochrome Anchor face instead of a generic scope symbol. A 21-surface hidden catalog now protects that aesthetic page by page without interrupting the owner's active desktop; full interaction automation moves to a manually dispatched isolated runner."
   }
 }

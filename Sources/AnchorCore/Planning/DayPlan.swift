@@ -138,7 +138,8 @@ public enum LifeDirection: String, CaseIterable, Codable, Hashable, Sendable {
 
 // MARK: - Schedule models
 
-/// A reusable rule that materializes one dated block on matching days.
+/// A reusable weekly rule. Ordinary rules materialize dated plan blocks;
+/// behavior habits stay available until the owner deliberately places them.
 @Model
 public final class ScheduleTemplate {
     public var id: UUID = UUID()
@@ -156,8 +157,11 @@ public final class ScheduleTemplate {
     public var behaviorPatternRaw: String?
     public var lifeDirectionRaw: String?
     /// Behavior-change habits are intentionally separate from ordinary recurring
-    /// schedule items. Only these templates participate in the five-slot policy.
+    /// schedule items so their weekly progress and upgrade streak stay distinct.
     public var isBehaviorHabit: Bool = false
+    /// Existing habits default to keeping their former clock time as a gentle
+    /// suggestion. New habits can turn this off and remain available all day.
+    public var habitUsesSuggestedTime: Bool = true
     public var habitVersion: Int = 1
     public var graduatedAt: Date?
     public var habitLevelStartedAt: Date?
@@ -177,6 +181,7 @@ public final class ScheduleTemplate {
         behaviorPattern: BehaviorPattern? = nil,
         lifeDirection: LifeDirection? = nil,
         isBehaviorHabit: Bool = false,
+        habitUsesSuggestedTime: Bool = true,
         habitVersion: Int = 1,
         graduatedAt: Date? = nil,
         habitLevelStartedAt: Date? = nil,
@@ -195,6 +200,7 @@ public final class ScheduleTemplate {
         self.behaviorPattern = behaviorPattern
         self.lifeDirection = lifeDirection
         self.isBehaviorHabit = isBehaviorHabit
+        self.habitUsesSuggestedTime = habitUsesSuggestedTime
         self.habitVersion = max(1, habitVersion)
         self.graduatedAt = graduatedAt
         self.habitLevelStartedAt = habitLevelStartedAt
@@ -239,8 +245,84 @@ public final class ScheduleTemplate {
     }
     public var currentHabitLevelStartedAt: Date { habitLevelStartedAt ?? createdAt }
 
+    public var habitSuggestedMinutesFromMidnight: Int? {
+        isBehaviorHabit && habitUsesSuggestedTime ? startMinutesFromMidnight : nil
+    }
+
+    public func habitSuggestedStart(on day: Date, calendar: Calendar = .current) -> Date? {
+        guard let minutes = habitSuggestedMinutesFromMidnight else { return nil }
+        return calendar.date(byAdding: .minute, value: minutes, to: calendar.startOfDay(for: day))
+    }
+
     public func applies(to day: Date, calendar: Calendar = .current) -> Bool {
         !isArchived && weekdays.contains(ScheduleWeekday(day: day, calendar: calendar))
+    }
+}
+
+/// Explicit evidence that a habit happened without requiring a timed plan
+/// block. Keeping this separate prevents Anchor from inventing elapsed time.
+@Model
+public final class HabitCompletion {
+    public var id: UUID = UUID()
+    public var habitID: UUID = UUID()
+    public var day: Date = Date()
+    public var isCompleted: Bool = true
+    public var completedAt: Date?
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+
+    public init(
+        id: UUID = UUID(),
+        habitID: UUID,
+        day: Date,
+        isCompleted: Bool = true,
+        completedAt: Date? = Date(),
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.habitID = habitID
+        self.day = day
+        self.isCompleted = isCompleted
+        self.completedAt = completedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    public func snapshot() -> HabitCompletionRecord {
+        HabitCompletionRecord(
+            id: id,
+            habitID: habitID,
+            day: day,
+            isCompleted: isCompleted,
+            completedAt: completedAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+public struct HabitCompletionRecord: Sendable, Equatable, Identifiable {
+    public var id: UUID
+    public var habitID: UUID
+    public var day: Date
+    public var isCompleted: Bool
+    public var completedAt: Date?
+    public var updatedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        habitID: UUID,
+        day: Date,
+        isCompleted: Bool = true,
+        completedAt: Date? = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.habitID = habitID
+        self.day = day
+        self.isCompleted = isCompleted
+        self.completedAt = completedAt
+        self.updatedAt = updatedAt
     }
 }
 
@@ -496,6 +578,18 @@ public enum ScheduleWeekday: Int, CaseIterable, Codable, Hashable, Sendable {
         }
     }
 
+    public var compactLabel: String {
+        switch self {
+        case .monday: "Mon"
+        case .tuesday: "Tue"
+        case .wednesday: "Wed"
+        case .thursday: "Thu"
+        case .friday: "Fri"
+        case .saturday: "Sat"
+        case .sunday: "Sun"
+        }
+    }
+
     public var label: String {
         switch self {
         case .monday: "Monday"
@@ -538,7 +632,7 @@ public struct DayPlanService {
         let templates = try context.fetch(FetchDescriptor<ScheduleTemplate>())
         var blocks = existing
 
-        for template in templates where template.applies(to: day, calendar: calendar) {
+        for template in templates where !template.isBehaviorHabit && template.applies(to: day, calendar: calendar) {
             guard !existingTemplateIDs.contains(template.id) else { continue }
             let block = PlanBlock(template: template, day: day, calendar: calendar)
             context.insert(block)
@@ -552,6 +646,12 @@ public struct DayPlanService {
     /// archived routine. Completed, skipped, moved, and in-progress history is
     /// preserved as the day was actually lived.
     public func reconcileFutureBlocks(for template: ScheduleTemplate, from date: Date = Date()) throws {
+        // Habit blocks are explicit daily placements. Editing or pausing the
+        // habit must never rewrite or remove those owner-authored decisions.
+        guard !template.isBehaviorHabit else {
+            if context.hasChanges { try context.save() }
+            return
+        }
         let start = calendar.startOfDay(for: date)
         let future = try context.fetch(FetchDescriptor<PlanBlock>()).filter {
             let occurrenceDay = $0.templateOccurrenceDay ?? $0.plannedStart

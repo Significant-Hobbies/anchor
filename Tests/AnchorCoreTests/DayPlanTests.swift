@@ -200,7 +200,166 @@ struct DayPlanTests {
         #expect(!routine.isActiveBehaviorHabit)
         #expect(habit.isActiveBehaviorHabit)
         #expect(HabitPolicy().canAdd(activeHabitCount: 4))
-        #expect(!HabitPolicy().canAdd(activeHabitCount: 5))
+        #expect(HabitPolicy().canAdd(activeHabitCount: 5))
+    }
+
+    @Test("Any-time habits stay out of the schedule and can complete without invented time")
+    func flexibleHabitCompletionIsUntimed() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let monday = Date(timeIntervalSince1970: 1_704_067_200)
+        let habit = ScheduleTemplate(
+            title: "Read",
+            startMinutesFromMidnight: 8 * 60,
+            plannedSeconds: 20 * 60,
+            weekdays: [.monday],
+            kind: .routine,
+            isBehaviorHabit: true,
+            habitUsesSuggestedTime: false,
+            habitLevelStartedAt: monday
+        )
+        context.insert(habit)
+        try context.save()
+
+        #expect(try DayPlanService(context: context, calendar: calendar).materialize(day: monday).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<PlanBlock>()).isEmpty)
+
+        let completion = try HabitDayService(context: context, calendar: calendar).setCompleted(
+            true,
+            habitID: habit.id,
+            on: monday,
+            at: monday.addingTimeInterval(20 * 60 * 60)
+        )
+        #expect(completion.isCompleted)
+        #expect(try context.fetch(FetchDescriptor<PlanBlock>()).isEmpty)
+        #expect(
+            HabitPolicy().weeklyProgress(
+                for: habit.habitSchedule(),
+                blocks: [],
+                completions: [completion.snapshot()],
+                weekContaining: monday,
+                calendar: calendar
+            ) == .init(completed: 1, scheduled: 1)
+        )
+    }
+
+    @Test("Placing a habit uses the chosen time without changing its suggestion")
+    func habitPlacementIsADailyDecision() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let monday = Date(timeIntervalSince1970: 1_704_067_200)
+        let chosenStart = calendar.date(byAdding: .minute, value: 17 * 60 + 30, to: monday)!
+        let habit = ScheduleTemplate(
+            title: "Walk",
+            startMinutesFromMidnight: 8 * 60,
+            plannedSeconds: 20 * 60,
+            weekdays: [.monday],
+            kind: .routine,
+            isBehaviorHabit: true,
+            habitUsesSuggestedTime: true
+        )
+        context.insert(habit)
+        try context.save()
+
+        let block = try HabitDayService(context: context, calendar: calendar).place(
+            habit,
+            on: monday,
+            at: chosenStart,
+            plannedSeconds: 35 * 60
+        )
+
+        #expect(block.plannedStart == chosenStart)
+        #expect(block.plannedSeconds == 35 * 60)
+        #expect(block.templateID == habit.id)
+        #expect(block.isTemplateOverride)
+        #expect(habit.startMinutesFromMidnight == 8 * 60)
+        #expect(habit.habitSuggestedStart(on: monday, calendar: calendar) == monday.addingTimeInterval(8 * 60 * 60))
+    }
+
+    @Test("Two-day habits report progress out of two scheduled occurrences")
+    func twoDayHabitUsesWeeklyCommitment() {
+        let templateID = UUID()
+        let monday = Date(timeIntervalSince1970: 1_704_067_200)
+        let schedule = HabitPolicy.Schedule(
+            templateID: templateID,
+            levelStartedAt: monday,
+            startMinutesFromMidnight: 8 * 60,
+            plannedSeconds: 20 * 60,
+            weekdays: [.tuesday, .thursday]
+        )
+        let friday = calendar.date(byAdding: .day, value: 4, to: monday)!
+
+        #expect(
+            HabitPolicy().weeklyProgress(
+                for: schedule,
+                blocks: [],
+                weekContaining: friday,
+                calendar: calendar
+            ) == .init(completed: 0, scheduled: 2)
+        )
+
+        let tuesday = calendar.date(byAdding: .day, value: 1, to: monday)!
+        let completed = PlanBlockRecord(
+            id: UUID(),
+            templateID: templateID,
+            templateOccurrenceDay: tuesday,
+            title: "Walk",
+            plannedStart: calendar.date(byAdding: .hour, value: 8, to: tuesday)!,
+            plannedSeconds: 20 * 60,
+            state: .completed,
+            kind: .routine
+        )
+        #expect(
+            HabitPolicy().weeklyProgress(
+                for: schedule,
+                blocks: [completed],
+                weekContaining: friday,
+                calendar: calendar
+            ) == .init(completed: 1, scheduled: 2)
+        )
+
+        let saturday = calendar.date(byAdding: .day, value: 5, to: monday)!
+        let createdSaturdayAfternoon = calendar.date(byAdding: .hour, value: 15, to: saturday)!
+        let sameDaySchedule = HabitPolicy.Schedule(
+            templateID: UUID(),
+            levelStartedAt: createdSaturdayAfternoon,
+            startMinutesFromMidnight: 8 * 60,
+            plannedSeconds: 20 * 60,
+            weekdays: [.saturday]
+        )
+        #expect(
+            HabitPolicy().weeklyProgress(
+                for: sameDaySchedule,
+                blocks: [],
+                weekContaining: saturday,
+                calendar: calendar
+            ) == .init(completed: 0, scheduled: 1)
+        )
+    }
+
+    @Test("Every weekday can keep a different usual schedule")
+    func weekdaySchedulesStayIndependent() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let monday = Date(timeIntervalSince1970: 1_704_067_200)
+
+        for day in ScheduleWeekday.allCases {
+            context.insert(ScheduleTemplate(
+                title: day.label,
+                startMinutesFromMidnight: (8 + day.rawValue) * 60,
+                plannedSeconds: 30 * 60,
+                weekdays: [day],
+                kind: .routine
+            ))
+        }
+        try context.save()
+
+        let service = DayPlanService(context: context, calendar: calendar)
+        for (offset, weekday) in ScheduleWeekday.allCases.enumerated() {
+            let date = calendar.date(byAdding: .day, value: offset, to: monday)!
+            let blocks = try service.materialize(day: date)
+            #expect(blocks.map(\.title) == [weekday.label])
+        }
     }
 
     @Test("Habit streak follows the actual weekly schedule and ignores off-days")
@@ -233,12 +392,14 @@ struct DayPlanTests {
         #expect(HabitPolicy().streak(for: schedule, blocks: records, now: now, calendar: calendar) == 7)
         #expect(HabitPolicy().canUpgrade(schedule: schedule, blocks: records, now: now, calendar: calendar))
 
-        #expect(HabitPolicy().streak(for: schedule, blocks: Array(records.dropLast()), now: now, calendar: calendar) == 0)
+        // An unfinished habit remains available through the end of today; it
+        // does not erase the six completed scheduled days behind it.
+        #expect(HabitPolicy().streak(for: schedule, blocks: Array(records.dropLast()), now: now, calendar: calendar) == 6)
 
         var moved = records
         moved[moved.count - 1].plannedStart = calendar.date(byAdding: .day, value: 1, to: moved.last!.plannedStart)!
         moved[moved.count - 1].state = .moved
-        #expect(HabitPolicy().streak(for: schedule, blocks: moved, now: now, calendar: calendar) == 0)
+        #expect(HabitPolicy().streak(for: schedule, blocks: moved, now: now, calendar: calendar) == 6)
 
         let beforeTodayIsDue = calendar.date(byAdding: .minute, value: 10, to: records.last!.plannedStart)!
         #expect(HabitPolicy().streak(for: schedule, blocks: Array(records.dropLast()), now: beforeTodayIsDue, calendar: calendar) == 6)

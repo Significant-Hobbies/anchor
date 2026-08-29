@@ -14,6 +14,7 @@ public enum AnchorStore {
         AnchorPreferences.self,
         BehaviorProfile.self,
         ScheduleTemplate.self,
+        HabitCompletion.self,
         DayPlanConfirmation.self,
         PlanBlock.self,
         DivergenceEvent.self,

@@ -1,0 +1,160 @@
+{
+  "$schema": "anchor.review-feature-matrix.v1",
+  "scope": ["macOS", "iOS"],
+  "features": [
+    {
+      "id": "onboarding-current-owner",
+      "name": "Current onboarding appears independently of existing planner data",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Tests/AnchorUITests/AppArchitectureTests.swift", "contains": "Onboarding depends on completion, never existing planner data"},
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testExistingPlannerDataStillShowsCurrentOnboarding"},
+        {"file": "Apps/Tests/AnchorIOSUITests/AnchorIOSUITests.swift", "contains": "testInterruptionFirstOnboardingStartsARealSession"}
+      ]
+    },
+    {
+      "id": "google-auth-cancel",
+      "name": "Google sign-in starts and cancel returns to a live app",
+      "platforms": ["macOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testGoogleSignInStartsAndCancelsWithoutLosingTheAccountStep"}
+      ]
+    },
+    {
+      "id": "test-store-hub-isolation",
+      "name": "Demo and redirected test stores cannot synchronize with Hub",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Tests/AnchorCoreTests/HubSyncStatusTests.swift", "contains": "Test stores disable external session synchronization"}
+      ]
+    },
+    {
+      "id": "hub-history-provenance",
+      "name": "Hub sign-in cannot silently import unproven history into the planner",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Tests/AnchorCoreTests/AnchorPlatformRecordTests.swift", "contains": "Remote Hub history does not enter Anchor's planner"}
+      ]
+    },
+    {
+      "id": "focus-loop",
+      "name": "Start, pause, resume, capture, end, and persist focus",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testFocusInterruptionAndReturnJourneyPersists"},
+        {"file": "Apps/Tests/AnchorIOSUITests/AnchorIOSUITests.swift", "contains": "testFocusInterruptionAndReturnJourneyPersists"},
+        {"file": "Tests/AnchorCoreTests/TimeAccountTests.swift", "contains": "Elapsed time comes from the wall clock"}
+      ]
+    },
+    {
+      "id": "schedule",
+      "name": "Today scheduling, completion, review, recurrence, and relaunch persistence",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testTodayCreatesCompletesReviewsAndPersistsABlock"},
+        {"file": "Apps/Tests/AnchorIOSUITests/AnchorIOSUITests.swift", "contains": "testDayPlanCreatesABlockAndOffersRecurringSchedule"},
+        {"file": "Tests/AnchorCoreTests/DayPlanTests.swift", "contains": "Recurring templates materialize once on matching days"}
+      ]
+    },
+    {
+      "id": "patterns-replacements",
+      "name": "Patterns and replacements save immediately and survive relaunch",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testBehaviorProfileSavesImmediatelyAndPersists"},
+        {"file": "Apps/Tests/AnchorIOSUITests/AnchorIOSUITests.swift", "contains": "testBehaviorProfileSavesImmediatelyAndPersists"},
+        {"file": "Tests/AnchorCoreTests/DayPlanTests.swift", "contains": "Behavior profile round-trips typed selections"}
+      ]
+    },
+    {
+      "id": "habits-flexible-daily-intentions",
+      "name": "Habits stay flexible while usual-week routines materialize and persist",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testUsualWeekMaterialisesWhileHabitStaysFlexibleAndPersists"},
+        {"file": "Apps/Tests/AnchorIOSUITests/AnchorIOSUITests.swift", "contains": "testHabitsCanBeAddedEditedAndRescheduled"},
+        {"file": "Tests/AnchorCoreTests/DayPlanTests.swift", "contains": "Any-time habits stay out of the schedule and can complete without invented time"},
+        {"file": "Tests/AnchorCoreTests/DayPlanTests.swift", "contains": "Placing a habit uses the chosen time without changing its suggestion"}
+      ]
+    },
+    {
+      "id": "habit-recurrence-denominator",
+      "name": "Habit progress uses scheduled occurrences rather than seven calendar days",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Tests/AnchorCoreTests/DayPlanTests.swift", "contains": "Two-day habits report progress out of two scheduled occurrences"}
+      ]
+    },
+    {
+      "id": "habit-crud",
+      "name": "People can add, edit, adjust, pause, and graduate habits",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testHabitsCanBeAddedEditedAndRescheduled"},
+        {"file": "Apps/Tests/AnchorIOSUITests/AnchorIOSUITests.swift", "contains": "testHabitsCanBeAddedEditedAndRescheduled"}
+      ]
+    },
+    {
+      "id": "weekday-schedules",
+      "name": "Every weekday has an independently editable usual schedule",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Tests/AnchorCoreTests/DayPlanTests.swift", "contains": "Every weekday can keep a different usual schedule"},
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testEveryWeekdayCanHaveADifferentSchedule"}
+      ]
+    },
+    {
+      "id": "project-tag-management",
+      "name": "Projects and tags have visible add, edit, and remove UI",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testProjectsAndTagsCanBeManaged"},
+        {"file": "Apps/Tests/AnchorIOSUITests/AnchorIOSUITests.swift", "contains": "testProjectsAndTagsCanBeManaged"}
+      ]
+    },
+    {
+      "id": "history-export",
+      "name": "History, review, trends, and private exports remain usable",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testSeededHistoryExposesReviewInterruptionsTrendsAndExports"},
+        {"file": "Tests/AnchorCoreTests/ExportTests.swift", "contains": "Unified export carries plans, causes, and private profile selections"}
+      ]
+    },
+    {
+      "id": "mini-timer",
+      "name": "Mac mini timer executes the compact focus loop",
+      "platforms": ["macOS"],
+      "evidence": [
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testMiniTimerRunsTheCompactFocusLoop"}
+      ]
+    },
+    {
+      "id": "menu-bar-brand",
+      "name": "Mac menu bar uses Anchor's template mark and retains timer state",
+      "platforms": ["macOS"],
+      "evidence": [
+        {"file": "Tests/AnchorUITests/DrawnDayLanguageTests.swift", "contains": "Mac menu bar uses the Anchor mark"},
+        {"file": "Apps/Tests/AnchorMacUITests/AnchorMacUITests.swift", "contains": "testMiniTimerRunsTheCompactFocusLoop"}
+      ]
+    },
+    {
+      "id": "privacy-non-egress",
+      "name": "Distraction and session notes never enter Hub payloads",
+      "platforms": ["macOS", "iOS"],
+      "evidence": [
+        {"file": "Tests/AnchorCoreTests/AnchorPlatformRecordTests.swift", "contains": "finishedSessionContainsNoDistractionText"},
+        {"file": "Apps/Shared/PrivacyInfo.xcprivacy", "contains": "<false/>"}
+      ]
+    },
+    {
+      "id": "navigation-polish",
+      "name": "Mac uses one navigation selection and responsive product language",
+      "platforms": ["macOS"],
+      "evidence": [
+        {"file": "Tests/AnchorUITests/DrawnDayLanguageTests.swift", "contains": "Mac navigation uses one selected surface"},
+        {"file": "Tests/AnchorUITests/MacShellMetricsTests.swift", "contains": "The minimum window uses an icon rail"}
+      ]
+    }
+  ]
+}

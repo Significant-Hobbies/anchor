@@ -119,7 +119,12 @@ fi
 command -v xcodegen >/dev/null && (cd Apps && xcodegen generate >/dev/null)
 
 echo "==> Archiving (Release)"
-rm -rf "$BUILD_DIR" && mkdir -p "$BUILD_DIR" "$DIST"
+if [ -e "$BUILD_DIR" ]; then
+  PREVIOUS_BUILD_DIR="$BUILD_DIR.previous-$(date -u +%Y%m%dT%H%M%SZ)"
+  mv "$BUILD_DIR" "$PREVIOUS_BUILD_DIR"
+  echo "   preserved previous build at $PREVIOUS_BUILD_DIR"
+fi
+mkdir -p "$BUILD_DIR" "$DIST"
 ARCHIVE="$BUILD_DIR/Anchor.xcarchive"
 xcodebuild archive -project Apps/Anchor.xcodeproj \
   -scheme "Anchor (iOS)" \
@@ -151,11 +156,16 @@ xcodebuild -exportArchive -archivePath "$ARCHIVE" \
   -allowProvisioningUpdates | grep -E "error:|EXPORT SUCCEEDED|EXPORT FAILED" || true
 
 [ -f "$BUILD_DIR/export/Anchor.ipa" ] || { echo "✘ Export produced no .ipa" >&2; exit 1; }
+if [ -e "$IPA" ]; then
+  PREVIOUS_IPA="$IPA.previous-$(date -u +%Y%m%dT%H%M%SZ)"
+  mv "$IPA" "$PREVIOUS_IPA"
+  echo "   preserved previous IPA at $PREVIOUS_IPA"
+fi
 cp "$BUILD_DIR/export/Anchor.ipa" "$IPA"
 
 echo "==> Verifying"
 UNZIP="$BUILD_DIR/verify"
-rm -rf "$UNZIP" && mkdir -p "$UNZIP"
+mkdir -p "$UNZIP"
 unzip -q "$IPA" -d "$UNZIP"
 APP="$UNZIP/Payload/Anchor.app"
 

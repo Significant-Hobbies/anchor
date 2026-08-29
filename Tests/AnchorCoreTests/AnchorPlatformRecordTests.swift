@@ -6,6 +6,11 @@ import Testing
 
 @Suite("Personal Platform session contract")
 struct AnchorPlatformRecordTests {
+    @Test("Remote Hub history does not enter Anchor's planner")
+    func hubIsOutboundOnly() {
+        #expect(!AnchorPlatformSync.importsRemoteSessions)
+    }
+
     @Test
     func finishedSessionContainsNoDistractionText() throws {
         let start = try #require(ISO8601DateFormatter().date(from: "2026-08-21T06:00:00Z"))

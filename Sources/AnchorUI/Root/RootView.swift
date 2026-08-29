@@ -361,13 +361,28 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
 ///
 /// An authored responsive rail on the Mac and native tabs on the phone, over
 /// one shared set of screens.
+enum OnboardingGate {
+    static func shouldPresent(
+        replayRequested: Bool,
+        skipsAutomaticOnboarding: Bool,
+        forcesOnboarding: Bool,
+        forcedOnboardingFinished: Bool,
+        hasCompletedCurrentOnboarding: Bool
+    ) -> Bool {
+        if replayRequested { return true }
+        if skipsAutomaticOnboarding { return false }
+        if forcesOnboarding { return !forcedOnboardingFinished }
+        return !hasCompletedCurrentOnboarding
+    }
+}
+
 public struct RootView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     // The product tour changed materially with the schedule/habit overhaul.
     // A versioned key ensures existing owners see this tour once as well.
-    @AppStorage("anchor.product-tour.seen.v3") private var unifiedOnboardingSeen = false
+    @AppStorage("anchor.product-tour.seen.v4") private var unifiedOnboardingSeen = false
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
     @State private var tab: AnchorTab = .focus
@@ -389,11 +404,7 @@ public struct RootView: View {
 
     public var body: some View {
         Group {
-            if presentsOnboarding {
-                onboarding
-            } else if controller.hasSession || shouldSkipOnboarding {
-                appShell
-            } else if (shouldForceOnboarding && !forcedOnboardingFinished) || !unifiedOnboardingSeen {
+            if shouldPresentOnboarding {
                 onboarding
             } else {
                 appShell
@@ -478,6 +489,16 @@ public struct RootView: View {
     private func showOnboarding() {
         showsSettings = false
         presentsOnboarding = true
+    }
+
+    private var shouldPresentOnboarding: Bool {
+        OnboardingGate.shouldPresent(
+            replayRequested: presentsOnboarding,
+            skipsAutomaticOnboarding: shouldSkipOnboarding,
+            forcesOnboarding: shouldForceOnboarding,
+            forcedOnboardingFinished: forcedOnboardingFinished,
+            hasCompletedCurrentOnboarding: unifiedOnboardingSeen
+        )
     }
 
     private func finishOnboarding(openFocus: Bool) {

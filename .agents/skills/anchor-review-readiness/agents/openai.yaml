@@ -1,0 +1,4 @@
+interface:
+  display_name: "Anchor Review Readiness"
+  short_description: "Fail-closed Mac and iPhone release evidence"
+  default_prompt: "Use $anchor-review-readiness to audit Anchor and report exact blockers before review."

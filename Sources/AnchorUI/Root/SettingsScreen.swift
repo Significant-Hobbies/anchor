@@ -16,10 +16,12 @@ public struct SettingsScreen: View {
     @Environment(\.anchorPlatformSync) private var platform
     @Query private var goals: [Goal]
     @Query(sort: \Project.createdAt) private var projects: [Project]
+    @Query(sort: \SavedTag.createdAt) private var savedTags: [SavedTag]
     @Query private var behaviorProfiles: [BehaviorProfile]
     @Query(sort: \AnchorPreferences.updatedAt, order: .reverse)
     private var preferences: [AnchorPreferences]
     @State private var showsBehaviorProfile = false
+    @State private var showsMetadataLibrary = false
     @State private var appearanceSaveError: String?
     private let storeKind: AnchorStore.StoreKind
     private let onShowOnboarding: (() -> Void)?
@@ -60,6 +62,9 @@ public struct SettingsScreen: View {
         .background(theme.canvas)
         .sheet(isPresented: $showsBehaviorProfile) {
             BehaviorProfileEditor().anchorTheme()
+        }
+        .sheet(isPresented: $showsMetadataLibrary) {
+            MetadataLibraryEditor().anchorTheme()
         }
     }
 
@@ -182,15 +187,23 @@ public struct SettingsScreen: View {
     }
 
     private var projectPreferences: some View {
-        PreferenceGroup("Projects & rates", subtitle: "Optional context for paid or client work") {
-            if projects.isEmpty {
+        PreferenceGroup("Projects & tags", subtitle: "Reusable context for focus, history, and exports") {
+            PreferenceActionRow(
+                systemImage: "folder.badge.gearshape",
+                title: "Manage projects and tags",
+                detail: "\(projects.filter { !$0.isArchived }.count) project\(projects.filter { !$0.isArchived }.count == 1 ? "" : "s") · \(savedTags.filter { !$0.isArchived }.count) tag\(savedTags.filter { !$0.isArchived }.count == 1 ? "" : "s")"
+            ) { showsMetadataLibrary = true }
+            .accessibilityIdentifier("anchor.settings.manage-metadata")
+
+            PreferenceDivider()
+            if projects.filter({ !$0.isArchived }).isEmpty {
                 PreferenceInfoRow(
                     systemImage: "briefcase",
                     title: "No project rates yet",
-                    detail: "Create a project from Focus, then set its hourly rate here."
+                    detail: "Add a project above, then optionally set its hourly rate here."
                 )
             } else {
-                ForEach(Array(projects.enumerated()), id: \.element.id) { index, project in
+                ForEach(Array(projects.filter { !$0.isArchived }.enumerated()), id: \.element.id) { index, project in
                     ProjectBillingRow(project: project) {
                         project.hourlyRate = max(0, project.hourlyRate)
                         project.currencyCode = project.currencyCode
@@ -201,7 +214,7 @@ public struct SettingsScreen: View {
                     }
                     .padding(.horizontal, Space.md)
                     .padding(.vertical, Space.xs)
-                    if index < projects.count - 1 { PreferenceDivider() }
+                    if index < projects.filter({ !$0.isArchived }).count - 1 { PreferenceDivider() }
                 }
             }
         }
