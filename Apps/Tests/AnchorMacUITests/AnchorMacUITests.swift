@@ -224,10 +224,9 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["anchor.today.habit.place"].click()
         XCTAssertTrue(app.staticTexts["Place habit"].waitForExistence(timeout: 3))
         app.buttons["Save"].click()
-        XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Placed at"))
-                .firstMatch.waitForExistence(timeout: 4)
-        )
+        let habitStatus = app.descendants(matching: .any)["anchor.today.habit.status"]
+        XCTAssertTrue(habitStatus.waitForExistence(timeout: 4))
+        XCTAssertTrue(habitStatus.label.hasPrefix("Placed at"))
 
         keepScreenshot(app, named: "anchor-build19-mac-flexible-habits-today")
     }
@@ -336,7 +335,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["When you focus"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Weekday rhythm"].exists)
 
-        let export = element(containing: "Export", in: app)
+        let export = app.buttons["Excel workbook"]
         let scrollView = app.scrollViews.firstMatch
         for _ in 0..<12 where !export.exists {
             scrollView.swipeUp()
@@ -370,7 +369,8 @@ final class AnchorMacUITests: XCTestCase {
         miniTimer.buttons["Pause"].click()
         miniTimer.buttons["Resume"].click()
         XCTAssertTrue(miniTimer.staticTexts["What pulled you away?"].waitForExistence(timeout: 3))
-        miniTimer.buttons["Nothing — just a break"].click()
+        XCTAssertTrue(miniTimer.buttons["Nothing — just a break"].waitForExistence(timeout: 3))
+        miniTimer.typeKey(.escape, modifierFlags: [])
         miniTimer.buttons["End"].click()
         XCTAssertTrue(miniTimer.staticTexts["Set your anchor"].waitForExistence(timeout: 3))
     }

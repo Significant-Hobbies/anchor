@@ -72,6 +72,21 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData-Watch" \
             build
 
+      - name: Collect native evidence
+        if: always()
+        run: |
+          evidence_root="$RUNNER_TEMP/anchor-native-evidence"
+          workspace_root="$HOME/Library/Developer/XcodeBuildMCP/workspaces"
+          mkdir -p "$evidence_root"
+          if [ -d "$workspace_root" ]; then
+            find "$workspace_root" -type d \( -name logs -o -name result-bundles \) -prune -print0 |
+              while IFS= read -r -d '' evidence_dir; do
+                workspace_name="$(basename "$(dirname "$evidence_dir")")"
+                evidence_kind="$(basename "$evidence_dir")"
+                ditto "$evidence_dir" "$evidence_root/$workspace_name/$evidence_kind"
+              done
+          fi
+
       - name: Upload page catalog and native evidence
         if: always()
         uses: actions/upload-artifact@v5
@@ -81,8 +96,7 @@ jobs:
           retention-days: 14
           path: |
             ${{ runner.temp }}/anchor-visual-catalog
-            ~/Library/Developer/XcodeBuildMCP/workspaces/**/logs
-            ~/Library/Developer/XcodeBuildMCP/workspaces/**/result-bundles
+            ${{ runner.temp }}/anchor-native-evidence
 
       - name: Enforce every native gate
         if: always()

@@ -293,6 +293,7 @@ struct CompactCapture: View {
                 controller.dismissCapture()
             }
             .buttonStyle(QuietButtonStyle(expands: false))
+            .keyboardShortcut(.cancelAction)
         }
         .onAppear { focused = true }
     }
