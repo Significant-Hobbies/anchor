@@ -228,7 +228,11 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(placeHabitTitle.waitForNonExistence(timeout: 4))
         let habitStatus = app.descendants(matching: .any)["anchor.today.habit.status"]
         XCTAssertTrue(habitStatus.waitForExistence(timeout: 4))
-        XCTAssertTrue(habitStatus.label.hasPrefix("Placed at"))
+        let placedStatus = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label BEGINSWITH %@", "Placed at"),
+            object: habitStatus
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [placedStatus], timeout: 4), .completed)
 
         keepScreenshot(app, named: "anchor-build19-mac-flexible-habits-today")
     }
@@ -375,8 +379,14 @@ final class AnchorMacUITests: XCTestCase {
         miniTimer.typeKey(.escape, modifierFlags: [])
         app.typeKey("0", modifierFlags: .command)
         XCTAssertTrue(miniTimer.waitForExistence(timeout: 3))
-        XCTAssertTrue(miniTimer.buttons["End"].waitForExistence(timeout: 3))
-        miniTimer.buttons["End"].click()
+        let end = miniTimer.buttons["End"]
+        XCTAssertTrue(end.waitForExistence(timeout: 3))
+        let endIsHittable = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "hittable == true"),
+            object: end
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [endIsHittable], timeout: 3), .completed)
+        end.click()
         XCTAssertTrue(miniTimer.staticTexts["Set your anchor"].waitForExistence(timeout: 3))
     }
 
