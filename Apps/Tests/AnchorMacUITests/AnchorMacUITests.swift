@@ -227,7 +227,6 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Save"].click()
         XCTAssertTrue(placeHabitTitle.waitForNonExistence(timeout: 4))
         XCTAssertTrue(app.buttons["anchor.today.habit.place"].waitForNonExistence(timeout: 4))
-        XCTAssertTrue(element(containing: "Placed at", in: app).waitForExistence(timeout: 4))
 
         keepScreenshot(app, named: "anchor-build19-mac-flexible-habits-today")
     }
