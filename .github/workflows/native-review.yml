@@ -14,7 +14,6 @@ jobs:
     timeout-minutes: 60
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      CATALOG_OUTPUT: ${{ runner.temp }}/anchor-visual-catalog
 
     steps:
       - name: Check out Anchor
@@ -34,6 +33,8 @@ jobs:
         run: xcodegen generate
 
       - name: Render every primary surface offscreen
+        env:
+          CATALOG_OUTPUT: ${{ runner.temp }}/anchor-visual-catalog
         run: scripts/render-visual-catalog.sh "$CATALOG_OUTPUT"
 
       - name: Run complete macOS UI suite
