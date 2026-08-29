@@ -11,6 +11,35 @@ struct AnchorPlatformRecordTests {
         #expect(!AnchorPlatformSync.importsRemoteSessions)
     }
 
+    @Test("Account deletion uses the authenticated Better Auth endpoint")
+    func accountDeletionRequest() throws {
+        let request = AnchorAccountDeletionRequest.make(
+            identityURL: try #require(URL(string: "https://live.significanthobbies.com")),
+            bearerToken: "private-token"
+        )
+        #expect(request.url?.absoluteString == "https://live.significanthobbies.com/api/auth/delete-user")
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer private-token")
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        #expect(request.httpBody == Data("{}".utf8))
+    }
+
+    @Test("Account deletion reports service failures without exposing credentials")
+    func accountDeletionFailure() throws {
+        let response = try #require(HTTPURLResponse(
+            url: URL(string: "https://live.significanthobbies.com/api/auth/delete-user")!,
+            statusCode: 401,
+            httpVersion: nil,
+            headerFields: nil
+        ))
+        #expect(throws: AnchorAccountDeletionError.rejected(status: 401, message: "Sign in again")) {
+            try AnchorAccountDeletionRequest.validate(
+                data: Data(#"{"message":"Sign in again"}"#.utf8),
+                response: response
+            )
+        }
+    }
+
     @Test
     func finishedSessionContainsNoDistractionText() throws {
         let start = try #require(ISO8601DateFormatter().date(from: "2026-08-21T06:00:00Z"))

@@ -20,6 +20,9 @@ public struct HubAccountPanel: View {
     @Environment(\.anchorTheme) private var theme
     private let platform: AnchorPlatformSync?
     private let presentation: Presentation
+    @State private var showsDeleteConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var accountDeletionError: String?
 
     public init(
         platform: AnchorPlatformSync?,
@@ -45,6 +48,29 @@ public struct HubAccountPanel: View {
             accountState
         }
         .accessibilityElement(children: .contain)
+        .confirmationDialog(
+            "Delete Significant Hobbies account?",
+            isPresented: $showsDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete account permanently", role: .destructive) {
+                deleteConnectedAccount()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes your Hub account and its synced summaries. Your Anchor planner, history, and distraction notes on this device and in iCloud stay intact.")
+        }
+        .alert(
+            "Account could not be deleted",
+            isPresented: Binding(
+                get: { accountDeletionError != nil },
+                set: { if !$0 { accountDeletionError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { accountDeletionError = nil }
+        } message: {
+            Text(accountDeletionError ?? "Please try again.")
+        }
     }
 
     private var accountIntroduction: some View {
@@ -166,6 +192,13 @@ public struct HubAccountPanel: View {
         }
         .buttonStyle(QuietButtonStyle(expands: false))
         .accessibilityIdentifier("anchor.hub.sign-out")
+
+        Button("Delete account", role: .destructive) {
+            showsDeleteConfirmation = true
+        }
+        .buttonStyle(QuietButtonStyle(expands: false))
+        .disabled(isDeletingAccount)
+        .accessibilityIdentifier("anchor.hub.delete-account")
     }
 
     @ViewBuilder
@@ -243,6 +276,20 @@ public struct HubAccountPanel: View {
     private func lastSyncText(_ date: Date?) -> String {
         guard let date else { return "Never" }
         return date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func deleteConnectedAccount() {
+        guard let platform else { return }
+        isDeletingAccount = true
+        accountDeletionError = nil
+        Task {
+            do {
+                try await platform.deleteAccount()
+            } catch {
+                accountDeletionError = error.localizedDescription
+            }
+            isDeletingAccount = false
+        }
     }
 
     private func labelled(_ label: String, _ value: String) -> some View {

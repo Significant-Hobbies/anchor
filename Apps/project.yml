@@ -210,6 +210,10 @@ targets:
     platform: iOS
     sources:
       - path: LiveActivity
+      # The extension links UserDefaults through shared focus state, so Apple's
+      # required-reason policy requires its executable bundle to carry the same
+      # declaration as the phone and watch apps.
+      - path: Shared/PrivacyInfo.xcprivacy
     dependencies:
       - package: AnchorPackage
         product: AnchorUI
@@ -285,6 +289,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.ui-tests
         GENERATE_INFOPLIST_FILE: YES
+      configs:
+        DebugLocal:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+          DEVELOPMENT_TEAM: ""
 
   AnchorMacUITests:
     type: bundle.ui-testing
@@ -297,6 +308,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.mac-ui-tests
         GENERATE_INFOPLIST_FILE: YES
+      configs:
+        DebugLocal:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+          DEVELOPMENT_TEAM: ""
 
 schemes:
   Anchor (macOS):

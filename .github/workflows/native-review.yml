@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Check out Anchor
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install XcodeGen
         run: command -v xcodegen >/dev/null || brew install xcodegen
@@ -38,6 +38,8 @@ jobs:
         run: scripts/render-visual-catalog.sh "$CATALOG_OUTPUT"
 
       - name: Run complete macOS UI suite
+        id: mac-ui
+        continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 macos test \
             --project-path Apps/Anchor.xcodeproj \
@@ -47,6 +49,8 @@ jobs:
             --output json
 
       - name: Run complete iPhone UI suite
+        id: ios-ui
+        continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 simulator test \
             --project-path Apps/Anchor.xcodeproj \
@@ -57,6 +61,8 @@ jobs:
             --output json
 
       - name: Build watch companion
+        id: watch-build
+        continue-on-error: true
         run: |
           xcodebuild \
             -project Apps/Anchor.xcodeproj \
@@ -68,7 +74,7 @@ jobs:
 
       - name: Upload page catalog and native evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: anchor-native-review-${{ github.run_id }}
           if-no-files-found: warn
@@ -77,3 +83,14 @@ jobs:
             ${{ runner.temp }}/anchor-visual-catalog
             ~/Library/Developer/XcodeBuildMCP/workspaces/**/logs
             ~/Library/Developer/XcodeBuildMCP/workspaces/**/result-bundles
+
+      - name: Enforce every native gate
+        if: always()
+        env:
+          MAC_UI_OUTCOME: ${{ steps.mac-ui.outcome }}
+          IOS_UI_OUTCOME: ${{ steps.ios-ui.outcome }}
+          WATCH_BUILD_OUTCOME: ${{ steps.watch-build.outcome }}
+        run: |
+          test "$MAC_UI_OUTCOME" = success
+          test "$IOS_UI_OUTCOME" = success
+          test "$WATCH_BUILD_OUTCOME" = success

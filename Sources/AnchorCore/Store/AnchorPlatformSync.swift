@@ -97,6 +97,32 @@ public final class AnchorPlatformSync {
         await refreshPendingCount()
     }
 
+    /// Permanently removes the connected Significant Hobbies account. Anchor's
+    /// local and iCloud planner data remains independent and is not deleted.
+    public func deleteAccount() async throws {
+        guard sessionSynchronizationEnabled, let connection else {
+            throw AnchorAccountDeletionError.signedOut
+        }
+        guard let bearerToken = try await connection.identity.bearerToken() else {
+            throw AnchorAccountDeletionError.signedOut
+        }
+
+        let request = AnchorAccountDeletionRequest.make(
+            identityURL: Self.identityURL,
+            bearerToken: bearerToken
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try AnchorAccountDeletionRequest.validate(data: data, response: response)
+
+        // Always clear the device token after the service confirms deletion.
+        // A subsequent sign-out request may receive 401 because the account no
+        // longer exists; PersonalIdentityClient still removes the Keychain item.
+        await account?.signOut()
+        receipt = HubSyncReceipt()
+        receiptStore.save(receipt)
+        await refreshPendingCount()
+    }
+
     public func synchronize(announcing _: Bool = false) async {
         guard sessionSynchronizationEnabled else {
             pendingCount = 0
@@ -152,6 +178,51 @@ public final class AnchorPlatformSync {
         }
     }
 
+}
+
+public enum AnchorAccountDeletionError: LocalizedError, Equatable, Sendable {
+    case signedOut
+    case invalidResponse
+    case rejected(status: Int, message: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .signedOut:
+            "Sign in again before deleting this account."
+        case .invalidResponse:
+            "The account service returned an invalid response."
+        case let .rejected(_, message):
+            message
+        }
+    }
+}
+
+public enum AnchorAccountDeletionRequest {
+    public static func make(identityURL: URL, bearerToken: String) -> URLRequest {
+        var request = URLRequest(url: identityURL.appending(path: "api/auth/delete-user"))
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        return request
+    }
+
+    public static func validate(data: Data, response: URLResponse) throws {
+        guard let response = response as? HTTPURLResponse else {
+            throw AnchorAccountDeletionError.invalidResponse
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            let fallback = "The account could not be deleted. Sign in again and retry."
+            let message = (try? JSONDecoder().decode(ServiceError.self, from: data).message)
+                .flatMap { $0.isEmpty ? nil : $0 } ?? fallback
+            throw AnchorAccountDeletionError.rejected(
+                status: response.statusCode,
+                message: message
+            )
+        }
+    }
+
+    private struct ServiceError: Decodable { let message: String }
 }
 
 public enum AnchorExternalSyncPolicy {
