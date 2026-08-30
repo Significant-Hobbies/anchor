@@ -34,6 +34,22 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-08-31** — Released Anchor `1.0 (20)` for macOS from product source
+  commit `627a4e6`. The follow-up operational PRs [#47](https://github.com/Significant-Hobbies/anchor/pull/47)
+  and [#48](https://github.com/Significant-Hobbies/anchor/pull/48) added an isolated,
+  DEBUG-only CloudKit schema seed without changing the release binary. Development
+  and Production schemas now match exactly, and the installed Production build
+  exported all 110 queued objects before reporting zero remaining; no CloudKit
+  partial or batch failure occurred. All 172 package tests, the on-device tagging
+  diagnostic, the offscreen page catalog, and stable-Xcode Mac/iPhone/Watch builds
+  pass. The Developer ID DMG is notarized, stapled, Gatekeeper-accepted, and live
+  with SHA-256 `cbc431905f3a22ed85aad56a5ba489631dabd47be364f2288e394076ebeed781`.
+  Landing source `4eaadf2` and Pages deployment `e6c41d03` serve those exact bytes
+  at the custom-domain download. Build 20 is installed and running from
+  `/Applications/Anchor.app` as PID `51951`. The broader App Store audit still
+  keeps its separate authenticated-account, physical-iPhone, exact-archive, and
+  hosted UI evidence gates explicit; they are not claimed by this Mac release.
+
 - **2026-08-29** — Released Anchor `1.0 (18)` from source commit `0da9c7c`
   after the owner's first real product pass. Existing owners receive the current
   replay-safe onboarding once, release/demo runs no longer consume first-run
@@ -298,12 +314,12 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 | Surface | State |
 | --- | --- |
-| Anchor for macOS | **Installed and running as notarized 1.0 (18)**; public DMG passes stapler, Gatekeeper, Developer ID, hardened-runtime, Production CloudKit/APNs, and app-group verification |
+| Anchor for macOS | **Installed and running as notarized 1.0 (20)**; Production CloudKit exported all 110 queued objects, and the public DMG passes stapler, Gatekeeper, Developer ID, hardened-runtime, Production CloudKit/APNs, and app-group verification |
 | Anchor for iOS | **App Store Connect 1.0 (18) is VALID, APP_STORE_ELIGIBLE, and assigned to Personal Testing**; an exact-source development-signed 1.0 (18) is installed on the physical iPhone, where launch is pending only on the device being unlocked; the physical iPad remains unavailable |
 | Anchor for watchOS | Embedded in accepted build 1.0 (18) with Production CloudKit and APNs; simulator compilation passes, while physical-Watch inspection and installation require Developer Mode to be enabled on the paired Watch |
 | `anchor-mcp` | Working repo-built stdio MCP server, 10 tools; not bundled or advertised by the signed Mac app until protected-store access has an app-mediated design |
-| Landing pages | **Live at `anchor.significanthobbies.com` from `ios-landings` commit `b010889`**, with current schedule proof and the verified Mac download |
-| macOS DMG | **Build 18 is Developer ID signed, hardened, notarized, stapled, Gatekeeper-accepted, and publicly downloadable** |
+| Landing pages | **Live at `anchor.significanthobbies.com` from `ios-landings` commit `4eaadf2`**, with build 20 copy and the byte-verified Mac download |
+| macOS DMG | **Build 20 is Developer ID signed, hardened, notarized, stapled, Gatekeeper-accepted, and publicly downloadable** |
 | iOS/watchOS IPA | **App Store Connect accepted and internally assigned 1.0 (18)**, including Watch and Live Activity targets; the first App Review submission and final physical acceptance remain pending |
 
 Bundle IDs are `com.significanthobbies.anchor(.watchkitapp)`, signed against team
