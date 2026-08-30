@@ -207,31 +207,56 @@ public struct FocusScreen: View {
         let trimmedActual = actualIntent.trimmingCharacters(in: .whitespacesAndNewlines)
         let intent = isChangingActivity ? trimmedActual : block.title
         guard !intent.isEmpty else { return }
-        let session = controller.start(
-            goal: nil,
-            intent: intent,
-            minutes: max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
-            notes: block.details
-        )
-        block.sessionID = session.id
-        block.actualStartedAt = session.startedAt
-        block.state = .inProgress
-        if intent != block.title {
-            context.insert(DivergenceEvent(
-                blockID: block.id,
-                sessionID: session.id,
-                kind: .deliberateReplan,
-                note: "Did \(intent) instead of \(block.title)."
-            ))
-        }
         do {
-            try context.save()
+            try PlanBlockFocusStarter.start(
+                block,
+                intent: intent,
+                controller: controller,
+                context: context
+            )
             loadError = nil
         } catch {
             loadError = "Focus started, but Anchor could not link it to the schedule. It will still appear in History."
         }
         isChangingActivity = false
         actualIntent = ""
+    }
+}
+
+/// The one schedule-to-timer handoff used by both the main Focus surface and
+/// the Mac mini timer. Keeping the link in one place prevents a quick menu-bar
+/// start from becoming an unplanned session in the evening review.
+@MainActor
+enum PlanBlockFocusStarter {
+    static func start(
+        _ block: PlanBlock,
+        intent: String? = nil,
+        minutes: Int? = nil,
+        controller: FocusController,
+        context: ModelContext
+    ) throws {
+        let resolvedIntent = intent?.trimmingCharacters(in: .whitespacesAndNewlines) ?? block.title
+        guard !resolvedIntent.isEmpty else { return }
+
+        let session = controller.start(
+            goal: nil,
+            intent: resolvedIntent,
+            minutes: minutes ?? max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
+            notes: block.details
+        )
+        block.sessionID = session.id
+        block.actualStartedAt = session.startedAt
+        block.state = .inProgress
+
+        if resolvedIntent != block.title {
+            context.insert(DivergenceEvent(
+                blockID: block.id,
+                sessionID: session.id,
+                kind: .deliberateReplan,
+                note: "Did \(resolvedIntent) instead of \(block.title)."
+            ))
+        }
+        try context.save()
     }
 }
 
@@ -385,21 +410,18 @@ public struct RootView: View {
     @AppStorage("anchor.product-tour.seen.v4") private var unifiedOnboardingSeen = false
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
-    @State private var tab: AnchorTab = .focus
-    @State private var showsSettings = false
+    @Bindable private var navigation: AnchorNavigationModel
     @State private var forcedOnboardingFinished = false
     @State private var presentsOnboarding = false
 
     public init(
         controller: FocusController,
-        storeKind: AnchorStore.StoreKind = .persistent
+        storeKind: AnchorStore.StoreKind = .persistent,
+        navigation: AnchorNavigationModel
     ) {
         self.controller = controller
         self.storeKind = storeKind
-        _tab = State(
-            initialValue: DemoData.initialTab.flatMap(AnchorTab.demoValue)
-                ?? .focus
-        )
+        _navigation = Bindable(wrappedValue: navigation)
     }
 
     public var body: some View {
@@ -431,39 +453,38 @@ public struct RootView: View {
         #if os(macOS)
         MacAppShell(
             selection: Binding(
-                get: { tab },
+                get: { navigation.selectedTab },
                 set: { newValue in
-                    tab = newValue
-                    showsSettings = false
+                    navigation.select(newValue)
                 }
             ),
             controller: controller,
-            isSettingsSelected: showsSettings,
-            onSettings: { showsSettings = true }
+            isSettingsSelected: navigation.showsSettings,
+            onSettings: { navigation.showSettings() }
         ) {
-            if showsSettings {
+            if navigation.showsSettings {
                 SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding)
             } else {
-                screen(for: tab)
+                screen(for: navigation.selectedTab)
             }
         }
         .tint(theme.accent)
         #else
-        TabView(selection: $tab) {
+        TabView(selection: $navigation.selectedTab) {
             ForEach(AnchorTab.allCases) { item in
                 NavigationStack {
                     screen(for: item)
                         .navigationTitle(item.label)
                         .toolbar {
                             ToolbarItem(placement: .primaryAction) {
-                                Button { showsSettings = true } label: {
+                                Button { navigation.showSettings() } label: {
                                     Label("Settings", systemImage: "gearshape")
                                 }
                                 .accessibilityIdentifier("anchor.toolbar.settings")
                                 .help("Open Settings")
                             }
                         }
-                        .navigationDestination(isPresented: $showsSettings) {
+                        .navigationDestination(isPresented: $navigation.showsSettings) {
                             SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding)
                                 .navigationTitle("Settings")
                                 .toolbar(.hidden, for: .tabBar)
@@ -487,7 +508,7 @@ public struct RootView: View {
     }
 
     private func showOnboarding() {
-        showsSettings = false
+        navigation.showsSettings = false
         presentsOnboarding = true
     }
 
@@ -507,7 +528,7 @@ public struct RootView: View {
         }
         forcedOnboardingFinished = true
         presentsOnboarding = false
-        if openFocus { tab = .focus }
+        if openFocus { navigation.select(.focus) }
     }
 
     private var shouldForceOnboarding: Bool {
@@ -523,7 +544,7 @@ public struct RootView: View {
         Group {
             switch tab {
             case .focus: FocusScreen(controller: controller)
-            case .today: TodayScreen(controller: controller) { self.tab = .focus }
+            case .today: TodayScreen(controller: controller) { navigation.select(.focus) }
             case .habits: HabitsScreen()
             case .history: HistoryScreen()
             }

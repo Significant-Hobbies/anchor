@@ -115,7 +115,7 @@ private struct AnchorNavigationRail: View {
                 .padding(.bottom, metrics.compactHeight ? Space.md : Space.xl)
 
             VStack(spacing: metrics.navigationSpacing) {
-                ForEach(Array(AnchorTab.allCases.enumerated()), id: \.element.id) { index, item in
+                ForEach(AnchorTab.allCases) { item in
                     MacRailDestination(
                         item: item,
                         presentation: metrics.presentation,
@@ -124,10 +124,6 @@ private struct AnchorNavigationRail: View {
                     ) {
                         selection = item
                     }
-                    .keyboardShortcut(
-                        KeyEquivalent(Character(String(index + 1))),
-                        modifiers: .command
-                    )
                 }
             }
 
@@ -145,7 +141,6 @@ private struct AnchorNavigationRail: View {
                 isSelected: isSettingsSelected,
                 action: onSettings
             )
-            .keyboardShortcut(",", modifiers: .command)
         }
         .padding(.horizontal, metrics.railInset)
         .padding(.top, metrics.compactHeight ? Space.sm : Space.lg)
@@ -277,6 +272,7 @@ private struct MacRailDestination: View {
         .help(item.label)
         .accessibilityIdentifier("anchor.mac.nav.\(item.rawValue)")
         .accessibilityValue(isSelected ? "Selected" : "")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var backgroundColor: Color {

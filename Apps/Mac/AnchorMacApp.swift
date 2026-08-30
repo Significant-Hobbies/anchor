@@ -24,7 +24,7 @@ struct AnchorMacApp: App {
 
     var body: some Scene {
         // Identified so the menu-bar panel can raise it with `openWindow(id:)`.
-        WindowGroup(id: "main") {
+        Window("Anchor", id: "main") {
             AnchorProductRoot(world: world)
                 .task {
                     // Register after launch so SwiftData's CloudKit mirror can
@@ -36,7 +36,12 @@ struct AnchorMacApp: App {
         .defaultSize(width: 1_000, height: 720)
         .modelContainer(world.container)
         .commands {
-            CommandGroup(after: .newItem) {
+            AnchorNavigationCommands(
+                navigation: world.navigation,
+                openMainWindow: openMainWindow
+            )
+
+            CommandMenu("Focus") {
                 Button("Lock a Distraction") {
                     world.controller.beginManualCapture()
                 }
@@ -86,6 +91,37 @@ struct AnchorMacApp: App {
             MenuBarLabel(controller: world.controller)
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+private struct AnchorNavigationCommands: Commands {
+    let navigation: AnchorNavigationModel
+    let openMainWindow: () -> Void
+
+    var body: some Commands {
+        CommandMenu("Navigate") {
+            Button("Focus") { route(to: .focus) }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("Today") { route(to: .today) }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("Habits") { route(to: .habits) }
+                .keyboardShortcut("3", modifiers: .command)
+            Button("History") { route(to: .history) }
+                .keyboardShortcut("4", modifiers: .command)
+        }
+
+        CommandGroup(replacing: .appSettings) {
+            Button("Settings…") {
+                navigation.showSettings()
+                openMainWindow()
+            }
+                .keyboardShortcut(",", modifiers: .command)
+        }
+    }
+
+    private func route(to tab: AnchorTab) {
+        navigation.select(tab)
+        openMainWindow()
     }
 }
 

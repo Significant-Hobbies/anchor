@@ -167,6 +167,9 @@ private struct VisualCatalogRenderer {
             page("settings-mac", width: 1_200, height: 800) {
                 SettingsScreen(storeKind: .inMemory, onShowOnboarding: {})
             },
+            page("settings-mac-1440", width: 1_440, height: 900) {
+                SettingsScreen(storeKind: .inMemory, onShowOnboarding: {})
+            },
             page("onboarding-phone", width: 402, height: 874) {
                 AnchorOnboardingView(onComplete: {})
             },
@@ -174,6 +177,9 @@ private struct VisualCatalogRenderer {
                 AnchorOnboardingView(onComplete: {})
             },
             page("compact-panel", width: 300, height: 230) {
+                CompactPanel(controller: controller, onOpenWindow: {})
+            },
+            page("compact-panel-390", width: 390, height: 300) {
                 CompactPanel(controller: controller, onOpenWindow: {})
             },
             page("editor-block-mac", width: 720, height: 760) {
@@ -186,6 +192,9 @@ private struct VisualCatalogRenderer {
                 AnchorVisualCatalogSheet(.behaviorProfile)
             },
             page("editor-metadata-mac", width: 660, height: 680) {
+                AnchorVisualCatalogSheet(.metadataLibrary)
+            },
+            page("editor-metadata-mac-768", width: 768, height: 680) {
                 AnchorVisualCatalogSheet(.metadataLibrary)
             },
         ]

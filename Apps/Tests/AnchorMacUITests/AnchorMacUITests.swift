@@ -308,6 +308,19 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Archive Launch"].exists)
         XCTAssertTrue(app.buttons["Archive Deep work"].exists)
 
+        let projectName = app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch
+        projectName.click()
+        projectName.typeKey("a", modifierFlags: .command)
+        projectName.typeText("Launch plan")
+        app.buttons["Done"].click()
+
+        XCTAssertTrue(manage.waitForExistence(timeout: 3))
+        manage.click()
+        XCTAssertTrue(
+            app.textFields.matching(NSPredicate(format: "value == %@", "Launch plan"))
+                .firstMatch.waitForExistence(timeout: 3)
+        )
+
         keepScreenshot(app, named: "anchor-build19-mac-projects-tags")
     }
 
@@ -382,6 +395,31 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [endIsHittable], timeout: 3), .completed)
         end.click()
         XCTAssertTrue(miniTimer.staticTexts["Set your anchor"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testMiniTimerStartsTheScheduledBlockWithoutRetypingIt() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "mini-timer-schedule")
+        app.launch()
+
+        app.buttons["Today"].click()
+        app.buttons["Add a block"].click()
+        let title = app.textFields["What will you do?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        title.click()
+        title.typeText("Menu-bar launch review")
+        app.buttons["Save"].click()
+        XCTAssertTrue(element(containing: "Menu-bar launch review", in: app).waitForExistence(timeout: 4))
+
+        app.typeKey("0", modifierFlags: .command)
+        let miniTimer = app.windows["Mini Timer"]
+        XCTAssertTrue(miniTimer.waitForExistence(timeout: 4))
+        XCTAssertTrue(miniTimer.staticTexts["Menu-bar launch review"].waitForExistence(timeout: 3))
+        miniTimer.buttons["Start this block"].click()
+        XCTAssertTrue(miniTimer.buttons["Lock a distraction"].waitForExistence(timeout: 3))
+        miniTimer.buttons["End"].click()
     }
 
     @MainActor

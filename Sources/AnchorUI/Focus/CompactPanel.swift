@@ -15,7 +15,9 @@ import SwiftUI
 /// out of what you were doing.
 public struct CompactPanel: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.modelContext) private var context
     @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
+    @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
 
     private let controller: FocusController
     private let onOpenWindow: () -> Void
@@ -24,6 +26,9 @@ public struct CompactPanel: View {
     @State private var intent = ""
     @State private var minutes = 25
     @State private var quickNote = ""
+    @State private var now = Date()
+    @State private var showsAdHocComposer = false
+    @State private var startError: String?
     @FocusState private var intentFocused: Bool
     @FocusState private var noteFocused: Bool
 
@@ -59,6 +64,12 @@ public struct CompactPanel: View {
         .frame(maxHeight: 520)
         .scrollBounceBehavior(.basedOnSize)
         .background(theme.canvas)
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                now = Date()
+            }
+        }
     }
 
     // MARK: Running
@@ -152,6 +163,23 @@ public struct CompactPanel: View {
 
     private var idle: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
+            if let scheduledBlock, !showsAdHocComposer {
+                scheduledIdle(scheduledBlock)
+            } else {
+                adHocComposer
+            }
+
+            if let startError {
+                Label(startError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(theme.negative)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var adHocComposer: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
             Text("Set your anchor")
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(theme.textPrimary)
@@ -201,17 +229,107 @@ public struct CompactPanel: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(intent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+            if scheduledBlock != nil {
+                Button("Use the scheduled block") {
+                    showsAdHocComposer = false
+                    startError = nil
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(theme.textSecondary)
+                .frame(maxWidth: .infinity)
+            }
         }
+    }
+
+    private func scheduledIdle(_ block: PlanBlock) -> some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Text(scheduleEyebrow(for: block).uppercased())
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .tracking(1.1)
+                .foregroundStyle(theme.textTertiary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(block.title)
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(theme.textPrimary)
+                    .lineLimit(2)
+                Text("\(block.plannedStart.formatted(date: .omitted, time: .shortened)) · \(Format.duration(Double(block.plannedSeconds)))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.textSecondary)
+            }
+
+            Button {
+                start(block)
+            } label: {
+                Label("Start this block", systemImage: "play.fill")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+
+            Button("Start something else") {
+                showsAdHocComposer = true
+                startError = nil
+                Task { @MainActor in intentFocused = true }
+            }
+            .buttonStyle(QuietButtonStyle())
+        }
+    }
+
+    private var scheduledBlock: PlanBlock? {
+        guard let record = ScheduledFocusResolver().nextBlock(
+            from: blocks.map { $0.snapshot() },
+            now: now
+        ) else { return nil }
+        return blocks.first { $0.id == record.id }
+    }
+
+    private func scheduleEyebrow(for block: PlanBlock) -> String {
+        if block.plannedStart <= now, now < block.plannedEnd { return "Now" }
+        if block.plannedStart > now { return "Up next" }
+        return "Still open"
     }
 
     private func start() {
         let trimmed = intent.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        if let scheduledBlock {
+            do {
+                try PlanBlockFocusStarter.start(
+                    scheduledBlock,
+                    intent: trimmed,
+                    minutes: minutes,
+                    controller: controller,
+                    context: context
+                )
+                intent = ""
+                showsAdHocComposer = false
+                startError = nil
+            } catch {
+                startError = "Focus started, but the schedule change could not be saved."
+            }
+            return
+        }
         // Reuse a goal with the same name rather than growing a duplicate every
         // time the menu bar is used for the same work.
         let existing = goals.first { !$0.isArchived && $0.title == trimmed }
         controller.start(goal: existing, intent: trimmed, minutes: minutes)
         intent = ""
+        showsAdHocComposer = false
+        startError = nil
+    }
+
+    private func start(_ block: PlanBlock) {
+        do {
+            try PlanBlockFocusStarter.start(
+                block,
+                controller: controller,
+                context: context
+            )
+            startError = nil
+        } catch {
+            startError = "Focus started, but the schedule link could not be saved."
+        }
     }
 
     // MARK: Footer

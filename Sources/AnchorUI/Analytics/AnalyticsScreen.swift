@@ -151,7 +151,7 @@ public struct AnalyticsScreen: View {
                 } else {
                     comparisonRow("Focused time", current: current.focusedSeconds, previous: prior.focusedSeconds, format: Format.duration)
                     comparisonRow("Sessions", current: Double(current.sessionCount), previous: Double(prior.sessionCount)) { "\(Int($0.rounded()))" }
-                    comparisonRow("Completion", current: current.completionRate, previous: prior.completionRate, format: Format.percent)
+                    comparisonRow("Sessions run to plan", current: current.completionRate, previous: prior.completionRate, format: Format.percent)
                     comparisonRow("Interruptions / hour", current: current.interruptionsPerHour, previous: prior.interruptionsPerHour) { String(format: "%.1f", $0) }
                 }
             }
@@ -251,7 +251,6 @@ public struct AnalyticsScreen: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: Space.sm)], spacing: Space.sm) {
                     presenceMetric("Uninterrupted", Format.percent(overview.uninterruptedRate), theme.positive)
                     presenceMetric("45m+ sessions", "\(overview.deepSessionCount)", theme.accent)
-                    presenceMetric("Longest", Format.duration(overview.longestSessionSeconds), theme.textPrimary)
                     presenceMetric("Abandoned", "\(overview.abandonedCount)", theme.negative)
                 }
             }
@@ -294,9 +293,9 @@ public struct AnalyticsScreen: View {
                 symbol: "hourglass"
             )
             StatTile(
-                label: "Completed",
+                label: "Ran to plan",
                 value: Format.percent(overview.completionRate),
-                detail: "\(overview.completedCount) ran full length",
+                detail: "\(overview.completedCount) of \(overview.sessionCount) sessions",
                 symbol: "checkmark.seal",
                 tint: theme.positive
             )
@@ -315,10 +314,10 @@ public struct AnalyticsScreen: View {
                 tint: theme.accent
             )
             StatTile(
-                label: "Streak",
-                value: "\(overview.currentStreakDays)d",
-                detail: "best \(overview.bestStreakDays)d",
-                symbol: "flame"
+                label: "Longest",
+                value: Format.duration(overview.longestSessionSeconds),
+                detail: "single focused session",
+                symbol: "arrow.up.right"
             )
             StatTile(
                 label: "Typical session",

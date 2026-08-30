@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Build 19 flexible habits, non-disruptive visual QA, and branded Mac menu bar",
+  "target": "Mac daily-use polish: single window, native commands, scheduled mini timer, and metadata library",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
@@ -11,152 +11,57 @@
     "design": "DESIGN.md"
   },
   "direction": {
-    "references": [
-      "Anchor's original interruption line artwork",
-      "Indulge's original chosen-time balance artwork",
-      "Native iOS typography, spacing, and control hierarchy"
-    ],
-    "probes": [
-      {
-        "id": "doodle-scene",
-        "path": "artifacts/design/anchor-overhaul-directions/doodle-scene-390.png"
-      },
-      {
-        "id": "doodle-thread",
-        "path": "artifacts/design/anchor-overhaul-directions/doodle-thread-390.png"
-      },
-      {
-        "id": "doodle-companion",
-        "path": "artifacts/design/anchor-overhaul-directions/doodle-companion-390.png"
-      }
-    ],
-    "selected": "doodle-scene",
+    "references": [],
+    "probes": [],
+    "selected": "existing-design",
     "approval": "not-required",
-    "before": "artifacts/design/anchor-mac-focus.jpeg",
+    "before": "artifacts/design/build19/catalog/editor-metadata-mac.png",
+    "library": {
+      "strategy": "upstream-first",
+      "primary": "existing-project-system",
+      "sources": [],
+      "runtime": "existing",
+      "customReplacement": {
+        "used": false,
+        "authorization": "not-required",
+        "reason": ""
+      }
+    },
     "contract": {
       "purpose": "Help a person plan a realistic day, follow the current intention, capture what changes it, and learn why the day lived differed from the day planned.",
-      "purposeSource": "PRODUCT.md and site-health publicDirectory.projects.anchor.purposeContract",
-      "canonicalPurpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
+      "purposeSource": "PRODUCT.md and site-health projects.anchor purpose contract",
+      "canonicalPurpose": "Anchor helps a person plan a realistic day, keep the current intention visible, capture what changes it, and learn why the lived day differed from the plan.",
       "purposeAlignment": "match",
       "driftNote": "",
-      "audience": "A person moving between Mac, iPhone, and Apple Watch who wants a deliberate day rather than another task list.",
-      "job": "Build or confirm today's schedule, focus the current block, capture interruptions without friction, and review planned versus lived time.",
-      "thesis": "The Drawn Day pairs calm native controls with authored doodles so planning feels human while schedule state stays precise.",
-      "system": "Neutral paper and charcoal surfaces, native SF typography, a chronological day rail, one high-contrast action, warm interruption-origin colors, and one purposeful doodle per primary surface.",
-      "signature": "The same drawn-day line moves from the Today schedule into Focus context and returns as the planned-versus-lived trace in History.",
-      "risk": "Doodle-first personality can crowd an operating surface; each screen limits art to one purposeful scene that yields to controls and collapses as density rises."
+      "audience": "A private owner who plans and focuses from a Mac and expects the app to behave like a polished native utility throughout the workday.",
+      "job": "Make the next planned action immediately startable, keep the timer reachable without context switching, and make reusable project and tag context trustworthy to edit.",
+      "thesis": "Preserve The Drawn Day while making Mac structure quieter and more native: one window, discoverable menus, a schedule-aware mini timer, and calm editable libraries.",
+      "system": "Existing neutral paper and charcoal surfaces, SF typography, one ink action, Anchor spacing and radii, native Mac menus and fields, and authored colour only for meaningful project or interruption context.",
+      "signature": "The scheduled intention moves directly from Today into the menu-bar timer, so Anchor stays present without pulling the owner out of their work.",
+      "risk": "Adding capability to the mini timer could make it noisy; scheduled context is limited to one current or next block and yields to the existing compact composer."
     }
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/anchor-ios-focus.png"
-      },
-      {
-        "width": 390,
-        "path": "artifacts/design/anchor-ios-settings.png"
-      },
-      {
-        "width": 1264,
-        "path": "artifacts/design/anchor-mac-focus.jpeg"
-      },
-      {
-        "width": 1264,
-        "path": "artifacts/design/anchor-mac-settings.jpeg"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/anchor-ios-hub-onboarding.png"
-      },
-      {
-        "width": 1100,
-        "path": "artifacts/design/anchor-mac-hub-onboarding.png"
+        "path": "artifacts/design/mac-polish/after/compact-panel-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/anchor-mac-hub-onboarding-768.png"
+        "path": "artifacts/design/mac-polish/after/editor-metadata-mac-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/anchor-mac-hub-onboarding-1440.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/final-evidence-ios-today-20260827.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/final-evidence-ios-focus-20260827.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/final-evidence-ios-habits-20260827.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/final-evidence-ios-history-20260827.png"
-      },
-      {
-        "width": 208,
-        "path": "artifacts/design/final-evidence-watch-focus-20260827.png"
-      },
-      {
-        "width": 390,
-        "path": "artifacts/design/build18/anchor-ios-patterns-saved-390.png"
-      },
-      {
-        "width": 768,
-        "path": "artifacts/design/build18/anchor-mac-focus-768.png"
-      },
-      {
-        "width": 1440,
-        "path": "artifacts/design/build18/anchor-mac-focus-1440.png"
-      },
-      {
-        "width": 1440,
-        "path": "artifacts/design/build18/anchor-mac-patterns-saved-1440.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/build19/anchor-ios-habits-402.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/build19/anchor-ios-projects-tags-402.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/build19/flexible-habits-ios/F734F394-51E2-4C85-B016-3449D31D72E3.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/build19/catalog/habits-phone.png"
-      },
-      {
-        "width": 1200,
-        "path": "artifacts/design/build19/catalog/habits-mac.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/build19/catalog/history-day-phone.png"
-      },
-      {
-        "width": 760,
-        "path": "artifacts/design/build19/catalog/editor-patterns-mac.png"
-      },
-      {
-        "width": 660,
-        "path": "artifacts/design/build19/catalog/editor-metadata-mac.png"
+        "path": "artifacts/design/mac-polish/after/settings-mac-1440.png"
       }
     ],
     "projectCheck": {
-      "command": "swift test; hidden 21-surface visual catalog; non-interactive iPhone and watchOS builds; anchor-mcp --diagnose; design-workflow check",
-      "status": "pass",
-      "note": "All 147 package and source-contract tests pass. A hidden LSUIElement catalog renders 21 real Focus, Today, Habits, History, Settings, onboarding, compact-timer, and editor surfaces from an in-memory store without activating a window. Every output was inspected individually. History no longer exposes a duplicate picker label; habit progress uses the chosen weekly denominator, clear weekday names, always-available adjustment, and a non-duplicated overflow menu. iPhone and watchOS DebugLocal builds pass without launching UI. Interactive UI remains an explicit isolated-runner gate."
+      "command": "rtk swift test && xcodebuildmcp macos build --scheme Anchor (macOS) --configuration DebugLocal",
+      "status": "pass"
     },
     "critique": {
-      "score": 36,
+      "score": 34,
       "maximum": 40
     },
     "audit": {
@@ -169,14 +74,35 @@
     },
     "detector": {
       "posture": "advisory",
-      "findings": []
+      "findings": [
+        "Native SwiftUI surface; browser UI detector is not applicable."
+      ]
     },
     "comprehension": {
-      "status": "not-applicable"
+      "status": "not-applicable",
+      "reviewer": "",
+      "answers": {
+        "product": "",
+        "audience": "",
+        "value": "",
+        "mechanism": "",
+        "proof": "",
+        "nextAction": ""
+      },
+      "purposeScore": {
+        "product": 0,
+        "audience": 0,
+        "value": 0,
+        "mechanism": 0,
+        "proof": 0,
+        "nextAction": 0,
+        "total": 0
+      },
+      "mismatches": []
     }
   },
   "ownerFeedback": {
-    "decision": "keep",
-    "note": "Round 0 rejected: the Day Overlay and Focus Viewfinder felt too simple and basic; Departure Lines had welcome authorship but its literal depot-board execution did not earn selection. Round 1 was rejected as too funky. The owner pinned the world to simple, premium, and doodle-first, selected Doodle Scene as the structural base, rejected the first repeated selector drawings, and asked for neutral chrome so authored colour could pop. The owner approved the implemented direction on 2026-08-25 and requested one final button refinement. Primary, quiet, and transport controls now share shallow physical depth and settle-on-press feedback. Dark is now the shared product default, with one iCloud-backed System, Light, or Dark choice for every Anchor device. The owner then asked for signup inside onboarding, a stronger Settings account experience, a real Google mark, and verified top-toolbar behavior; the shared Hub panel and responsive six-stage onboarding now carry that direction. The final account composition is viewport-centered, uses compact secondary actions, and leaves Mac window chrome entirely to the native title bar. On 2026-08-29 the owner said the aesthetic should be preserved, while rejecting the glossy blue icon, missing owner onboarding, invisible behavior-profile persistence, crashing Google callback, and stacked Mac selection cues. Build 18 keeps the visual world and closes those trust breaks with the paper-and-ink Anchor face, versioned replay-safe onboarding, persistent auto-save feedback, isolated browser callback handling, and one selected rail surface. Build 19 stays in that preserve lane: habits are flexible daily intentions with optional time suggestions, honest untimed completion, deliberate placement into Today, and progress tied to chosen days rather than seven calendar days; projects, tags, and every weekday retain direct native management. The Mac menu bar now carries a simplified monochrome Anchor face instead of a generic scope symbol. A 21-surface hidden catalog now protects that aesthetic page by page without interrupting the owner's active desktop; full interaction automation moves to a manually dispatched isolated runner."
+    "decision": "agent-selected",
+    "note": "The owner directed a Mac-only preserve pass and clarified the core: maintain habits, sort the calendar, start and stop focus, and review focus hours and blockers. No scope expansion was taken."
   }
 }

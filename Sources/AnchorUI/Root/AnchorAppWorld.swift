@@ -24,6 +24,7 @@ public final class AnchorAppWorld {
     public let controller: FocusController
     public let storeKind: AnchorStore.StoreKind
     public let platform: AnchorPlatformSync
+    public let navigation: AnchorNavigationModel
 
     #if os(macOS)
     private let machineActivityMonitor: MachineActivityMonitor
@@ -40,6 +41,9 @@ public final class AnchorAppWorld {
 
         container = result.container
         storeKind = result.kind
+        navigation = AnchorNavigationModel(
+            selectedTab: DemoData.initialTab.flatMap(AnchorTab.demoValue) ?? .focus
+        )
         if DemoData.isRequested {
             DemoData.seedIfNeeded(into: result.container.mainContext)
         }
@@ -78,10 +82,37 @@ public struct AnchorProductRoot: View {
     }
 
     public var body: some View {
-        RootView(controller: world.controller, storeKind: world.storeKind)
+        RootView(
+            controller: world.controller,
+            storeKind: world.storeKind,
+            navigation: world.navigation
+        )
             .anchorAppearance()
             .environment(\.anchorPlatformSync, world.platform)
             .task { await world.platform.restoreAndSynchronize() }
+    }
+}
+
+/// Process-lifetime navigation shared by the app window and native Mac menus.
+/// Keeping it outside focused values means commands still work from the mini
+/// timer and can restore a closed main window at the requested destination.
+@MainActor
+@Observable
+public final class AnchorNavigationModel {
+    public var selectedTab: AnchorTab
+    public var showsSettings = false
+
+    public init(selectedTab: AnchorTab = .focus) {
+        self.selectedTab = selectedTab
+    }
+
+    public func select(_ tab: AnchorTab) {
+        selectedTab = tab
+        showsSettings = false
+    }
+
+    public func showSettings() {
+        showsSettings = true
     }
 }
 

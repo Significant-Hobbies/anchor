@@ -428,7 +428,6 @@ public struct AnalyticsEngine: Sendable {
             // Same rounding the UI uses, so the model can never quote a number
             // that disagrees with the tile sitting next to it.
             "Recovered after parking: \(Int((stats.recoveryRate * 100).rounded()))% of interruptions.",
-            "Current streak: \(stats.currentStreakDays) days.",
         ]
         if !goals.isEmpty {
             lines.append("Top goals by time: " + goals.map {

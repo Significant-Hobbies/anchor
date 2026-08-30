@@ -64,6 +64,24 @@ struct AppArchitectureTests {
         }
     }
 
+    @Test("The Mac app is a single-window utility with discoverable native commands")
+    func macUsesOneWindowAndNativeMenus() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: repository.appending(path: "Apps/Mac/AnchorMacApp.swift"),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("Window(\"Anchor\", id: \"main\")"))
+        #expect(!source.contains("WindowGroup(id: \"main\")"))
+        #expect(source.contains("CommandMenu(\"Navigate\")"))
+        #expect(source.contains("CommandMenu(\"Focus\")"))
+        #expect(source.contains("CommandGroup(replacing: .appSettings)"))
+    }
+
     @Test("Local-only build selection is shared by both full apps")
     func buildConfigurationUsesSharedFactory() throws {
         let repository = URL(fileURLWithPath: #filePath)
