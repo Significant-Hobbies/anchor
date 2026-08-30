@@ -44,7 +44,13 @@ public final class AnchorAppWorld {
         navigation = AnchorNavigationModel(
             selectedTab: DemoData.initialTab.flatMap(AnchorTab.demoValue) ?? .focus
         )
-        if DemoData.isRequested {
+        if CloudKitSchemaSeed.isRequested {
+            do {
+                try CloudKitSchemaSeed.seedIfNeeded(into: result.container.mainContext)
+            } catch {
+                fatalError("Anchor could not save its CloudKit schema seed: \(error)")
+            }
+        } else if DemoData.isRequested {
             DemoData.seedIfNeeded(into: result.container.mainContext)
         }
 

@@ -72,14 +72,28 @@ public enum AnchorStore {
 
     /// Build a container. Throws rather than trapping so the app can show a real
     /// error instead of dying on launch with a corrupt store.
-    public static func makeContainer(kind: StoreKind = .persistent) throws -> ModelContainer {
-        try ModelContainer(for: schema, configurations: configuration(kind: kind))
+    public static func makeContainer(
+        kind: StoreKind = .persistent,
+        url: URL? = nil
+    ) throws -> ModelContainer {
+        try ModelContainer(for: schema, configurations: configuration(kind: kind, url: url))
     }
 
     /// Best-effort container: tries CloudKit, falls back to local-only, then to
     /// memory. The app stays usable even when iCloud is misconfigured — losing
     /// sync should never mean losing the ability to start a timer.
     public static func makeResilientContainer() -> (container: ModelContainer, kind: StoreKind) {
+        if CloudKitSchemaSeed.isRequested {
+            guard let url = CloudKitSchemaSeed.storeURL() else {
+                fatalError("Anchor schema seeding requires the signed app-group entitlement.")
+            }
+            do {
+                return (try makeContainer(kind: .persistent, url: url), .persistent)
+            } catch {
+                fatalError("Anchor could not open its CloudKit schema-seed store: \(error)")
+            }
+        }
+
         for kind in resilientStoreKinds(
             hasExplicitStorePath: ProcessInfo.processInfo.environment["ANCHOR_STORE_PATH"]?.isEmpty == false
         ) {

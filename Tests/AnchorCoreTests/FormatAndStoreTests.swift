@@ -245,6 +245,38 @@ struct DemoDataTests {
     }
 }
 
+@Suite("CloudKit schema seed")
+struct CloudKitSchemaSeedTests {
+    @MainActor
+    @Test("The seed materializes every current model without user content")
+    func coversTheCompleteSchema() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContextFactory.make(container)
+
+        try CloudKitSchemaSeed.seedIfNeeded(into: context)
+
+        #expect(try context.fetchCount(FetchDescriptor<Project>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<SavedTag>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<Goal>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<FocusSession>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<Distraction>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<MachineActivityDay>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<AnchorPreferences>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<BehaviorProfile>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<ScheduleTemplate>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<HabitCompletion>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<DayPlanConfirmation>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<PlanBlock>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<DivergenceEvent>()) == 1)
+
+        let distraction = try #require(context.fetch(FetchDescriptor<Distraction>()).first)
+        #expect(distraction.note.isEmpty)
+
+        try CloudKitSchemaSeed.seedIfNeeded(into: context)
+        #expect(try context.fetchCount(FetchDescriptor<ScheduleTemplate>()) == 1)
+    }
+}
+
 import SwiftData
 
 /// Tiny helper so the SwiftData import stays confined to where it is needed.
