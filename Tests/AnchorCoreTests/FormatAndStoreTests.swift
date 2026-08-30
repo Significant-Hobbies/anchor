@@ -271,6 +271,42 @@ struct CloudKitSchemaSeedTests {
 
         let distraction = try #require(context.fetch(FetchDescriptor<Distraction>()).first)
         #expect(distraction.note.isEmpty)
+        #expect(distraction.kind != nil)
+        #expect(distraction.handledAt != nil)
+        #expect(distraction.session != nil)
+
+        let session = try #require(context.fetch(FetchDescriptor<FocusSession>()).first)
+        #expect(session.goal != nil)
+        #expect(session.project != nil)
+        #expect(session.runningSince != nil)
+        #expect(session.pausedAt != nil)
+        #expect(session.endedAt != nil)
+        #expect(session.endReason != nil)
+
+        let schedule = try #require(context.fetch(FetchDescriptor<ScheduleTemplate>()).first)
+        #expect(schedule.archivedAt != nil)
+        #expect(schedule.behaviorPattern != nil)
+        #expect(schedule.lifeDirection != nil)
+        #expect(schedule.graduatedAt != nil)
+        #expect(schedule.habitLevelStartedAt != nil)
+        #expect(schedule.lastProgressPromptedAt != nil)
+
+        let confirmation = try #require(context.fetch(FetchDescriptor<DayPlanConfirmation>()).first)
+        #expect(confirmation.confirmedAt != nil)
+        #expect(confirmation.deferredAt != nil)
+
+        let block = try #require(context.fetch(FetchDescriptor<PlanBlock>()).first)
+        #expect(block.templateID != nil)
+        #expect(block.templateOccurrenceDay != nil)
+        #expect(block.sessionID != nil)
+        #expect(block.actualStartedAt != nil)
+        #expect(block.actualEndedAt != nil)
+        #expect(block.behaviorPattern != nil)
+        #expect(block.lifeDirection != nil)
+
+        let divergence = try #require(context.fetch(FetchDescriptor<DivergenceEvent>()).first)
+        #expect(divergence.sessionID != nil)
+        #expect(divergence.distractionID != nil)
 
         try CloudKitSchemaSeed.seedIfNeeded(into: context)
         #expect(try context.fetchCount(FetchDescriptor<ScheduleTemplate>()) == 1)
