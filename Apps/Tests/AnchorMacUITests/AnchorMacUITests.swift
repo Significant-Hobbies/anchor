@@ -405,7 +405,7 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons["Today"].click()
-        app.buttons["Add a block"].click()
+        app.buttons["Add the first block"].click()
         let title = app.textFields["What will you do?"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
