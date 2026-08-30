@@ -25,68 +25,138 @@ public enum CloudKitSchemaSeed {
         return group.appending(path: "Anchor-CloudKitSchemaSeed.store")
     }
 
-    /// Inserts one minimal record for every model absent from the seed store.
+    /// Inserts or enriches one synthetic record for every model. Optional
+    /// properties must be non-nil here because CloudKit's just-in-time schema
+    /// generation only materializes fields present in an exported record.
     /// No user-authored content is copied into Development.
     @MainActor
     public static func seedIfNeeded(into context: ModelContext) throws {
-        if isEmpty(Project.self, in: context) {
-            context.insert(Project(name: "Schema seed"))
+        let timestamp = Date()
+
+        let project = try firstOrInsert(Project.self, into: context) {
+            Project(name: "Schema seed")
         }
-        if isEmpty(SavedTag.self, in: context) {
-            context.insert(SavedTag(name: "schema-seed"))
+        project.archivedAt = timestamp
+
+        let tag = try firstOrInsert(SavedTag.self, into: context) {
+            SavedTag(name: "schema-seed")
         }
-        if isEmpty(Goal.self, in: context) {
-            context.insert(Goal(title: "Schema seed"))
+        tag.archivedAt = timestamp
+
+        let goal = try firstOrInsert(Goal.self, into: context) {
+            Goal(title: "Schema seed")
         }
-        if isEmpty(FocusSession.self, in: context) {
-            let session = FocusSession(goal: nil, intent: "", plannedSeconds: 60)
-            session.state = .finished
-            session.runningSince = nil
-            session.endedAt = session.startedAt
-            session.endReason = .completed
-            context.insert(session)
+        goal.archivedAt = timestamp
+        goal.theme = .other
+
+        let session = try firstOrInsert(FocusSession.self, into: context) {
+            FocusSession(goal: goal, intent: "", project: project, plannedSeconds: 60)
         }
-        if isEmpty(Distraction.self, in: context) {
-            context.insert(Distraction(note: ""))
+        session.goal = goal
+        session.project = project
+        session.state = .finished
+        session.runningSince = timestamp
+        session.pausedAt = timestamp
+        session.endedAt = timestamp
+        session.endReason = .completed
+
+        let distraction = try firstOrInsert(Distraction.self, into: context) {
+            Distraction(note: "", session: session)
         }
-        if isEmpty(MachineActivityDay.self, in: context) {
-            context.insert(MachineActivityDay(day: Date()))
+        distraction.note = ""
+        distraction.session = session
+        distraction.kind = .other
+        distraction.handledAt = timestamp
+
+        _ = try firstOrInsert(MachineActivityDay.self, into: context) {
+            MachineActivityDay(day: timestamp)
         }
-        if isEmpty(AnchorPreferences.self, in: context) {
-            context.insert(AnchorPreferences())
+
+        _ = try firstOrInsert(AnchorPreferences.self, into: context) {
+            AnchorPreferences()
         }
-        if isEmpty(BehaviorProfile.self, in: context) {
-            context.insert(BehaviorProfile())
+
+        let profile = try firstOrInsert(BehaviorProfile.self, into: context) {
+            BehaviorProfile()
         }
-        if isEmpty(ScheduleTemplate.self, in: context) {
-            context.insert(
-                ScheduleTemplate(
-                    title: "Schema seed",
-                    startMinutesFromMidnight: 0,
-                    plannedSeconds: 60
-                )
+        profile.selectedPatterns = [.socialFeeds]
+        profile.desiredDirections = [.focus]
+
+        let schedule = try firstOrInsert(ScheduleTemplate.self, into: context) {
+            ScheduleTemplate(
+                title: "Schema seed",
+                startMinutesFromMidnight: 0,
+                plannedSeconds: 60
             )
         }
-        if isEmpty(HabitCompletion.self, in: context) {
-            context.insert(HabitCompletion(habitID: UUID(), day: Date()))
+        schedule.archivedAt = timestamp
+        schedule.behaviorPattern = .socialFeeds
+        schedule.lifeDirection = .focus
+        schedule.isBehaviorHabit = true
+        schedule.graduatedAt = timestamp
+        schedule.habitLevelStartedAt = timestamp
+        schedule.lastProgressPromptedAt = timestamp
+
+        let completion = try firstOrInsert(HabitCompletion.self, into: context) {
+            HabitCompletion(habitID: schedule.id, day: timestamp)
         }
-        if isEmpty(DayPlanConfirmation.self, in: context) {
-            context.insert(DayPlanConfirmation(day: Date(), decision: .later))
+        completion.completedAt = timestamp
+
+        let confirmation = try firstOrInsert(DayPlanConfirmation.self, into: context) {
+            DayPlanConfirmation(day: timestamp, decision: .adjusted)
         }
-        if isEmpty(PlanBlock.self, in: context) {
-            context.insert(PlanBlock(title: "Schema seed", plannedStart: Date(), plannedSeconds: 60))
+        confirmation.confirmedAt = timestamp
+        confirmation.deferredAt = timestamp
+
+        let block = try firstOrInsert(PlanBlock.self, into: context) {
+            PlanBlock(
+                templateID: schedule.id,
+                templateOccurrenceDay: timestamp,
+                isTemplateOverride: true,
+                title: "Schema seed",
+                plannedStart: timestamp,
+                plannedSeconds: 60,
+                behaviorPattern: .socialFeeds,
+                lifeDirection: .focus
+            )
         }
-        if isEmpty(DivergenceEvent.self, in: context) {
-            context.insert(DivergenceEvent(blockID: UUID(), kind: .unknown))
+        block.templateID = schedule.id
+        block.templateOccurrenceDay = timestamp
+        block.isTemplateOverride = true
+        block.sessionID = session.id
+        block.actualStartedAt = timestamp
+        block.actualEndedAt = timestamp
+        block.behaviorPattern = .socialFeeds
+        block.lifeDirection = .focus
+        block.state = .completed
+
+        let divergence = try firstOrInsert(DivergenceEvent.self, into: context) {
+            DivergenceEvent(
+                blockID: block.id,
+                sessionID: session.id,
+                distractionID: distraction.id,
+                kind: .unknown
+            )
         }
+        divergence.sessionID = session.id
+        divergence.distractionID = distraction.id
 
         try context.save()
     }
 
-    private static func isEmpty<Model: PersistentModel>(
+    @MainActor
+    private static func firstOrInsert<Model: PersistentModel>(
         _ type: Model.Type,
-        in context: ModelContext
-    ) -> Bool {
-        ((try? context.fetchCount(FetchDescriptor<Model>())) ?? 0) == 0
+        into context: ModelContext,
+        make: () -> Model
+    ) throws -> Model {
+        var descriptor = FetchDescriptor<Model>()
+        descriptor.fetchLimit = 1
+        if let existing = try context.fetch(descriptor).first {
+            return existing
+        }
+        let model = make()
+        context.insert(model)
+        return model
     }
 }
