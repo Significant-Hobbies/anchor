@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Mac daily-use polish: single window, native commands, scheduled mini timer, and metadata library",
+  "target": "Build 20 Mac daily-use polish: single window, native commands, scheduled mini timer, and metadata library",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
