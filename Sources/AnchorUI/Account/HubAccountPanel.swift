@@ -2,6 +2,9 @@
 import AnchorCore
 import AuthenticationServices
 import SwiftUI
+#if os(macOS)
+import Security
+#endif
 
 enum HubAccountLayout {
     static let controlMaxWidth: CGFloat = 340
@@ -205,26 +208,32 @@ public struct HubAccountPanel: View {
     private func signedOutState(platform: AnchorPlatformSync) -> some View {
         if let account = platform.account {
             VStack(alignment: .leading, spacing: Space.sm) {
-                Text("Choose an account provider")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(theme.textTertiary)
+                if nativeAppleSignInAvailable {
+                    Text("Choose an account provider")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(theme.textTertiary)
 
-                SignInWithAppleButton(.continue) { request in
-                    account.prepareApple(request)
-                } onCompletion: { result in
-                    Task {
-                        await account.completeApple(result)
-                        if account.isSignedIn {
-                            await platform.synchronize(announcing: true)
+                    SignInWithAppleButton(.continue) { request in
+                        account.prepareApple(request)
+                    } onCompletion: { result in
+                        Task {
+                            await account.completeApple(result)
+                            if account.isSignedIn {
+                                await platform.synchronize(announcing: true)
+                            }
                         }
                     }
+                    .signInWithAppleButtonStyle(theme.isDark ? .white : .black)
+                    .frame(maxWidth: HubAccountLayout.controlMaxWidth, minHeight: 44)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(.capsule)
+                    .disabled(account.isConnecting)
+                    .accessibilityIdentifier("anchor.hub.sign-in-apple")
+                } else {
+                    Text("Connect your Hub account")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(theme.textTertiary)
                 }
-                .signInWithAppleButtonStyle(theme.isDark ? .white : .black)
-                .frame(maxWidth: HubAccountLayout.controlMaxWidth, minHeight: 44)
-                .frame(maxWidth: .infinity)
-                .clipShape(.capsule)
-                .disabled(account.isConnecting)
-                .accessibilityIdentifier("anchor.hub.sign-in-apple")
 
                 Button {
                     Task { await platform.connect() }
@@ -264,6 +273,19 @@ public struct HubAccountPanel: View {
 
     private var isSignedIn: Bool {
         platform?.account?.isSignedIn == true
+    }
+
+    private var nativeAppleSignInAvailable: Bool {
+        #if os(macOS)
+        guard let task = SecTaskCreateFromSelf(nil) else { return false }
+        return SecTaskCopyValueForEntitlement(
+            task,
+            "com.apple.developer.applesignin" as CFString,
+            nil
+        ) != nil
+        #else
+        return true
+        #endif
     }
 
     private func statusText(_ platform: AnchorPlatformSync) -> String {

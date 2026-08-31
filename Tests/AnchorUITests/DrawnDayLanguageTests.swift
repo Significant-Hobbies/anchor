@@ -77,12 +77,14 @@ struct DrawnDayLanguageTests {
             in: repository
         )
         let settings = try source("Sources/AnchorUI/Root/SettingsScreen.swift", in: repository)
-
         #expect(account.contains("public struct HubAccountPanel"))
         #expect(account.contains("anchor.hub.delete-account"))
         #expect(account.contains("Delete account permanently"))
         #expect(account.contains("goal, timing, outcome, and interruption count"))
         #expect(account.contains("Image(\"GoogleSignInMark\")"))
+        #expect(account.contains("nativeAppleSignInAvailable"))
+        #expect(account.contains("SecTaskCopyValueForEntitlement"))
+        #expect(account.contains("Connect your Hub account"))
         #expect(onboarding.contains("presentation: .onboarding"))
         #expect(onboarding.contains("Continue locally"))
         #expect(settings.contains("presentation: .settings"))
