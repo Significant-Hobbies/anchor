@@ -97,6 +97,25 @@ struct AppArchitectureTests {
         #expect(factory.contains("ANCHOR_LOCAL_ONLY"))
     }
 
+    @Test("Unsigned Mac builds cannot masquerade as the installed Anchor app")
+    func macLocalBuildHasDistinctIdentity() throws {
+        let repository = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let project = try String(
+            contentsOf: repository.appending(path: "Apps/project.yml"),
+            encoding: .utf8
+        )
+        let macTarget = try #require(
+            project.split(separator: "  AnchorIOS:", maxSplits: 1).first.map(String.init)
+        )
+
+        #expect(macTarget.contains("PRODUCT_NAME: Anchor Local"))
+        #expect(macTarget.contains("PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.local"))
+        #expect(macTarget.contains("CFBundleDisplayName: $(PRODUCT_NAME)"))
+    }
+
     @Test("Flexible habits remain available until explicitly completed or placed")
     func habitsStayDistinctFromTimedScheduleBlocks() throws {
         let repository = URL(fileURLWithPath: #filePath)

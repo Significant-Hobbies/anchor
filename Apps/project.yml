@@ -65,6 +65,11 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
       configs:
         DebugLocal:
+          # Keep unsigned QA builds visibly and technically distinct from the
+          # installed production app. Multiple identical Anchor bundles made a
+          # local-only onboarding window look like the released build.
+          PRODUCT_NAME: Anchor Local
+          PRODUCT_BUNDLE_IDENTIFIER: com.significanthobbies.anchor.local
           CODE_SIGN_ENTITLEMENTS: ""
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: "-"
@@ -82,8 +87,8 @@ targets:
     info:
       path: Mac/Info.plist
       properties:
-        CFBundleName: Anchor
-        CFBundleDisplayName: Anchor
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundleDisplayName: $(PRODUCT_NAME)
         CFBundlePackageType: APPL
         CFBundleURLTypes:
           - CFBundleTypeRole: Editor
