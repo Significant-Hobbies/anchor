@@ -21,6 +21,7 @@ public struct HubAccountPanel: View {
     }
 
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     private let platform: AnchorPlatformSync?
     private let presentation: Presentation
     @State private var showsDeleteConfirmation = false
@@ -236,7 +237,19 @@ public struct HubAccountPanel: View {
                 }
 
                 Button {
-                    Task { await platform.connect() }
+                    Task {
+                        await account.connectWithGoogle { url, callbackScheme in
+                            try await webAuthenticationSession.authenticate(
+                                using: url,
+                                callback: .customScheme(callbackScheme),
+                                preferredBrowserSession: nil,
+                                additionalHeaderFields: [:]
+                            )
+                        }
+                        if account.isSignedIn {
+                            await platform.synchronize(announcing: true)
+                        }
+                    }
                 } label: {
                     HStack(spacing: Space.xs) {
                         if account.isConnecting {
