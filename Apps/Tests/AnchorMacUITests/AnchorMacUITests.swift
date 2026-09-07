@@ -202,8 +202,12 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Undo check-off"].click()
         XCTAssertTrue(app.buttons["anchor.habits.complete"].exists)
 
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "More actions for")).firstMatch.click()
-        app.buttons["Edit habit"].click()
+        let habitMenu = app.popUpButtons["More actions for Two-day reset"]
+        XCTAssertTrue(habitMenu.waitForExistence(timeout: 4))
+        habitMenu.click()
+        let editHabit = app.menuItems["Edit habit"]
+        XCTAssertTrue(editHabit.waitForExistence(timeout: 3))
+        editHabit.click()
         let editedTitle = app.textFields["What will you do?"]
         editedTitle.click()
         editedTitle.typeKey("a", modifierFlags: .command)
@@ -234,7 +238,16 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons["Today"].click()
-        app.buttons["Set up usual week"].click()
+        app.buttons["Add the first entry"].click()
+        let initialTitle = app.textFields["What will you do?"]
+        XCTAssertTrue(initialTitle.waitForExistence(timeout: 3))
+        initialTitle.click()
+        initialTitle.typeText("Initial weekly entry")
+        app.checkBoxes["Repeat weekly"].click()
+        app.buttons["Save"].click()
+        let usualWeek = app.buttons["Your usual week · 1 item"]
+        XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))
+        usualWeek.click()
         XCTAssertTrue(app.radioButtons["Monday"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.radioButtons["Sunday"].exists)
 
@@ -406,7 +419,7 @@ final class AnchorMacUITests: XCTestCase {
         title.click()
         title.typeText("Menu-bar launch review")
         app.buttons["Save"].click()
-        XCTAssertTrue(element(containing: "Menu-bar launch review", in: app).waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts["Menu-bar launch review"].waitForExistence(timeout: 4))
 
         app.typeKey("0", modifierFlags: .command)
         let miniTimer = app.windows["Mini Timer"]

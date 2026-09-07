@@ -175,6 +175,14 @@ Hobbies Hub. There is no analytics SDK.
 
 These are unresolved requirements retained at the owner’s request. They are not completed features. Work should follow a concrete need and fresh evidence.
 
+### Qualify the simpler daily loop on the owner's devices
+
+Direct habit tracking, daily editing/copying, project-linked entries and pause
+recovery are implemented. The development iPhone build is installed; physical
+use, Production CloudKit promotion and the notarized Mac release remain open.
+See [the qualification receipt](docs/qualification/simple-day-2026-09-07/README.md)
+and [#51](https://github.com/Significant-Hobbies/anchor/issues/51).
+
 ### Sync with Apple Reminders
 
 Design and verify bounded Apple Reminders synchronization without losing either application’s original records.

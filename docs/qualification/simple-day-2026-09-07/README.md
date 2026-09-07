@@ -46,3 +46,23 @@ prompts from the main loop while retaining stored history.
   claimed. Issue 51 remains open for actual phone/Mac release qualification.
 
 Design evidence: [`artifacts/design/simple-day-20260907`](../../../artifacts/design/simple-day-20260907).
+
+## Hosted full-suite result and correction
+
+[Run 34151609977](https://github.com/Significant-Hobbies/anchor/actions/runs/34151609977)
+passed the full iPhone suite and Watch build, but failed the final gate because
+three Mac tests failed. A step's `conclusion: success` was misleading here: its
+`continue-on-error` policy masked `outcome: failure` until the final guard.
+
+Two Mac tests still used the removed usual-week setup button and button-role
+queries for a native popup menu. The mini-timer test timed out while scanning
+the entire accessibility tree for the saved title. Updated them to enter the
+weekly manager through a real recurring entry, use popup/menu-item roles, and
+query the actual title text directly. These preserve the tested requirements;
+no assertions or product capabilities were removed. The corrected native suite
+requires a fresh hosted run before claiming a pass.
+
+Stable-Xcode ReleaseDirect archive/export and Developer ID DMG verification
+succeeded. Notarization is blocked by the missing documented `anchor-notary`
+Keychain profile. The signed package is prepared, not installed or released.
+A fresh Production CloudKit reread still lacks the two project fields.

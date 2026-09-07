@@ -41,7 +41,10 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
   history. All 185 package tests and three focused iPhone simulator journeys
   pass. Native layout evidence and the design receipt pass. A development build
   is installed on iPhone; physical use, Mac UI and Production CloudKit remain
-  separate release gates. Mac build 21 is preserved. See the
+  separate release gates. The full hosted iPhone suite and Watch build pass;
+  three Mac test failures require corrected navigation/element queries and a
+  fresh run. Developer ID packaging succeeds, while the documented notarization
+  profile is missing. Mac build 21 is preserved. See the
   [qualification receipt](docs/qualification/simple-day-2026-09-07/README.md)
   and [issue 51](https://github.com/Significant-Hobbies/anchor/issues/51).
 
