@@ -168,3 +168,26 @@ and private CloudKit remain local-first storage. If you explicitly connect
 Significant Hobbies, Anchor also sends only the goal, start and end times,
 focused duration, outcome, and interruption count to your private Significant
 Hobbies Hub. There is no analytics SDK.
+
+<!-- portfolio-retained-work:2026-09-07 -->
+## Retained work from the portfolio review
+
+These are unresolved requirements retained at the owner’s request. They are not completed features. Work should follow a concrete need and fresh evidence.
+
+### Sync with Apple Reminders
+
+Design and verify bounded Apple Reminders synchronization without losing either application’s original records.
+
+Original requirements and discussion: [#50](https://github.com/Significant-Hobbies/anchor/issues/50).
+
+### Ship a signed app-mediated MCP bridge for macOS
+
+Qualify the signed, app-mediated MCP bridge with explicit access boundaries and installed-app evidence.
+
+Original requirements and discussion: [#41](https://github.com/Significant-Hobbies/anchor/issues/41).
+
+### Verify signed Hub authentication and clean account provenance
+
+Verify signed Hub authentication and clean account provenance; preserve local data and do not infer success from a landing page.
+
+Original requirements and discussion: [#40](https://github.com/Significant-Hobbies/anchor/issues/40).
