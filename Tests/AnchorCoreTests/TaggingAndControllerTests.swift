@@ -34,6 +34,31 @@ struct HeuristicTaggerTests {
         #expect(tagger.classifyDistraction(note: "someone slacked me").kind == .message)
     }
 
+    @Test("Physical arrivals outrank generic chat, while explicit channels remain messages", arguments: [
+        ("Roommate walked in to chat", DistractionKind.person),
+        ("Colleague stopped by for a chat", DistractionKind.person),
+        ("Someone knocked and wanted to chat", DistractionKind.person),
+        ("Slack from my roommate", DistractionKind.message),
+        ("A message says someone walked in", DistractionKind.message),
+        ("Chat with my roommate online", DistractionKind.message),
+    ])
+    func physicalVersusMessage(note: String, expected: DistractionKind) {
+        #expect(tagger.classifyDistraction(note: note).kind == expected)
+    }
+
+    @Test("Token refresh supplies missing technical context without overriding the activity", arguments: [
+        ("Finish the token refresh", GoalTheme.building),
+        ("Complete refresh token handling", GoalTheme.building),
+        ("Draft a token refresh guide", GoalTheme.writing),
+        ("Study refresh tokens", GoalTheme.learning),
+        ("Plan token refresh rollout", GoalTheme.planning),
+        ("Refresh the garden labels", GoalTheme.other),
+        ("Count subway tokens", GoalTheme.other),
+    ])
+    func technicalGoalContext(title: String, expected: GoalTheme) {
+        #expect(tagger.classifyGoal(title: title).theme == expected)
+    }
+
     @Test("Unrecognised notes land on other with low confidence")
     func fallback() {
         let result = tagger.classifyDistraction(note: "zzzz qqqq")

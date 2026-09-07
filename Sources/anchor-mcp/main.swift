@@ -494,10 +494,10 @@ struct MCPServer {
 /// Tagging quality is otherwise invisible until it has already mislabelled a
 /// week of your data.
 @MainActor
-func runDiagnostics() async {
+func runDiagnostics(allowsOnDeviceModel: Bool = true) async -> Bool {
     let availability = TaggingService.availability
     print("Apple Intelligence: \(availability)")
-    print(availability.explanation)
+    print(allowsOnDeviceModel ? availability.explanation : "Diagnostics use built-in rules (--heuristic-only).")
     print("Store: \(AnchorStore.storeURL().path)")
     print("")
 
@@ -511,7 +511,7 @@ func runDiagnostics() async {
         ("Jumped over to fix an unrelated bug", .otherWork),
         ("Standup ran over", .meeting),
     ]
-    let service = TaggingService()
+    let service = TaggingService(allowsOnDeviceModel: allowsOnDeviceModel)
     var correct = 0
     for (note, expected) in cases {
         let result = await service.classifyDistraction(note: note, duringGoal: "Ship the auth rewrite")
@@ -536,6 +536,7 @@ func runDiagnostics() async {
         print("\(ok ? "ok  " : "MISS") \(title) -> \(result.theme.rawValue) (expected \(expected.rawValue))")
     }
     print("Goals: \(goalsCorrect)/\(goals.count)")
+    return correct == cases.count && goalsCorrect == goals.count
 }
 
 /// The stdio loop. Blocking reads on the main actor are correct here: the
@@ -566,7 +567,10 @@ func runServer() {
 // MARK: - Entry point
 
 if CommandLine.arguments.contains("--diagnose") {
-    await runDiagnostics()
+    let passed = await runDiagnostics(
+        allowsOnDeviceModel: !CommandLine.arguments.contains("--heuristic-only")
+    )
+    exit(passed ? EXIT_SUCCESS : EXIT_FAILURE)
 } else {
     runServer()
 }

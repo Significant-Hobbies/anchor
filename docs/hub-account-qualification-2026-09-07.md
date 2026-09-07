@@ -79,15 +79,51 @@ existing stash are preserved. Initial exploratory tests used that editable link;
 the final qualification uses the exact pinned source instead.
 
 - Focused account transport suite: 7 tests passed.
-- Full shared Swift package suite: 180 tests passed, zero failures or skips.
+- Full shared Swift package suite after native-review repairs: 182 tests passed, zero failures or skips.
 - Shared Swift package build: passed.
 - No production dependencies, lockfile revision, authentication providers,
   Keychain service identity, signing settings or production configuration changed.
 
 The repository's only Actions workflow, `Anchor native review`, is
-`workflow_dispatch` only and includes native UI/model checks. This repair does
-not dispatch it and makes no exact-commit hosted CI claim. No release, deployment,
-foreground native automation, model download or provider verification ran.
+`workflow_dispatch` only. After a read-only effects audit, the owner authorized
+its hosted Mac and simulator tests, including starting Google OAuth and cancelling
+without credentials. This contacts Live/Google and can create transient OAuth
+state; it does not release, deploy, migrate or modify production configuration.
+No UI automation runs on the owner's Mac.
+
+The first hosted run,
+[34116034709](https://github.com/Significant-Hobbies/anchor/actions/runs/34116034709),
+at `fb2e9f4` failed its final gate. Shared package tests and watch build passed;
+Mac UI had 13 passes and one failure, and iPhone UI had six passes and one failure.
+GitHub's intermediate step `conclusion` reported success because those commands
+use `continue-on-error`; the final gate correctly inspected their failed
+`outcome`. The Google start/cancel test itself passed. This is cancellation
+proof on an unsigned hosted build, not authenticated Apple/Google acceptance.
+
+Concrete repairs from that run:
+
+- The unsigned Mac onboarding test now checks the existing "Connect your Hub
+  account" fallback and absence of an Apple button. Signed Apple acceptance
+  remains separate; the entitlement requirement is unchanged.
+- Capture journey tests wait for the existing two-second confirmation dismissal
+  instead of racing a disappearing "Back to work" button. They still assert
+  the saved note, resumed focus and persisted history. Product timing is unchanged.
+- Heuristics recognize a physical arrival over generic "chat" while explicit
+  messaging channels retain priority. Technical token-refresh context applies
+  after writing, learning and planning cues. Counterexamples cover both boundaries.
+- Diagnostics now fail with a nonzero exit unless all eight distraction and all
+  four goal cases pass. The original run printed 7/8 and 3/4 while exiting zero.
+  The repaired executable reports 8/8 and 4/4 with `--diagnose --heuristic-only`.
+  An isolated negative control with one deliberately wrong expected category
+  reported 7/8 and exited 1; the unchanged source was restored and rebuilt.
+
+All 24 catalog PNGs in the first run's manifest were present, decodable,
+nonblank and matched their declared dimensions. A contact-sheet review confirmed
+populated primary surfaces. These are offscreen macOS renders of shared views at
+Mac/phone sizes, using synthetic in-memory data, not real iPhone screenshots.
+
+The workflow, Google cancellation path and final native gate remain intact.
+Latest hosted run receipts are tracked on [#40](https://github.com/Significant-Hobbies/anchor/issues/40).
 
 Issue #40 stays open for signed Apple and Google sign-in, recoverable cancellation,
 provider errors, fresh/existing account provenance and signed-app sign-out with

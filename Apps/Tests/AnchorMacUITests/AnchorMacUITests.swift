@@ -33,7 +33,9 @@ final class AnchorMacUITests: XCTestCase {
         note.click()
         note.typeText("Synthetic interruption")
         app.buttons["Park it — back to work"].click()
-        app.buttons["Back to work"].click()
+        // Confirmation returns to Focus automatically after two seconds.
+        // Wait for that transition instead of racing its disappearing button.
+        XCTAssertTrue(app.buttons["Back to work"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Synthetic interruption"].waitForExistence(timeout: 3))
 
         app.buttons["Pause"].click()
@@ -454,7 +456,12 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Save habits and continue"].click()
 
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 4))
+        #if ANCHOR_LOCAL_ONLY
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-apple"].exists)
+        XCTAssertTrue(app.staticTexts["Connect your Hub account"].exists)
+        #else
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
+        #endif
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-google"].exists)
         app.buttons["anchor.onboarding.hub-continue-locally"].click()
 

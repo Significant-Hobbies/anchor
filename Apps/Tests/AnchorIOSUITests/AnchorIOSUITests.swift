@@ -43,9 +43,9 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Done"].tap()
         app.buttons["Park it — back to work"].tap()
 
-        let backToWork = app.buttons["Back to work"]
-        XCTAssertTrue(backToWork.waitForExistence(timeout: 3))
-        backToWork.tap()
+        // The confirmation automatically dismisses after two seconds. XCTest
+        // may see its button just before it disappears; await the real return.
+        XCTAssertTrue(app.buttons["Back to work"].waitForNonExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Check the build status"].waitForExistence(timeout: 3))
 
         app.buttons["Pause"].tap()

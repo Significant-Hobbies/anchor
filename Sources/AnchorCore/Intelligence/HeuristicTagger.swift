@@ -16,7 +16,11 @@ public struct HeuristicTagger: Sendable {
     /// "slack message from mum" lands on `.message`, not `.person`.
     private static let distractionCues: [(DistractionKind, [String])] = [
         (.meeting, ["meeting", "standup", "stand-up", "call with", "zoom", "huddle", "1:1", "one on one", "interview", "sync"]),
-        (.message, ["slack", "whatsapp", "imessage", "text from", "texted", "dm", "discord", "telegram", "message", "messaged", "signal", "chat"]),
+        (.message, ["slack", "whatsapp", "imessage", "text from", "texted", "dm", "discord", "telegram", "message", "messaged", "signal"]),
+        // Explicit channels still win, but a physical arrival is stronger
+        // evidence than the ambiguous word "chat".
+        (.person, ["knocked", "walked in", "stopped by", "tapped me"]),
+        (.message, ["chat"]),
         (.email, ["email", "inbox", "gmail", "mail from", "newsletter"]),
         (.notification, ["notification", "badge", "popup", "pop-up", "alert", "banner", "buzzed", "pinged", "ping"]),
         (.socialFeed, ["twitter", "x.com", "instagram", "reddit", "linkedin", "tiktok", "facebook", "threads", "hacker news", "hn", "feed", "scroll", "scrolling"]),
@@ -64,6 +68,12 @@ public struct HeuristicTagger: Sendable {
         let haystack = (title + " " + notes).lowercased()
         for (theme, cues) in Self.goalCues where cues.contains(where: haystack.contains) {
             return GoalTagging(theme: theme, keywords: Self.keywords(from: title), source: .heuristic)
+        }
+        // A technical task can omit a coding verb. Apply this only after the
+        // activity cues, so writing/studying/planning token refresh stays in
+        // that activity rather than being classified by its subject alone.
+        if haystack.contains("token refresh") || haystack.contains("refresh token") {
+            return GoalTagging(theme: .building, keywords: Self.keywords(from: title), source: .heuristic)
         }
         return GoalTagging(theme: .other, keywords: Self.keywords(from: title), source: .heuristic)
     }
