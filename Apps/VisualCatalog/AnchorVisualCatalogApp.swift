@@ -137,6 +137,15 @@ private struct VisualCatalogRenderer {
             page("today-mac", width: 1_200, height: 800) {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
+            page("today-390", width: 390, height: 874) {
+                TodayScreen(controller: controller, onOpenFocus: {})
+            },
+            page("today-768", width: 768, height: 900) {
+                TodayScreen(controller: controller, onOpenFocus: {})
+            },
+            page("today-1440", width: 1_440, height: 900) {
+                TodayScreen(controller: controller, onOpenFocus: {})
+            },
             page("habits-phone", width: 402, height: 874) {
                 HabitsScreen()
             },

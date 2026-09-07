@@ -1,0 +1,21 @@
+
+🧪 Test
+
+   Scheme: Anchor (iOS)
+   Project: Apps/Anchor.xcodeproj
+   Configuration: DebugLocal
+   Platform: iOS Simulator
+   Simulator: 127D7C7E-7BE8-4E38-BA9B-778770E01577
+   Derived Data: /tmp/anchor-simple-day-20260907/ios-test
+   Selective Testing:
+     AnchorIOSUITests/AnchorIOSUITests/testHabitsCanBeAddedEditedAndRescheduled
+
+Discovered 1 test(s):
+   AnchorIOSUITests/AnchorIOSUITests/testHabitsCanBeAddedEditedAndRescheduled
+Running tests (1 completed, 0 failures, 0 skipped)
+
+✅ 1 test passed, 0 failed, 0 skipped (⏱️ 49.7s)
+  └ Files:
+     ├ Result Bundle: ~/Library/Developer/XcodeBuildMCP/workspaces/anchor-084ad8da25bb/result-bundles/test_sim_2026-09-07T18-08-09-133Z_pid50998_444c047b.xcresult
+     ├ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/anchor-084ad8da25bb/logs/test_sim_2026-09-07T18-08-09-132Z_pid50998_0e59fd78.log
+     └ Test Products: ~/Library/Developer/XcodeBuildMCP/workspaces/anchor-084ad8da25bb/test-products/test_sim_2026-09-07T18-08-09-133Z_pid50998_5d59bc22.xctestproducts

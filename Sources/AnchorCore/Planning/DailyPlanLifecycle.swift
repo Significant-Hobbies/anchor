@@ -335,6 +335,7 @@ public struct HabitDayService {
             templateID: habit.id,
             templateOccurrenceDay: normalized,
             isTemplateOverride: true,
+            projectID: habit.projectID,
             title: title ?? habit.title,
             details: details ?? habit.details,
             plannedStart: start,

@@ -2,11 +2,10 @@
 
 Plan the day, protect the present, and learn what moved it.
 
-You give Anchor a schedule made of work, commitments, recurring routines, rest,
-and intentional enjoyment. A focus block becomes the same wall-clock timer
-Anchor has always used. When something pulls at you, one keystroke parks it;
-the end-of-day review then compares what you planned with what was observed and
-keeps deliberate changes, internal pulls, and external interruptions distinct.
+Replace unwanted habits with good ones, check them off, and schedule the ones
+that need a time. Pick a day, edit or copy its entries, tag them to projects, and
+play an entry. When something interrupts you, park it, pause and come back, or
+end the session. History keeps the plan and what actually happened visible.
 
 Runs on macOS, iOS and Apple Watch from one shared codebase. The app is local-first;
 distraction text always stays on your device.
@@ -18,15 +17,17 @@ distraction text always stays on your device.
 - **Focus** automatically offers the current or next scheduled block, lets you
   name what you are actually doing when reality changes, and keeps interruption
   capture on top of the live wall-clock timer.
-- **Today** shows the complete chronological schedule and a neutral percentage
-  of scheduled blocks completed. It is a snapshot, never an adherence score.
+- **Today** lets you select, edit, and copy a day's schedule. Copies keep times
+  and projects, start unfinished, and preserve existing destination entries.
+  Add a spontaneous entry directly; no habit or recurring rule is required.
 - **Habits** carries Indulge's original behavioral artwork from automatic-pattern
-  selection into concrete replacement suggestions and editable recurring blocks.
+  selection into concrete replacements. Check a habit off directly, undo it,
+  or optionally schedule it. There is no required progression programme.
 - **History** compares the planned and lived day, with interruption evidence,
   internal choices, external causes, and Unknown kept distinct. Parked items and
   longer-term analytics live here as secondary views.
-- **Lock a distraction** (`⌘⇧L`) — name it, park it, keep working. Or record
-  honestly that it won.
+- **Capture a distraction** (`⌘⇧L`) — park it and keep working, pause and return
+  to the same session, or end the session. Break time does not count as focus.
 - **Resuming asks what pulled you away.** A pause is usually an interruption, so
   coming back captures it — with "nothing, just a break" one key away.
 - **A compact version** that lives in the menu bar, or as a floating mini timer

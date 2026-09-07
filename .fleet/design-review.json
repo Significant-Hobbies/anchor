@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Build 21 Mac direct-account polish over the approved Build 20 design: capability-aware provider UI",
+  "target": "Simple daily habits, schedule, and pause recovery",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
@@ -15,7 +15,7 @@
     "probes": [],
     "selected": "existing-design",
     "approval": "not-required",
-    "before": "artifacts/design/build19/catalog/editor-metadata-mac.png",
+    "before": "artifacts/design/simple-day-20260907/before-today-mac.png",
     "library": {
       "strategy": "upstream-first",
       "primary": "existing-project-system",
@@ -28,36 +28,36 @@
       }
     },
     "contract": {
-      "purpose": "Help a person plan a realistic day, follow the current intention, capture what changes it, and learn why the day lived differed from the day planned.",
-      "purposeSource": "PRODUCT.md and site-health projects.anchor purpose contract",
-      "canonicalPurpose": "Anchor helps a person plan a realistic day, keep the current intention visible, capture what changes it, and learn why the lived day differed from the plan.",
-      "purposeAlignment": "match",
-      "driftNote": "",
-      "audience": "A private owner who plans and focuses from a Mac and expects the app to behave like a polished native utility throughout the workday.",
-      "job": "Make the next planned action immediately startable, keep the timer reachable without context switching, and make reusable project and tag context trustworthy to edit.",
-      "thesis": "Preserve The Drawn Day while making Mac structure quieter and more native: one window, discoverable menus, a schedule-aware mini timer, and calm editable libraries.",
-      "system": "Existing neutral paper and charcoal surfaces, SF typography, one ink action, Anchor spacing and radii, native Mac menus and fields, and authored colour only for meaningful project or interruption context.",
-      "signature": "The scheduled intention moves directly from Today into the menu-bar timer, so Anchor stays present without pulling the owner out of their work.",
-      "risk": "Adding capability to the mini timer could make it noisy; scheduled context is limited to one current or next block and yields to the existing compact composer."
+      "purpose": "Replace unwanted habits, track good ones, plan a day and run its entries with honest interruption logging.",
+      "purposeSource": "Owner direction on 7 September 2026 and PRODUCT.md",
+      "canonicalPurpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
+      "purposeAlignment": "repository-override",
+      "driftNote": "Owner simplified the product to habits, editable daily schedules, project context and interruption recovery; progression and daily confirmation are no longer primary flows.",
+      "audience": "The owner using an iPhone and Mac throughout an ordinary day.",
+      "job": "Check off a habit or schedule and play an entry without configuring a behavior programme.",
+      "thesis": "Preserve The Drawn Day but give the actual daily actions the prominent controls.",
+      "system": "Existing paper/charcoal, native SF type, Anchor spacing, restrained ink actions and original doodles.",
+      "signature": "A drawn day with directly playable entries and habits that can be checked off without a time.",
+      "risk": "Removing progression prompts changes familiar placement; preserve saved history and keep editing available."
     }
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/mac-polish/after/compact-panel-390.png"
+        "path": "artifacts/design/simple-day-20260907/today-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/mac-polish/after/editor-metadata-mac-768.png"
+        "path": "artifacts/design/simple-day-20260907/today-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/mac-polish/after/settings-mac-1440.png"
+        "path": "artifacts/design/simple-day-20260907/today-1440.png"
       }
     ],
     "projectCheck": {
-      "command": "rtk swift test && xcodebuildmcp macos build --scheme Anchor (macOS) --configuration DebugLocal",
+      "command": "swift test; scripts/render-visual-catalog.sh /tmp/anchor-simple-day-20260907/reviewed-visuals",
       "status": "pass"
     },
     "critique": {
@@ -65,7 +65,7 @@
       "maximum": 40
     },
     "audit": {
-      "score": 19,
+      "score": 17,
       "maximum": 20
     },
     "unresolved": {
@@ -75,7 +75,9 @@
     "detector": {
       "posture": "advisory",
       "findings": [
-        "Native SwiftUI surface; browser UI detector is not applicable."
+        "Native SwiftUI review, not a browser rendering. Phone-width catalog images use macOS controls; actual iOS journeys are recorded separately.",
+        "Large drawn header retained from the existing system; a denser layout remains optional polish.",
+        "Full Mac UI and physical-device journeys remain release gates; visual scores do not qualify them."
       ]
     },
     "comprehension": {
@@ -102,7 +104,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "agent-selected",
-    "note": "The owner directed a Mac-only preserve pass and clarified the core: maintain habits, sort the calendar, start and stop focus, and review focus hours and blockers. No scope expansion was taken."
+    "decision": "delegated",
+    "note": "Owner specified the simpler workflow and asked for phone and Mac readiness for tomorrow."
   }
 }

@@ -143,6 +143,7 @@ public enum LifeDirection: String, CaseIterable, Codable, Hashable, Sendable {
 @Model
 public final class ScheduleTemplate {
     public var id: UUID = UUID()
+    public var projectID: UUID?
     public var title: String = ""
     public var details: String = ""
     public var createdAt: Date = Date()
@@ -169,6 +170,7 @@ public final class ScheduleTemplate {
 
     public init(
         id: UUID = UUID(),
+        projectID: UUID? = nil,
         title: String,
         details: String = "",
         createdAt: Date = Date(),
@@ -188,6 +190,7 @@ public final class ScheduleTemplate {
         lastProgressPromptedAt: Date? = nil
     ) {
         self.id = id
+        self.projectID = projectID
         self.title = title
         self.details = details
         self.createdAt = createdAt
@@ -338,6 +341,7 @@ public final class PlanBlock {
     /// template output. Later routine edits and archival must leave it alone.
     public var isTemplateOverride: Bool = false
     public var sessionID: UUID?
+    public var projectID: UUID?
     public var title: String = ""
     public var details: String = ""
     public var plannedStart: Date = Date()
@@ -357,6 +361,7 @@ public final class PlanBlock {
         templateID: UUID? = nil,
         templateOccurrenceDay: Date? = nil,
         isTemplateOverride: Bool = false,
+        projectID: UUID? = nil,
         title: String,
         details: String = "",
         plannedStart: Date,
@@ -370,6 +375,7 @@ public final class PlanBlock {
         self.templateID = templateID
         self.templateOccurrenceDay = templateOccurrenceDay
         self.isTemplateOverride = isTemplateOverride
+        self.projectID = projectID
         self.title = title
         self.details = details
         self.plannedStart = plannedStart
@@ -390,6 +396,7 @@ public final class PlanBlock {
         self.init(
             templateID: template.id,
             templateOccurrenceDay: startOfDay,
+            projectID: template.projectID,
             title: template.title,
             details: template.details,
             plannedStart: start,
@@ -642,6 +649,33 @@ public struct DayPlanService {
         return blocks.sorted { $0.plannedStart < $1.plannedStart }
     }
 
+    /// Copy authored content only. Existing destination entries and both days'
+    /// execution history remain untouched; copies are independent dated entries.
+    @discardableResult
+    public func copyDay(from sourceDay: Date, to targetDay: Date) throws -> [PlanBlock] {
+        guard !calendar.isDate(sourceDay, inSameDayAs: targetDay) else { return [] }
+        let source = try context.fetch(FetchDescriptor<PlanBlock>()).filter {
+            calendar.isDate($0.plannedStart, inSameDayAs: sourceDay)
+        }.sorted { $0.plannedStart < $1.plannedStart }
+        let copies = source.map { block in
+            let time = calendar.dateComponents([.hour, .minute, .second], from: block.plannedStart)
+            let start = calendar.date(
+                bySettingHour: time.hour ?? 0, minute: time.minute ?? 0, second: time.second ?? 0,
+                of: calendar.startOfDay(for: targetDay)
+            ) ?? calendar.startOfDay(for: targetDay)
+            return PlanBlock(
+                projectID: block.projectID,
+                title: block.title, details: block.details,
+                plannedStart: start, plannedSeconds: block.plannedSeconds,
+                kind: block.kind, flexibility: block.flexibility,
+                behaviorPattern: block.behaviorPattern, lifeDirection: block.lifeDirection
+            )
+        }
+        for copy in copies { context.insert(copy) }
+        try context.save()
+        return copies
+    }
+
     /// Keep derivative, still-unstarted occurrences aligned with an edited or
     /// archived routine. Completed, skipped, moved, and in-progress history is
     /// preserved as the day was actually lived.
@@ -668,6 +702,7 @@ public struct DayPlanService {
                 continue
             }
             let day = calendar.startOfDay(for: occurrenceDay)
+            block.projectID = template.projectID
             block.title = template.title
             block.details = template.details
             block.plannedStart = calendar.date(

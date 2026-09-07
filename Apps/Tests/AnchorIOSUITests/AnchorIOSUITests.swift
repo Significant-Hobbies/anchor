@@ -6,6 +6,35 @@ final class AnchorIOSUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testDayCanBeCopiedWithoutReplacingTheOriginal() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-copy-day-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launch()
+        app.tabBars.buttons["Today"].tap()
+        let add = app.buttons["Add the first entry"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let title = app.textFields["What will you do?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        title.tap()
+        title.typeText("Read the next chapter")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Read the next chapter"].waitForExistence(timeout: 4))
+        app.buttons["anchor.today.copy-day"].tap()
+        XCTAssertTrue(app.buttons["Copy entries"].waitForExistence(timeout: 3))
+        app.buttons["Copy entries"].tap()
+        XCTAssertTrue(app.buttons["Copy entries"].waitForNonExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Read the next chapter"].exists)
+        app.buttons["Go to today"].tap()
+        XCTAssertTrue(app.staticTexts["Read the next chapter"].exists)
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["Read the next chapter"].waitForExistence(timeout: 4))
+        keepScreenshot(app, named: "anchor-simple-day-copy")
+    }
+
     func testFocusInterruptionAndReturnJourneyPersists() {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-ui-\(UUID().uuidString).store"
@@ -41,14 +70,7 @@ final class AnchorIOSUITests: XCTestCase {
         note.tap()
         note.typeText("Check the build status")
         app.buttons["Done"].tap()
-        app.buttons["Park it — back to work"].tap()
-
-        // The confirmation automatically dismisses after two seconds. XCTest
-        // may see its button just before it disappears; await the real return.
-        XCTAssertTrue(app.buttons["Back to work"].waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Check the build status"].waitForExistence(timeout: 3))
-
-        app.buttons["Pause"].tap()
+        app.buttons["anchor.capture.pause"].tap()
         let resume = app.buttons["Resume"]
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
         resume.tap()
@@ -136,8 +158,8 @@ final class AnchorIOSUITests: XCTestCase {
 
         app.tabBars.buttons["Today"].tap()
         XCTAssertTrue(app.staticTexts["Give the day one anchor"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.datePickers.count, 0, "Today must not browse other dates; History owns that.")
-        app.buttons["Add the first block"].tap()
+        XCTAssertGreaterThan(app.datePickers.count, 0, "The schedule must allow choosing a day.")
+        app.buttons["Add the first entry"].tap()
         let title = app.textFields["What will you do?"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.tap()
@@ -208,8 +230,17 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Two-day reset"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["0 of 2 this week"].exists)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Any time")).firstMatch.exists)
-        XCTAssertTrue(app.buttons["Edit"].firstMatch.exists)
-        XCTAssertTrue(app.buttons["Adjust"].firstMatch.exists)
+        let checkOff = app.buttons["anchor.habits.complete"]
+        XCTAssertTrue(checkOff.exists)
+        checkOff.tap()
+        XCTAssertTrue(app.buttons["Undo check-off"].waitForExistence(timeout: 3))
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons["Habits"].tap()
+        XCTAssertTrue(app.buttons["Undo check-off"].waitForExistence(timeout: 4))
+        app.buttons["Undo check-off"].tap()
+        XCTAssertTrue(app.buttons["anchor.habits.complete"].exists)
+
 
         app.tabBars.buttons["Today"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 4))

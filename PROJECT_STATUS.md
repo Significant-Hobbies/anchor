@@ -34,6 +34,17 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-07** — Implemented the owner's simpler daily loop for build 22:
+  check off habits directly, optionally schedule them, select/edit/copy a day,
+  carry project context into sessions, and pause from interruption capture.
+  Removed primary progression and daily-confirmation prompts while preserving
+  history. All 185 package tests and three focused iPhone simulator journeys
+  pass. Native layout evidence and the design receipt pass. A development build
+  is installed on iPhone; physical use, Mac UI and Production CloudKit remain
+  separate release gates. Mac build 21 is preserved. See the
+  [qualification receipt](docs/qualification/simple-day-2026-09-07/README.md)
+  and [issue 51](https://github.com/Significant-Hobbies/anchor/issues/51).
+
 - **2026-08-31** — Released Anchor `1.0 (20)` for macOS from product source
   commit `627a4e6`. The follow-up operational PRs [#47](https://github.com/Significant-Hobbies/anchor/pull/47)
   and [#48](https://github.com/Significant-Hobbies/anchor/pull/48) added an isolated,

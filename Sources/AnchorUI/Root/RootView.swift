@@ -237,11 +237,13 @@ enum PlanBlockFocusStarter {
     ) throws {
         let resolvedIntent = intent?.trimmingCharacters(in: .whitespacesAndNewlines) ?? block.title
         guard !resolvedIntent.isEmpty else { return }
+        let project = try context.fetch(FetchDescriptor<Project>()).first { $0.id == block.projectID }
 
         let session = controller.start(
             goal: nil,
             intent: resolvedIntent,
             minutes: minutes ?? max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
+            project: project,
             notes: block.details
         )
         block.sessionID = session.id

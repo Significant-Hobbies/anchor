@@ -203,6 +203,23 @@ public final class FocusController {
         publishLiveActivityUpdate()
     }
 
+    /// Capture an interruption and step away without ending the current session.
+    /// An empty note is a plain break; a recorded interruption only counts as a
+    /// return to focus after the owner actually resumes.
+    public func pauseFromCapture(
+        note: String,
+        kind: DistractionKind? = nil,
+        tagIDStrings: [String] = []
+    ) {
+        guard isRunning else { return }
+        pause()
+        if let distraction = park(note: note, kind: kind, tagIDStrings: tagIDStrings) {
+            distraction.didReturnToFocus = false
+            save()
+        }
+        dismissCapture()
+    }
+
     /// Resuming always asks what pulled you away.
     ///
     /// A pause is the honest signal that something interrupted you — more honest
@@ -213,6 +230,12 @@ public final class FocusController {
         guard let session, session.state == .paused else { return }
         let now = Date()
         let awaySeconds = session.pausedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
+
+        if let pausedAt = session.pausedAt {
+            for distraction in parked where distraction.capturedAt >= pausedAt {
+                distraction.didReturnToFocus = true
+            }
+        }
 
         var account = session.account
         account.resume(at: now)

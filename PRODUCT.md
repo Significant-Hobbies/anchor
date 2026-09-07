@@ -38,6 +38,15 @@ gaps, then offers evidence-linked changes for a future day.
 
 ## Operating Context
 
+- The daily loop starts with replacing unwanted habits with good ones. A habit
+  can be checked off directly; giving it a time is optional.
+- The owner can select a day, edit its entries, copy them to another day, and
+  add a spontaneous entry. Copies preserve planned content and project context,
+  start unfinished, and leave existing destination entries intact.
+- Entries can carry a project and start the same focus timer. Interruption
+  capture offers park-and-continue, pause-and-return, and end-session actions.
+- Habit progression and daily confirmation are not prerequisites for using the
+  planner. Historical records remain available without driving extra prompts.
 - A day contains dated plan blocks sourced from local recurring routines,
   one-off intentions, and eventually read-only calendar commitments.
 - A focus-capable plan block can become an Anchor session without duplicating

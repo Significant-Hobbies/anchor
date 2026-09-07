@@ -146,9 +146,9 @@ public struct RunningSessionView: View {
                 Button {
                     controller.isPaused ? controller.resume() : controller.pause()
                 } label: {
-                    Image(systemName: controller.isPaused ? "play.fill" : "pause.fill")
+                    Label(controller.isPaused ? "Resume" : "Pause", systemImage: controller.isPaused ? "play.fill" : "pause.fill")
                 }
-                .buttonStyle(CircleButtonStyle())
+                .buttonStyle(QuietButtonStyle(expands: false))
                 .help(controller.isPaused ? "Resume" : "Pause")
                 .accessibilityLabel(controller.isPaused ? "Resume" : "Pause")
 

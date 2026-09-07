@@ -28,7 +28,7 @@ public struct HabitsScreen: View {
     @State private var showsProfile = false
     @State private var showsNewHabit = false
     @State private var editingTemplate: ScheduleTemplate?
-    @State private var upgradingTemplate: ScheduleTemplate?
+    @State private var schedulingTemplate: ScheduleTemplate?
     @State private var progressionError: String?
 
     public init() {}
@@ -41,22 +41,14 @@ public struct HabitsScreen: View {
         templates.filter { $0.isBehaviorHabit && $0.archivedAt != nil && $0.graduatedAt == nil }
     }
 
-    private var readyHabits: [ScheduleTemplate] {
-        activeTemplates.filter { template in
-            streak(for: template) >= HabitPolicy.upgradeStreak
-                && (template.lastProgressPromptedAt == nil
-                    || template.lastProgressPromptedAt! < template.currentHabitLevelStartedAt)
-        }
-    }
-
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
                 DoodleScene(
                     "HabitsDoodle",
                     eyebrow: "Habits",
-                    title: "Redraw the pattern",
-                    message: "Choose what you want to make room for. Keep it available, then place it when the day takes shape."
+                    title: "Habits",
+                    message: "Tick it off or add it to your day. A time is optional."
                 )
 
                 Button { showsProfile = true } label: {
@@ -86,10 +78,6 @@ public struct HabitsScreen: View {
                 .accessibilityIdentifier("anchor.habits.behavior-profile")
                 .accessibilityValue(profileSummary)
 
-                if let readyHabit = readyHabits.first {
-                    progressionPrompt(for: readyHabit)
-                }
-
                 if let progressionError {
                     Label(progressionError, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote)
@@ -98,7 +86,7 @@ public struct HabitsScreen: View {
 
                 VStack(alignment: .leading, spacing: Space.sm) {
                     HStack(alignment: .firstTextBaseline) {
-                        SectionHeader("This week", subtitle: "The promise is the days you chose—not every day by default")
+                        SectionHeader("Your habits", subtitle: "Track them here. Schedule only what needs a time.")
                         Spacer(minLength: Space.sm)
                         Text("\(activeTemplates.count) active")
                             .font(.caption.weight(.bold).monospacedDigit())
@@ -159,11 +147,9 @@ public struct HabitsScreen: View {
             PlanBlockEditor(initialDay: Date(), template: template) {}
                 .anchorTheme()
         }
-        .sheet(item: $upgradingTemplate) { template in
-            HabitUpgradeSheet(template: template) {
-                progressionError = nil
-            }
-            .anchorTheme()
+        .sheet(item: $schedulingTemplate) { template in
+            PlanBlockEditor(initialDay: Date(), placingHabit: template) {}
+                .anchorTheme()
         }
     }
 
@@ -181,14 +167,6 @@ public struct HabitsScreen: View {
         return "Suggested \(time.formatted(date: .omitted, time: .shortened))"
     }
 
-    private func streak(for template: ScheduleTemplate) -> Int {
-        HabitPolicy().streak(
-            for: template.habitSchedule(),
-            blocks: planBlocks.map { $0.snapshot() },
-            completions: habitCompletions.map { $0.snapshot() }
-        )
-    }
-
     private func weeklyProgress(for template: ScheduleTemplate) -> HabitPolicy.WeeklyProgress {
         HabitPolicy().weeklyProgress(
             for: template.habitSchedule(),
@@ -199,7 +177,6 @@ public struct HabitsScreen: View {
 
     private func habitCard(_ template: ScheduleTemplate) -> some View {
         let progress = weeklyProgress(for: template)
-        let currentStreak = streak(for: template)
         return VStack(alignment: .leading, spacing: Space.md) {
             HStack(alignment: .top, spacing: Space.sm) {
                 Image(systemName: template.lifeDirection?.symbolName ?? "repeat")
@@ -214,11 +191,16 @@ public struct HabitsScreen: View {
                     Text("\(habitTiming(template)) · \(template.weekdays.sorted { $0.rawValue < $1.rawValue }.map(\.compactLabel).joined(separator: ", "))")
                         .font(.caption)
                         .foregroundStyle(theme.textSecondary)
+                    if let pattern = template.behaviorPattern {
+                        Text("Instead of \(pattern.label.lowercased())")
+                            .font(.caption)
+                            .foregroundStyle(theme.textSecondary)
+                    }
                 }
                 Spacer(minLength: Space.sm)
                 Menu {
                     Button("Pause habit", systemImage: "pause") { pause(template) }
-                    Button("Graduate habit", systemImage: "checkmark.seal") { graduate(template) }
+                    Button("Edit habit", systemImage: "pencil") { editingTemplate = template }
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(width: 32, height: 32)
@@ -230,12 +212,12 @@ public struct HabitsScreen: View {
 
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .center, spacing: Space.md) {
-                    habitProgress(progress, streak: currentStreak)
+                    habitProgress(progress)
                     Spacer(minLength: 0)
                     habitActions(template)
                 }
                 VStack(alignment: .leading, spacing: Space.sm) {
-                    habitProgress(progress, streak: currentStreak)
+                    habitProgress(progress)
                     habitActions(template)
                 }
             }
@@ -247,85 +229,49 @@ public struct HabitsScreen: View {
         .accessibilityIdentifier("anchor.habits.card.\(template.id.uuidString)")
     }
 
-    private func habitProgress(_ progress: HabitPolicy.WeeklyProgress, streak: Int) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(progress.completed) of \(progress.scheduled) this week")
-                .font(.title3.weight(.semibold).monospacedDigit())
-                .foregroundStyle(theme.textPrimary)
-            Text(habitProgressHint(streak: streak))
-                .font(.caption)
-                .foregroundStyle(streak >= HabitPolicy.upgradeStreak ? theme.positive : theme.textTertiary)
+    private func habitProgress(_ progress: HabitPolicy.WeeklyProgress) -> some View {
+        Text("\(progress.completed) of \(progress.scheduled) this week")
+            .font(.subheadline.monospacedDigit())
+            .foregroundStyle(theme.textSecondary)
+    }
+
+    private func completedBlock(_ template: ScheduleTemplate) -> PlanBlock? {
+        planBlocks.first {
+            $0.templateID == template.id && $0.state == .completed
+                && Calendar.current.isDate($0.templateOccurrenceDay ?? $0.plannedStart, inSameDayAs: Date())
         }
     }
 
-    private func habitProgressHint(streak: Int) -> String {
-        guard streak < HabitPolicy.upgradeStreak else {
-            return "Enough evidence to adjust the rhythm"
+    private func isCompleted(_ template: ScheduleTemplate) -> Bool {
+        let direct = habitCompletions.first {
+            $0.habitID == template.id && Calendar.current.isDate($0.day, inSameDayAs: Date())
         }
-        guard streak > 0 else {
-            return "Adjust whenever you want; Anchor will suggest changes after a steady run"
-        }
-        let remaining = HabitPolicy.upgradeStreak - streak
-        return "\(remaining) more completion\(remaining == 1 ? "" : "s") before Anchor suggests a change"
+        return direct?.isCompleted == true || completedBlock(template) != nil
     }
 
     private func habitActions(_ template: ScheduleTemplate) -> some View {
-        HStack(spacing: Space.xs) {
-            Button("Edit", systemImage: "pencil") { editingTemplate = template }
-                .buttonStyle(QuietButtonStyle(expands: false))
-            Button("Adjust", systemImage: "slider.horizontal.3") { upgradingTemplate = template }
-                .buttonStyle(QuietButtonStyle(expands: false))
-        }
-    }
-
-    private func progressionPrompt(for template: ScheduleTemplate) -> some View {
-        Card(padding: Space.lg) {
-            VStack(alignment: .leading, spacing: Space.md) {
-                HStack(alignment: .top, spacing: Space.sm) {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(theme.positive)
-                        .frame(width: 34, height: 34)
-                        .background(theme.positive.opacity(0.12), in: .circle)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("\(template.title) is ready for what’s next")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(theme.textPrimary)
-                        Text("You completed this on seven scheduled days. Keep it, adjust the rhythm, or add something new alongside it.")
-                            .font(.subheadline)
-                            .foregroundStyle(theme.textSecondary)
-                    }
-                }
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Space.sm) { progressionButtons(for: template) }
-                    VStack(spacing: Space.sm) { progressionButtons(for: template) }
-                }
+        let done = isCompleted(template)
+        return FlowRow(spacing: Space.xs) {
+            Button(done ? "Undo check-off" : "Done", systemImage: done ? "arrow.uturn.backward" : "checkmark") {
+                setCompleted(!done, template: template)
             }
-        }
-        .accessibilityIdentifier("anchor.habits.progression-prompt")
-    }
-
-    @ViewBuilder
-    private func progressionButtons(for template: ScheduleTemplate) -> some View {
-        Button("Adjust this habit") { upgradingTemplate = template }
-            .buttonStyle(PrimaryButtonStyle())
-        Button("Add another habit") {
-            prepareNewHabit(after: template)
-        }
-        .buttonStyle(QuietButtonStyle())
-        Button("Later") { markPromptHandled(template) }
             .buttonStyle(QuietButtonStyle(expands: false))
+            .disabled(completedBlock(template) != nil)
+            .accessibilityHint(done ? "Tap to undo today's check-off" : "Record without scheduling a time")
+            .accessibilityIdentifier("anchor.habits.complete")
+            Button("Schedule", systemImage: "calendar.badge.plus") { schedulingTemplate = template }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .disabled(!template.applies(to: Date()))
+        }
     }
 
-    private func prepareNewHabit(after template: ScheduleTemplate) {
+    private func setCompleted(_ completed: Bool, template: ScheduleTemplate) {
         do {
-            template.lastProgressPromptedAt = Date()
-            template.updatedAt = Date()
-            try context.save()
+            try HabitDayService(context: context).setCompleted(completed, habitID: template.id, on: Date())
             progressionError = nil
-            showsNewHabit = true
         } catch {
             context.rollback()
-            progressionError = "Anchor could not prepare the new habit. Nothing was changed."
+            progressionError = "Anchor could not save that check-off. Please try again."
         }
     }
 
@@ -340,12 +286,6 @@ public struct HabitsScreen: View {
         persistScheduleChange(template, failure: "Anchor could not resume that habit.")
     }
 
-    private func graduate(_ template: ScheduleTemplate) {
-        template.graduatedAt = Date()
-        template.archivedAt = Date()
-        persistScheduleChange(template, failure: "Anchor could not graduate that habit.")
-    }
-
     private func persistScheduleChange(_ template: ScheduleTemplate, failure: String) {
         template.updatedAt = Date()
         do {
@@ -357,17 +297,7 @@ public struct HabitsScreen: View {
         }
     }
 
-    private func markPromptHandled(_ template: ScheduleTemplate) {
-        template.lastProgressPromptedAt = Date()
-        template.updatedAt = Date()
-        do {
-            try context.save()
-            progressionError = nil
-        } catch {
-            context.rollback()
-            progressionError = "Anchor could not save that choice. Please try again."
-        }
-    }
+
 }
 
 private struct HabitUpgradeSheet: View {

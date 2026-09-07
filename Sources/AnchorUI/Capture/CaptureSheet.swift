@@ -157,8 +157,17 @@ public struct CaptureSheet: View {
                 .keyboardShortcut(.return, modifiers: [])
 
                 if !isReturningFromPause {
+                    Button {
+                        controller.pauseFromCapture(note: note, kind: chosenKind, tagIDStrings: selectedTagIDs)
+                        dismiss()
+                    } label: {
+                        Label("Pause — come back later", systemImage: "pause.fill")
+                    }
+                    .buttonStyle(QuietButtonStyle())
+                    .accessibilityIdentifier("anchor.capture.pause")
+
                     Button(action: surrender) {
-                        Text("It wins — end the session")
+                        Text("End the session")
                     }
                     .buttonStyle(QuietButtonStyle())
                     .disabled(!canPark)

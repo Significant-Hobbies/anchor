@@ -12,7 +12,10 @@ struct PlanBlockFocusStarterTests {
     func startLinksSessionToPlan() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)
         let context = container.mainContext
+        let project = Project(name: "Utility")
+        context.insert(project)
         let block = PlanBlock(
+            projectID: project.id,
             title: "Review the launch",
             details: "Resolve the final decisions.",
             plannedStart: Date(),
@@ -36,6 +39,8 @@ struct PlanBlockFocusStarterTests {
         #expect(block.sessionID == controller.session?.id)
         #expect(controller.session?.intent == "Review the launch")
         #expect(controller.session?.notes == "Resolve the final decisions.")
+        #expect(controller.session?.project?.id == project.id)
+        controller.end()
     }
 
     @Test("Starting different work preserves the plan and records the replan")

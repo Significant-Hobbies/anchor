@@ -90,6 +90,7 @@ public enum CloudKitSchemaSeed {
             )
         }
         schedule.archivedAt = timestamp
+        schedule.projectID = project.id
         schedule.behaviorPattern = .socialFeeds
         schedule.lifeDirection = .focus
         schedule.isBehaviorHabit = true
@@ -113,6 +114,7 @@ public enum CloudKitSchemaSeed {
                 templateID: schedule.id,
                 templateOccurrenceDay: timestamp,
                 isTemplateOverride: true,
+                projectID: project.id,
                 title: "Schema seed",
                 plannedStart: timestamp,
                 plannedSeconds: 60,
@@ -121,6 +123,7 @@ public enum CloudKitSchemaSeed {
             )
         }
         block.templateID = schedule.id
+        block.projectID = project.id
         block.templateOccurrenceDay = timestamp
         block.isTemplateOverride = true
         block.sessionID = session.id

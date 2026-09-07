@@ -13,6 +13,40 @@ struct DayPlanTests {
         return calendar
     }
 
+    @Test("Copying a day preserves projects and times without copying history or replacing destination entries")
+    func copyDayKeepsOnlyAuthoredContent() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let monday = Date(timeIntervalSince1970: 1_704_067_200)
+        let tuesday = calendar.date(byAdding: .day, value: 1, to: monday)!
+        let projectID = UUID()
+        let source = PlanBlock(projectID: projectID, title: "Read", details: "Chapter two", plannedStart: monday.addingTimeInterval(3600), plannedSeconds: 1200)
+        source.sessionID = UUID()
+        source.templateID = UUID()
+        source.begin(at: monday)
+        source.complete(at: monday.addingTimeInterval(1200))
+        let existing = PlanBlock(title: "Keep this", plannedStart: tuesday, plannedSeconds: 600)
+        context.insert(source)
+        context.insert(existing)
+        try context.save()
+        let service = DayPlanService(context: context, calendar: calendar)
+        let copies = try service.copyDay(from: monday, to: tuesday)
+        let copy = try #require(copies.first)
+        #expect(copies.count == 1)
+        #expect(copy.id != source.id)
+        #expect(copy.projectID == projectID)
+        #expect(copy.details == "Chapter two")
+        #expect(copy.plannedStart == tuesday.addingTimeInterval(3600))
+        #expect(copy.state == .planned)
+        #expect(copy.sessionID == nil && copy.templateID == nil)
+        #expect(copy.actualStartedAt == nil && copy.actualEndedAt == nil)
+        #expect(source.state == .completed)
+        #expect(try context.fetchCount(FetchDescriptor<PlanBlock>()) == 3)
+        #expect(try service.copyDay(from: monday, to: monday).isEmpty)
+        copy.title = "Independent"
+        #expect(source.title == "Read")
+    }
+
     @Test("Recurring templates materialize once on matching days")
     func materializationIsIdempotent() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)

@@ -10,18 +10,19 @@ struct PlanScreen: View {
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
     @Query(sort: \HabitCompletion.updatedAt, order: .reverse) private var habitCompletions: [HabitCompletion]
-    @Query(sort: \DayPlanConfirmation.updatedAt, order: .reverse) private var confirmations: [DayPlanConfirmation]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query private var projects: [Project]
     private let controller: FocusController
     private let onOpenFocus: () -> Void
     @State private var today = Date()
+    @State private var lastCalendarDay = Date()
+    @State private var showsCopyDay = false
     @State private var editorSeed: EditorSeed?
     @State private var showsRoutines = false
     @State private var editingBlock: PlanBlock?
     @State private var placingHabit: ScheduleTemplate?
     @State private var explainingBlock: PlanBlock?
     @State private var loadError: String?
-    @State private var checkInDeferredInSession = false
 
     init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
         self.controller = controller
@@ -34,7 +35,7 @@ struct PlanScreen: View {
     }
 
     private var blocks: [PlanBlock] {
-        allBlocks.filter { dayInterval.contains($0.plannedStart) }
+        allBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
     }
 
     var body: some View {
@@ -42,11 +43,7 @@ struct PlanScreen: View {
             VStack(alignment: .leading, spacing: Space.lg) {
                 dayHeader
 
-                if shouldShowDailyCheckIn {
-                    dailyCheckIn
-                } else if todayConfirmation?.decision == .adjusted {
-                    todayOnlyStatus
-                }
+                dayControls
 
                 if !todayHabits.isEmpty {
                     todayHabitsSection
@@ -68,7 +65,7 @@ struct PlanScreen: View {
                         HStack(spacing: Space.lg) {
                             emptyDayCopy
                             Spacer(minLength: Space.lg)
-                            Button("Add the first block") { editorSeed = EditorSeed(start: suggestedStart) }
+                            Button("Add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
                                 .buttonStyle(PrimaryButtonStyle(expands: false))
                         }
                         #else
@@ -76,12 +73,12 @@ struct PlanScreen: View {
                             HStack(spacing: Space.lg) {
                                 emptyDayCopy
                                 Spacer(minLength: Space.lg)
-                                Button("Add the first block") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("Add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                             }
                             VStack(alignment: .leading, spacing: Space.md) {
                                 emptyDayCopy
-                                Button("Add the first block") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("Add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
                                 .buttonStyle(PrimaryButtonStyle())
                             }
                         }
@@ -94,6 +91,7 @@ struct PlanScreen: View {
                             case let .block(block):
                                 PlanBlockRow(
                                     block: block,
+                                    projectName: projects.first { $0.id == block.projectID }?.name,
                                     linkedSession: block.sessionID.flatMap { id in sessions.first { $0.id == id } },
                                     hasDifferentActiveSession: controller.hasSession && controller.session?.id != block.sessionID,
                                     isCurrent: isCurrent(block),
@@ -134,7 +132,7 @@ struct PlanScreen: View {
         }
         .safeAreaInset(edge: .bottom) {
             if !blocks.isEmpty {
-                Button("Add a block") { editorSeed = EditorSeed(start: suggestedStart) }
+                Button("Add an entry") { editorSeed = EditorSeed(start: suggestedStart) }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Space.lg)
                     .padding(.vertical, Space.xs)
@@ -142,6 +140,21 @@ struct PlanScreen: View {
             }
         }
         .background(theme.canvas)
+        .sheet(isPresented: $showsCopyDay) {
+            CopyDaySheet(sourceDay: today, entryCount: blocks.count) { destination in
+                do {
+                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination)
+                    today = destination
+                    refresh()
+                    return nil
+                } catch {
+                    context.rollback()
+                    return "Anchor could not copy the day. Nothing was replaced."
+                }
+            }
+            .anchorTheme()
+        }
+        .onChange(of: today) { refresh() }
         .sheet(item: $editorSeed) { seed in
             PlanBlockEditor(initialDay: today, suggestedStart: seed.start) { refresh() }
                 .anchorTheme()
@@ -193,8 +206,9 @@ struct PlanScreen: View {
                     return
                 }
                 let current = Date()
-                if !Calendar.current.isDate(current, inSameDayAs: today) {
-                    today = current
+                if !Calendar.current.isDate(current, inSameDayAs: lastCalendarDay) {
+                    if Calendar.current.isDate(today, inSameDayAs: lastCalendarDay) { today = current }
+                    lastCalendarDay = current
                     refresh()
                 }
             }
@@ -205,10 +219,25 @@ struct PlanScreen: View {
     private var dayHeader: some View {
         DoodleScene(
             "TodayDoodle",
-            eyebrow: Date().formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
+            eyebrow: today.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
             title: "Draw the day",
             message: "Give the important things a place. The plan can move when life does."
         )
+    }
+
+    private var dayControls: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(spacing: Space.sm) {
+                DatePicker("Day", selection: $today, displayedComponents: .date)
+                Button("Today") { today = Date() }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Go to today")
+            }
+            Button("Copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .disabled(blocks.isEmpty)
+                .accessibilityIdentifier("anchor.today.copy-day")
+        }
     }
 
     private var activeTemplates: [ScheduleTemplate] {
@@ -221,51 +250,11 @@ struct PlanScreen: View {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
-    private var todayConfirmation: DayPlanConfirmation? {
-        confirmations.first { Calendar.current.isDate($0.day, inSameDayAs: today) }
-    }
-
-    private var shouldShowDailyCheckIn: Bool {
-        todayConfirmation?.decision.isConfirmed != true && !checkInDeferredInSession
-    }
-
-    private var usualDayName: String {
-        today.formatted(.dateTime.weekday(.wide))
-    }
-
-    private var dailyCheckIn: some View {
-        Card(padding: Space.lg) {
-            VStack(alignment: .leading, spacing: Space.md) {
-                HStack(alignment: .top, spacing: Space.sm) {
-                    Image(systemName: "sun.horizon.fill")
-                        .foregroundStyle(theme.accent)
-                        .frame(width: 32, height: 32)
-                        .background(theme.accent.opacity(0.12), in: .circle)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(activeTemplates.isEmpty ? "Build your usual week" : "Same plan today?")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(theme.textPrimary)
-                        Text(activeTemplates.isEmpty
-                             ? "Set the week once. Anchor will bring each day forward for a quick confirmation."
-                             : "Your usual \(usualDayName) is already here. Confirm it, or change only today.")
-                            .font(.subheadline)
-                            .foregroundStyle(theme.textSecondary)
-                    }
-                }
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Space.sm) { dailyCheckInButtons }
-                    VStack(spacing: Space.sm) { dailyCheckInButtons }
-                }
-            }
-        }
-        .accessibilityIdentifier("anchor.today.daily-check-in")
-    }
-
     private var todayHabitsSection: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
             SectionHeader(
-                "Today’s habits",
-                subtitle: "Finish one as it happens, or give it a place in the day"
+                Calendar.current.isDateInToday(today) ? "Today’s habits" : "Habits for this day",
+                subtitle: "Check it off or schedule a time."
             )
             VStack(spacing: Space.xs) {
                 ForEach(todayHabits) { habit in
@@ -292,6 +281,7 @@ struct PlanScreen: View {
                 habitActions(habit, placed: placed, direct: direct, isDone: isDone)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Space.md)
         .background(theme.surface, in: .rect(cornerRadius: Radius.md))
         .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
@@ -345,7 +335,7 @@ struct PlanScreen: View {
                 Button("Done", systemImage: "checkmark") { setHabitCompleted(true, habit: habit) }
                     .buttonStyle(QuietButtonStyle(expands: false))
                     .accessibilityIdentifier("anchor.today.habit.done")
-                Button("Place", systemImage: "calendar.badge.plus") { placingHabit = habit }
+                Button("Schedule", systemImage: "calendar.badge.plus") { placingHabit = habit }
                     .buttonStyle(PrimaryButtonStyle(expands: false))
                     .accessibilityIdentifier("anchor.today.habit.place")
             }
@@ -353,14 +343,14 @@ struct PlanScreen: View {
     }
 
     private func habitStatusCopy(_ habit: ScheduleTemplate, placed: PlanBlock?, isDone: Bool) -> String {
-        if isDone { return "Completed today" }
+        if isDone { return Calendar.current.isDateInToday(today) ? "Completed today" : "Completed on this day" }
         if let placed {
             return "Placed at \(placed.plannedStart.formatted(date: .omitted, time: .shortened))"
         }
         if let suggested = habit.habitSuggestedStart(on: today) {
             return "Suggested around \(suggested.formatted(date: .omitted, time: .shortened)) · available all day"
         }
-        return "Any time today"
+        return Calendar.current.isDateInToday(today) ? "Any time today" : "Any time on this day"
     }
 
     private func placedBlock(for habit: ScheduleTemplate) -> PlanBlock? {
@@ -384,46 +374,6 @@ struct PlanScreen: View {
             context.rollback()
             loadError = "Anchor could not save that habit. Nothing else changed."
         }
-    }
-
-    @ViewBuilder
-    private var dailyCheckInButtons: some View {
-        if activeTemplates.isEmpty {
-            Button("Set up usual week") { showsRoutines = true }
-                .buttonStyle(PrimaryButtonStyle())
-        } else {
-            Button("Use usual \(usualDayName)") { recordCheckIn(.usual) }
-                .buttonStyle(PrimaryButtonStyle())
-            Button("Adjust today") { recordCheckIn(.adjusted) }
-                .buttonStyle(QuietButtonStyle())
-        }
-        Button("Later") {
-            recordCheckIn(.later)
-            checkInDeferredInSession = true
-        }
-        .buttonStyle(QuietButtonStyle(expands: false))
-    }
-
-    private var todayOnlyStatus: some View {
-        HStack(spacing: Space.sm) {
-            Image(systemName: "pencil.and.list.clipboard")
-                .foregroundStyle(theme.accent)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Adjusting today only")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-                Text("Edit or move blocks below. Your usual \(usualDayName) will not change.")
-                    .font(.caption)
-                    .foregroundStyle(theme.textSecondary)
-            }
-            Spacer(minLength: 0)
-            Button("Edit usual week") { showsRoutines = true }
-                .buttonStyle(.plain)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(theme.accent)
-        }
-        .padding(Space.md)
-        .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.md))
     }
 
     private var emptyDayCopy: some View {
@@ -496,16 +446,6 @@ struct PlanScreen: View {
         }
     }
 
-    private func recordCheckIn(_ decision: DayPlanConfirmationDecision) {
-        do {
-            try DailyPlanService(context: context).record(decision, for: today)
-            loadError = nil
-        } catch {
-            context.rollback()
-            loadError = "Anchor could not save today’s confirmation. Your schedule is still available."
-        }
-    }
-
     private func reconcileSessions() {
         for block in allBlocks {
             guard let sessionID = block.sessionID,
@@ -530,6 +470,7 @@ struct PlanScreen: View {
             goal: nil,
             intent: block.title,
             minutes: max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
+            project: projects.first { $0.id == block.projectID },
             notes: block.details
         )
         let previousSessionID = block.sessionID
@@ -575,6 +516,7 @@ private struct PlanBlockRow: View {
     @Environment(\.anchorTheme) private var theme
     @State private var showsActions = false
     let block: PlanBlock
+    let projectName: String?
     let linkedSession: FocusSession?
     let hasDifferentActiveSession: Bool
     let isCurrent: Bool
@@ -608,6 +550,10 @@ private struct PlanBlockRow: View {
                     .foregroundStyle(theme.textPrimary)
                     .lineLimit(2)
                 HStack(spacing: Space.xxs) {
+                    if let projectName {
+                        Text(projectName)
+                        Text("·")
+                    }
                     Text(block.kind.label)
                     Text("·")
                     Text(block.flexibility.label)
@@ -849,6 +795,7 @@ struct PlanBlockEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var details = ""
+    @State private var selectedProjectID: UUID?
     @State private var plannedStart: Date
     @State private var minutes = 30
     @State private var kind: PlanBlockKind = .focus
@@ -896,6 +843,7 @@ struct PlanBlockEditor: View {
             ?? initialDay
         _title = State(initialValue: block?.title ?? sourceTemplate?.title ?? "")
         _details = State(initialValue: block?.details ?? sourceTemplate?.details ?? "")
+        _selectedProjectID = State(initialValue: block?.projectID ?? sourceTemplate?.projectID)
         _plannedStart = State(initialValue: suggested)
         _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? 1_800) / 60))
         _kind = State(initialValue: startsBehaviorHabit ? .routine : (block?.kind ?? sourceTemplate?.kind ?? .focus))
@@ -947,8 +895,10 @@ struct PlanBlockEditor: View {
                             .foregroundStyle(theme.textSecondary)
                             .lineLimit(2...4)
 
+                        ProjectPicker(selectedID: $selectedProjectID)
+
                         if isBehaviorHabit {
-                            Label("Behavior-change habit", systemImage: "leaf")
+                            Label("Habit", systemImage: "leaf")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(theme.accent)
                         } else {
@@ -1074,9 +1024,11 @@ struct PlanBlockEditor: View {
                 let occurrenceChanged = scheduleChanged
                     || block.title != trimmed
                     || block.details != details
+                    || block.projectID != selectedProjectID
                     || block.kind != kind
                     || block.flexibility != flexibility
                     || block.lifeDirection != direction
+                block.projectID = selectedProjectID
                 block.title = trimmed
                 block.details = details
                 block.plannedStart = plannedStart
@@ -1100,7 +1052,7 @@ struct PlanBlockEditor: View {
                 }
                 try context.save()
             } else if let placingHabit {
-                _ = try HabitDayService(context: context).place(
+                let placed = try HabitDayService(context: context).place(
                     placingHabit,
                     on: initialDay,
                     at: plannedStart,
@@ -1108,7 +1060,10 @@ struct PlanBlockEditor: View {
                     title: trimmed,
                     details: details
                 )
+                placed.projectID = selectedProjectID
+                try context.save()
             } else if let template {
+                template.projectID = selectedProjectID
                 template.title = trimmed
                 template.details = details
                 template.startMinutesFromMidnight = calendar.component(.hour, from: plannedStart) * 60
@@ -1128,6 +1083,7 @@ struct PlanBlockEditor: View {
                 }
             } else if repeats {
                 let template = ScheduleTemplate(
+                    projectID: selectedProjectID,
                     title: trimmed,
                     details: details,
                     startMinutesFromMidnight: calendar.component(.hour, from: plannedStart) * 60 + calendar.component(.minute, from: plannedStart),
@@ -1148,6 +1104,7 @@ struct PlanBlockEditor: View {
                 }
             } else {
                 context.insert(PlanBlock(
+                    projectID: selectedProjectID,
                     title: trimmed,
                     details: details,
                     plannedStart: plannedStart,

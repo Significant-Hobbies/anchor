@@ -1,0 +1,21 @@
+
+🚀 Launch App
+
+   Device: <owner-iphone>
+   Bundle ID: com.significanthobbies.anchor
+
+Errors (1):
+
+  ✗ The application failed to launch. (com.apple.dt.CoreDeviceError error 10002 (0x2712))
+           BundleIdentifier = com.significanthobbies.anchor
+           ----------------------------------------
+               The request to open "com.significanthobbies.anchor" failed. (FBSOpenApplicationServiceErrorDomain error 1 (0x01))
+               BSErrorCodeDescription = RequestDenied
+               NSLocalizedFailureReason = The request was denied by service delegate (SBMainWorkspace) for reason: Locked ("Unable to launch com.significanthobbies.anchor because the device was not, or could not be, unlocked").
+               FBSOpenApplicationRequestID = 0x7863
+           ----------------------------------------
+                   The operation couldn’t be completed. Unable to launch com.significanthobbies.anchor because the device was not, or could not be, unlocked. (FBSOpenApplicationErrorDomain error 7 (0x07))
+                   NSLocalizedFailureReason = Unable to launch com.significanthobbies.anchor because the device was not, or could not be, unlocked.
+                   BSErrorCodeDescription = Locked
+
+❌ Failed to launch app.

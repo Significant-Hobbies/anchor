@@ -1,0 +1,475 @@
+Building for debugging...
+[1 / 1]
+[2 / 12] AnchorUI
+[4 / 14] AnchorUI
+[8 / 18] AnchorUI
+[9 / 19] AnchorUI
+[13 / 18] AnchorUITests-product
+[16 / 21]
+[18 / 21] AnchorUITests-product
+[22 / 24] AnchorUITests-product
+Build complete! (4.02 secs)
+Test Suite 'All tests' started at 2026-09-07 23:52:16.656.
+Test Suite 'All tests' passed at 2026-09-07 23:52:16.656.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+Test Suite 'All tests' started at 2026-09-07 23:52:16.748.
+Test Suite 'All tests' passed at 2026-09-07 23:52:16.749.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 2074
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Shared app architecture" started.
+◇ Suite "Drawn Day visual language" started.
+◇ Suite "Mac shell metrics" started.
+◇ Suite "Scheduled focus handoff" started.
+◇ Test "Unsigned Mac builds cannot masquerade as the installed Anchor app" started.
+◇ Test "Mac and iPhone are thin shells over the same product root" started.
+◇ Test "Local-only build selection is shared by both full apps" started.
+◇ Test "The Mac app is a single-window utility with discoverable native commands" started.
+◇ Test "Flexible habits remain available until explicitly completed or placed" started.
+◇ Test "Onboarding depends on completion, never existing planner data" started.
+◇ Test "A wide window earns the full brand promise" started.
+◇ Test "Starting different work preserves the plan and records the replan" started.
+◇ Test "A common 1264-point Mac window receives the composed wide layout" started.
+◇ Test "The minimum window uses an icon rail and preserves operating width" started.
+◇ Test "Tall narrow windows keep labels without stretching the rail" started.
+◇ Test "A mini-timer start remains linked to the planned block" started.
+◇ Test "Mac menu bar uses the Anchor mark" started.
+◇ Test "The core loop shares the line, knot, and trace materials" started.
+◇ Test "Preference primitives stay product-agnostic and Settings adapts as one screen" started.
+◇ Test "Onboarding and Settings share one optional private Hub account experience" started.
+◇ Test "Mac navigation uses one selected surface" started.
+◇ Test "Default-dark primary doodles have real luminosity variants" started.
+◇ Test "The standard window uses labeled navigation" started.
+◇ Test "Onboarding centers responsively and Mac keeps native window chrome" started.
+◇ Test "Visual review stays offscreen and History keeps one visible section control" started.
+◇ Test "Onboarding QA cannot consume the owner's first-run state" started.
+◇ Test "Google account connection uses the canonical identity origin" started.
+✔ Test "Onboarding depends on completion, never existing planner data" passed after 0.001 seconds.
+✔ Test "A wide window earns the full brand promise" passed after 0.001 seconds.
+✔ Test "The standard window uses labeled navigation" passed after 0.001 seconds.
+✔ Test "Preference primitives stay product-agnostic and Settings adapts as one screen" passed after 0.001 seconds.
+✔ Test "Mac menu bar uses the Anchor mark" passed after 0.001 seconds.
+✔ Test "A common 1264-point Mac window receives the composed wide layout" passed after 0.001 seconds.
+✔ Test "The Mac app is a single-window utility with discoverable native commands" passed after 0.001 seconds.
+✔ Test "Google account connection uses the canonical identity origin" passed after 0.001 seconds.
+✔ Test "Onboarding centers responsively and Mac keeps native window chrome" passed after 0.001 seconds.
+✔ Test "Mac and iPhone are thin shells over the same product root" passed after 0.001 seconds.
+✔ Test "Default-dark primary doodles have real luminosity variants" passed after 0.001 seconds.
+✔ Test "Tall narrow windows keep labels without stretching the rail" passed after 0.001 seconds.
+✔ Test "Unsigned Mac builds cannot masquerade as the installed Anchor app" passed after 0.001 seconds.
+✔ Test "The minimum window uses an icon rail and preserves operating width" passed after 0.001 seconds.
+✔ Suite "Mac shell metrics" passed after 0.001 seconds.
+✔ Test "Local-only build selection is shared by both full apps" passed after 0.001 seconds.
+✔ Test "Mac navigation uses one selected surface" passed after 0.001 seconds.
+✔ Test "Visual review stays offscreen and History keeps one visible section control" passed after 0.001 seconds.
+✔ Test "The core loop shares the line, knot, and trace materials" passed after 0.002 seconds.
+✔ Test "Flexible habits remain available until explicitly completed or placed" passed after 0.002 seconds.
+✔ Suite "Shared app architecture" passed after 0.002 seconds.
+✔ Test "Onboarding QA cannot consume the owner's first-run state" passed after 0.002 seconds.
+✔ Test "Onboarding and Settings share one optional private Hub account experience" passed after 0.002 seconds.
+✔ Suite "Drawn Day visual language" passed after 0.002 seconds.
+✔ Test "A mini-timer start remains linked to the planned block" passed after 0.020 seconds.
+✔ Test "Starting different work preserves the plan and records the replan" passed after 0.020 seconds.
+✔ Suite "Scheduled focus handoff" passed after 0.020 seconds.
+✔ Test run with 23 tests in 4 suites passed after 0.020 seconds.
+◇ Test run started.
+↳ Testing Library Version: 2074
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Heuristic tagging" started.
+◇ Suite "Analytics" started.
+◇ Suite "Day planning" started.
+◇ Suite "Formatting" started.
+◇ Suite "Live Activity lifecycle" started.
+◇ Suite "Demo data" started.
+◇ Suite "Store location" started.
+◇ Suite "Record derivations" started.
+◇ Suite "Onboarding rehearsal" started.
+◇ Suite "CloudKit schema seed" started.
+◇ Suite "Time accounting" started.
+◇ Suite "Significant Hobbies Hub status" started.
+◇ Suite "Focus controller" started.
+◇ Suite "Shared appearance preferences" started.
+◇ Suite "Machine activity" started.
+◇ Suite "Personal Platform session contract" started.
+◇ Suite "Day review" started.
+◇ Suite "Tagging service" started.
+◇ Suite "JSON value" started.
+◇ Test "Keywords drop stop words, short words and duplicates" started.
+◇ Test "The model brief contains only numbers that exist" started.
+◇ Test "Origin classification splits external pulls from internal ones" started.
+◇ Suite "Live Activity snapshot" started.
+◇ Test "A personalized recurring occurrence survives routine changes without rematerializing" started.
+◇ Test "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test "A slack message from a person is a message, not a person interruption" started.
+◇ Test "Sessions under a minute don't count toward a streak" started.
+◇ Test "Specific cues beat general ones" started.
+◇ Test "Editing a routine reconciles only future unstarted occurrences" started.
+◇ Suite "Account-scoped Hub transport" started.
+◇ Test "Origin split separates what came to you from what you went to" started.
+◇ Test "Streaks count consecutive days and tolerate today being unstarted" started.
+◇ Test "Goals sort into themes" started.
+◇ Test "Unrecognised notes land on other with low confidence" started.
+◇ Suite "Export" started.
+◇ Test "Every life direction has an actionable habit suggestion" started.
+◇ Test "Interruption rate is per focused hour, not per session" started.
+◇ Test "Behavior profile round-trips typed selections" started.
+◇ Test "Habit streak follows the actual weekly schedule and ignores off-days" started.
+◇ Test "Median handles even and odd counts, and empty input" started.
+◇ Test "Daily series includes empty days so charts don't flatter you" started.
+◇ Test "Recovery rate is 1 when nothing has interrupted you" started.
+◇ Test "Every weekday can keep a different usual schedule" started.
+◇ Test "Projects, tags, and billing preserve useful reporting dimensions" started.
+◇ Test "The clock rounds rather than truncating" started.
+◇ Test "Physical arrivals outrank generic chat, while explicit channels remain messages" started.
+◇ Test "Any-time habits stay out of the schedule and can complete without invented time" started.
+◇ Test "Recurring themes cluster on keywords, not raw text" started.
+◇ Test "The clock never shows negative time" started.
+◇ Test "Daily confirmation keeps the usual week separate from a today-only choice" started.
+◇ Test "The clock hides hours until they exist" started.
+◇ Test "Resuming publishes a running snapshot" started.
+◇ Test "Copying a day preserves projects and times without copying history or replacing destination entries" started.
+◇ Test "Habit slots never include ordinary recurring schedule items" started.
+◇ Test "Machine presence separates logged from untracked active time" started.
+◇ Test "Durations read compactly and drop empty units" started.
+◇ Test "Focus resolves the active, current, upcoming, then last unfinished block" started.
+◇ Test "A gap breaks the current streak but not the best one" started.
+◇ Test "Restoring an in-flight session on launch starts a Live Activity" started.
+◇ Test "Pausing publishes a paused snapshot" started.
+◇ Test "Stopping a routine removes future planned occurrences and preserves history" started.
+◇ Test "Distraction leaderboard ranks by count then by damage" started.
+◇ Test "Importing an active session starts a Live Activity" started.
+◇ Test "Recurring templates materialize once on matching days" started.
+◇ Test "Overview totals and rates" started.
+◇ Test "Extending publishes an updated planned duration" started.
+◇ Test "Placing a habit uses the chosen time without changing its suggestion" started.
+◇ Test "By-goal grouping sums time and falls back to the intent when unassigned" started.
+◇ Test "Auto-completion at the plan boundary ends the Live Activity" started.
+◇ Test "Two-day habits report progress out of two scheduled occurrences" started.
+◇ Test "Surrendering ends the Live Activity" started.
+◇ Test "A template does not materialize on the wrong weekday" started.
+◇ Test "Starting a session publishes a running snapshot" started.
+◇ Test "Percentages round to whole numbers" started.
+◇ Test "Ending a session ends the Live Activity" started.
+◇ Test "A remotely finished session ends the Live Activity" started.
+◇ Test "Seeding fills an empty store and never runs twice" started.
+◇ Test "Persistent storage explicitly selects Anchor's CloudKit container" started.
+◇ Test "didComplete reflects the recorded outcome, not the elapsed time" started.
+◇ Test "A distraction with no category still displays as something" started.
+◇ Test "Interruption rate ignores sessions too short to be meaningful" started.
+◇ Test "Launching without an active session cleans up an orphaned activity" started.
+◇ Test "An in-memory container is usable and isolated" started.
+◇ Test "Explicit local paths never attempt CloudKit" started.
+◇ Test "Seeded history is deterministic, so screenshots don't churn" started.
+◇ Test "Park and return discards the captured thought from live rehearsal state" started.
+◇ Test "Starting a new session after ending starts a fresh Live Activity" started.
+◇ Test "Parking a distraction updates the interruption count" started.
+◇ Test "Every category maps to a label, symbol and origin" started.
+◇ Test "A noop coordinator never throws and does not block lifecycle" started.
+◇ Test "Pause and resume are idempotent" started.
+◇ Test "Seeded analytics are coherent, not just present" started.
+◇ Test "Blank goals and thoughts cannot advance the rehearsal" started.
+◇ Test "Open-ended sessions report elapsed only" started.
+◇ Test "Unsigned app builds open a local-only container" started.
+◇ Test "Identifiers are the Significant Hobbies ones the entitlements declare" started.
+◇ Test "A backwards clock cannot rewind earned time" started.
+◇ Test "The seed materializes every current model without user content" started.
+◇ Test "The store path always lands on a writable directory" started.
+◇ Test "Fraction stays inside 0...1" started.
+◇ Test "Extending an open-ended session does nothing" started.
+◇ Test "Setting a category by hand round-trips through the raw string" started.
+◇ Test "Elapsed time comes from the wall clock, so it survives relaunch" started.
+◇ Test "Paused time is excluded" started.
+◇ Test "The schema carries the complete CloudKit-safe model set" started.
+◇ Test case passing 2 arguments title → "Complete refresh token handling", expected → .building to "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test case passing 2 arguments title → "Draft a token refresh guide", expected → .writing to "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test case passing 2 arguments title → "Finish the token refresh", expected → .building to "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test case passing 2 arguments title → "Plan token refresh rollout", expected → .planning to "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test case passing 2 arguments title → "Study refresh tokens", expected → .learning to "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test "Remaining never goes negative and the plan is met exactly on time" started.
+◇ Test "The completion date is derived from banked time and the open wall-clock interval" started.
+◇ Test case passing 2 arguments title → "Refresh the garden labels", expected → .other to "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test "Extending pushes the finish line without touching earned time" started.
+◇ Test "Starting a second session closes the first" started.
+◇ Test "A planned session stops itself at the exact finish instant" started.
+◇ Test case passing 2 arguments title → "Count subway tokens", expected → .other to "Token refresh supplies missing technical context without overriding the activity" started.
+◇ Test case passing 2 arguments note → "Slack from Ravi about the invoice", expected → .message to "Specific cues beat general ones" started.
+◇ Test case passing 2 arguments note → "standup ran over", expected → .meeting to "Specific cues beat general ones" started.
+◇ Test case passing 2 arguments note → "phone buzzed with a notification", expected → .notification to "Specific cues beat general ones" started.
+◇ Test "An empty capture can pause without inventing an interruption" started.
+◇ Test case passing 2 arguments note → "email from the bank", expected → .email to "Specific cues beat general ones" started.
+◇ Test "Parking without a session does nothing" started.
+◇ Test "Manual capture is distinguishable from a resume prompt" started.
+◇ Test "Parking a distraction keeps the session alive" started.
+◇ Test case passing 2 arguments note → "started scrolling twitter", expected → .socialFeed to "Specific cues beat general ones" started.
+◇ Test case passing 2 arguments note → "watched a youtube video", expected → .entertainment to "Specific cues beat general ones" started.
+◇ Test "Surrendering records the loss and ends the session as abandoned" started.
+◇ Test case passing 2 arguments note → "Roommate walked in to chat", expected → .person to "Physical arrivals outrank generic chat, while explicit channels remain messages" started.
+◇ Test "Starting a session makes it current and running" started.
+◇ Test case passing 2 arguments note → "went down a wikipedia rabbit hole", expected → .rabbitHole to "Specific cues beat general ones" started.
+◇ Test case passing 2 arguments note → "Colleague stopped by for a chat", expected → .person to "Physical arrivals outrank generic chat, while explicit channels remain messages" started.
+◇ Test "Snapshots carry the session and its distractions into the analytics layer" started.
+◇ Test "Projects, saved tags, and entry text survive the full record path" started.
+◇ Test case passing 2 arguments note → "roommate walked in", expected → .person to "Specific cues beat general ones" started.
+◇ Test "Completion notifications follow start, pause, resume, and manual end" started.
+◇ Test "A session imported after launch becomes the active timer" started.
+◇ Test "Empty notes are not parked" started.
+◇ Test "Extending a running plan keeps the session active" started.
+◇ Test case passing 2 arguments note → "remembered the laundry", expected → .chore to "Specific cues beat general ones" started.
+◇ Test case passing 2 arguments note → "got hungry", expected → .bodily to "Specific cues beat general ones" started.
+◇ Test case passing 2 arguments note → "Slack from my roommate", expected → .message to "Physical arrivals outrank generic chat, while explicit channels remain messages" started.
+◇ Test receiptSurvivesRelaunchAndSuccessClearsFailure() started.
+◇ Test case passing 2 arguments note → "Someone knocked and wanted to chat", expected → .person to "Physical arrivals outrank generic chat, while explicit channels remain messages" started.
+◇ Test "An overdue running session completes safely when restored" started.
+◇ Test failureCopyReportsSafePendingSummaries() started.
+◇ Test "A remotely finished session clears the active timer" started.
+◇ Test case passing 2 arguments note → "construction noise outside", expected → .environment to "Specific cues beat general ones" started.
+◇ Test "Machine presence stays transient until the local timer changes state" started.
+◇ Test "A distraction logged on resume lands at the moment you stopped" started.
+◇ Test case passing 2 arguments note → "switched to a different project", expected → .otherWork to "Specific cues beat general ones" started.
+◇ Test case passing 2 arguments note → "A message says someone walked in", expected → .message to "Physical arrivals outrank generic chat, while explicit channels remain messages" started.
+◇ Test "Saying it was just a break records nothing" started.
+◇ Test case passing 2 arguments note → "worried about the deadline", expected → .wanderingThought to "Specific cues beat general ones" started.
+◇ Test classifiesExpiredOfflineAndServiceFailures() started.
+◇ Test "Test stores disable external session synchronization" started.
+◇ Test "Ending early is recorded as such, and pause banks the time" started.
+◇ Test "Pausing from capture preserves the session and records recovery only on resume" started.
+◇ Test "An in-flight session is restored when the app relaunches" started.
+◇ Test "Unknown stored values degrade to the product default" started.
+◇ Test "A session that served its plan is recorded as completed even if stopped by hand" started.
+◇ Test "Idle observations become aggregate active and tracked totals" started.
+◇ Test "Resuming always asks what pulled you away" started.
+◇ Test finishedSessionContainsNoDistractionText() started.
+◇ Test "The newest device update wins" started.
+◇ Test "Remote Hub history does not enter Anchor's planner" started.
+◇ Test "Captured distractions provide evidence but do not invent a note" started.
+◇ Test case passing 2 arguments note → "Chat with my roommate online", expected → .message to "Physical arrivals outrank generic chat, while explicit channels remain messages" started.
+◇ Test "Explicit deliberate replanning remains neutral" started.
+◇ Test "Open-ended and paused sessions never auto-complete" started.
+◇ Test "Unplanned sessions still appear in the followed day" started.
+◇ Test "No record uses Anchor's shared dark default" started.
+◇ Test "Selected life direction can shape a grounded replacement suggestion" started.
+◇ Test "Account deletion uses the authenticated Better Auth endpoint" started.
+◇ Test "Review compares planned and actual without an adherence score" started.
+◇ Test "Equal timestamps resolve deterministically" started.
+◇ Test "Parses the shapes JSON-RPC actually sends" started.
+◇ Test paceSessionUsesStableIdentityAndWallClockDates() started.
+◇ Test "Untimed completion stays complete without inventing a duration" started.
+◇ Test "Non-finite doubles become null rather than invalid JSON" started.
+◇ Test "Malformed input is rejected rather than trapping" started.
+◇ Test "A paused open-ended session freezes on elapsed time" started.
+◇ Test "Planned sessions derive a completion date from the wall clock" started.
+◇ Test "Paused sessions have no completion date even when planned" started.
+◇ Test "Summaries are absent rather than invented when the model is off" started.
+◇ Test "Encoding is stable and escapes control characters" started.
+◇ Test "With the on-device model disabled it falls back to rules" started.
+◇ Test "Open-ended elapsed time includes focus banked before a pause" started.
+◇ Test "Each identity gets independent fingerprints, versions, cursor and receipt" started.
+◇ Test "Open-ended sessions have no completion date" started.
+◇ Test "Sheet names are unique, trimmed and free of reserved characters" started.
+✔ Test "A slack message from a person is a message, not a person interruption" passed after 0.001 seconds.
+✔ Test "Origin classification splits external pulls from internal ones" passed after 0.001 seconds.
+◇ Test "Unified export carries plans, causes, and private profile selections" started.
+◇ Test "Account deletion reports service failures without exposing credentials" started.
+◇ Test "CSV quotes commas, quotes and newlines per RFC 4180" started.
+◇ Test "Excel serial dates use the 1899-12-30 epoch" started.
+◇ Test "A paused planned session freezes on remaining time" started.
+◇ Test "The workbook is a well-formed ZIP with the parts Excel requires" started.
+◇ Test "The workbook actually unzips and every sheet is present" started.
+◇ Test "Column letters roll over past Z" started.
+◇ Test "Distraction notes with quotes survive the CSV round trip" started.
+✔ Test "Keywords drop stop words, short words and duplicates" passed after 0.002 seconds.
+✔ Test "Token refresh supplies missing technical context without overriding the activity" with 7 test cases passed after 0.002 seconds.
+◇ Test "JSON export carries the overview and every session" started.
+◇ Test "Sessions CSV has one row per session" started.
+✔ Test "Interruption rate is per focused hour, not per session" passed after 0.002 seconds.
+✔ Test "Sessions under a minute don't count toward a streak" passed after 0.002 seconds.
+◇ Test "XML special characters in a note cannot corrupt the sheet" started.
+✔ Test "Origin split separates what came to you from what you went to" passed after 0.002 seconds.
+✔ Test "The clock rounds rather than truncating" passed after 0.002 seconds.
+✔ Test "Recovery rate is 1 when nothing has interrupted you" passed after 0.002 seconds.
+✔ Test "Unrecognised notes land on other with low confidence" passed after 0.002 seconds.
+◇ Test "Model keywords are cleaned, and empty output keeps the rule-based ones" started.
+✔ Test "The clock never shows negative time" passed after 0.002 seconds.
+✔ Test "Goals sort into themes" passed after 0.002 seconds.
+✔ Test "Physical arrivals outrank generic chat, while explicit channels remain messages" with 6 test cases passed after 0.002 seconds.
+✔ Test "The clock hides hours until they exist" passed after 0.002 seconds.
+✔ Test "Specific cues beat general ones" with 13 test cases passed after 0.002 seconds.
+✔ Test "Daily series includes empty days so charts don't flatter you" passed after 0.002 seconds.
+✔ Test "Streaks count consecutive days and tolerate today being unstarted" passed after 0.002 seconds.
+✔ Test "Recurring themes cluster on keywords, not raw text" passed after 0.002 seconds.
+✔ Test "Machine presence separates logged from untracked active time" passed after 0.002 seconds.
+✔ Test "Projects, tags, and billing preserve useful reporting dimensions" passed after 0.002 seconds.
+✔ Test "Median handles even and odd counts, and empty input" passed after 0.002 seconds.
+✔ Test "Durations read compactly and drop empty units" passed after 0.002 seconds.
+✔ Test "A gap breaks the current streak but not the best one" passed after 0.002 seconds.
+✔ Test "Percentages round to whole numbers" passed after 0.002 seconds.
+✔ Test "Overview totals and rates" passed after 0.002 seconds.
+✔ Test "didComplete reflects the recorded outcome, not the elapsed time" passed after 0.002 seconds.
+✔ Test "Interruption rate ignores sessions too short to be meaningful" passed after 0.002 seconds.
+✔ Test "By-goal grouping sums time and falls back to the intent when unassigned" passed after 0.002 seconds.
+✔ Test "The model brief contains only numbers that exist" passed after 0.002 seconds.
+✔ Test "Explicit local paths never attempt CloudKit" passed after 0.002 seconds.
+✔ Test "Pause and resume are idempotent" passed after 0.002 seconds.
+✔ Test "Distraction leaderboard ranks by count then by damage" passed after 0.002 seconds.
+✔ Test "Park and return discards the captured thought from live rehearsal state" passed after 0.002 seconds.
+✔ Test "Every category maps to a label, symbol and origin" passed after 0.002 seconds.
+✔ Test "Fraction stays inside 0...1" passed after 0.002 seconds.
+✔ Test "Extending an open-ended session does nothing" passed after 0.002 seconds.
+✔ Test "Elapsed time comes from the wall clock, so it survives relaunch" passed after 0.002 seconds.
+✔ Test "A backwards clock cannot rewind earned time" passed after 0.002 seconds.
+✔ Test "Paused time is excluded" passed after 0.002 seconds.
+✔ Test "Identifiers are the Significant Hobbies ones the entitlements declare" passed after 0.002 seconds.
+✔ Test "The completion date is derived from banked time and the open wall-clock interval" passed after 0.002 seconds.
+✔ Test "Open-ended sessions report elapsed only" passed after 0.002 seconds.
+✔ Test "Blank goals and thoughts cannot advance the rehearsal" passed after 0.002 seconds.
+✔ Test "Remaining never goes negative and the plan is met exactly on time" passed after 0.002 seconds.
+✔ Test "Extending pushes the finish line without touching earned time" passed after 0.002 seconds.
+✔ Test "Test stores disable external session synchronization" passed after 0.001 seconds.
+✔ Test "Remote Hub history does not enter Anchor's planner" passed after 0.001 seconds.
+✔ Test failureCopyReportsSafePendingSummaries() passed after 0.001 seconds.
+✔ Test classifiesExpiredOfflineAndServiceFailures() passed after 0.001 seconds.
+✔ Test "No record uses Anchor's shared dark default" passed after 0.001 seconds.
+✔ Test "The store path always lands on a writable directory" passed after 0.002 seconds.
+✔ Test "Review compares planned and actual without an adherence score" passed after 0.001 seconds.
+✔ Test "Non-finite doubles become null rather than invalid JSON" passed after 0.001 seconds.
+✔ Test "Captured distractions provide evidence but do not invent a note" passed after 0.001 seconds.
+✔ Test "A paused open-ended session freezes on elapsed time" passed after 0.001 seconds.
+✔ Test "The newest device update wins" passed after 0.001 seconds.
+✔ Test "Malformed input is rejected rather than trapping" passed after 0.001 seconds.
+✔ Test "Selected life direction can shape a grounded replacement suggestion" passed after 0.001 seconds.
+✔ Test "Explicit deliberate replanning remains neutral" passed after 0.001 seconds.
+✔ Test "Parses the shapes JSON-RPC actually sends" passed after 0.001 seconds.
+✔ Test "Unplanned sessions still appear in the followed day" passed after 0.001 seconds.
+✔ Test "Paused sessions have no completion date even when planned" passed after 0.001 seconds.
+✔ Test "Untimed completion stays complete without inventing a duration" passed after 0.001 seconds.
+✔ Test "Planned sessions derive a completion date from the wall clock" passed after 0.001 seconds.
+✔ Test "Unknown stored values degrade to the product default" passed after 0.001 seconds.
+✔ Test "Equal timestamps resolve deterministically" passed after 0.001 seconds.
+✔ Test "Summaries are absent rather than invented when the model is off" passed after 0.001 seconds.
+✔ Test "With the on-device model disabled it falls back to rules" passed after 0.001 seconds.
+✔ Suite "Heuristic tagging" passed after 0.003 seconds.
+✔ Test "Excel serial dates use the 1899-12-30 epoch" passed after 0.001 seconds.
+✔ Test "Open-ended elapsed time includes focus banked before a pause" passed after 0.001 seconds.
+✔ Test "Sheet names are unique, trimmed and free of reserved characters" passed after 0.001 seconds.
+✔ Test "CSV quotes commas, quotes and newlines per RFC 4180" passed after 0.001 seconds.
+✔ Test "Encoding is stable and escapes control characters" passed after 0.001 seconds.
+✔ Test "Column letters roll over past Z" passed after 0.001 seconds.
+✔ Test "Open-ended sessions have no completion date" passed after 0.001 seconds.
+✔ Test "A paused planned session freezes on remaining time" passed after 0.001 seconds.
+✔ Suite "Formatting" passed after 0.003 seconds.
+✔ Test "XML special characters in a note cannot corrupt the sheet" passed after 0.001 seconds.
+✔ Test "Model keywords are cleaned, and empty output keeps the rule-based ones" passed after 0.001 seconds.
+✔ Test "Setting a category by hand round-trips through the raw string" passed after 0.002 seconds.
+✔ Test "A distraction with no category still displays as something" passed after 0.002 seconds.
+✔ Suite "Onboarding rehearsal" passed after 0.003 seconds.
+✔ Suite "Time accounting" passed after 0.003 seconds.
+✔ Test "JSON export carries the overview and every session" passed after 0.001 seconds.
+✔ Suite "Shared appearance preferences" passed after 0.003 seconds.
+✔ Suite "Day review" passed after 0.003 seconds.
+✔ Suite "JSON value" passed after 0.003 seconds.
+✔ Suite "Tagging service" passed after 0.003 seconds.
+✔ Suite "Record derivations" passed after 0.003 seconds.
+✔ Suite "Analytics" passed after 0.003 seconds.
+✔ Suite "Live Activity snapshot" passed after 0.003 seconds.
+✔ Test "Account deletion reports service failures without exposing credentials" passed after 0.001 seconds.
+✔ Test "Distraction notes with quotes survive the CSV round trip" passed after 0.001 seconds.
+✔ Test "Sessions CSV has one row per session" passed after 0.001 seconds.
+✔ Test "Unified export carries plans, causes, and private profile selections" passed after 0.002 seconds.
+✔ Test "The schema carries the complete CloudKit-safe model set" passed after 0.004 seconds.
+✔ Test "Persistent storage explicitly selects Anchor's CloudKit container" passed after 0.004 seconds.
+✔ Test "Account deletion uses the authenticated Better Auth endpoint" passed after 0.002 seconds.
+✔ Test finishedSessionContainsNoDistractionText() passed after 0.003 seconds.
+✔ Test "The workbook is a well-formed ZIP with the parts Excel requires" passed after 0.003 seconds.
+✔ Test paceSessionUsesStableIdentityAndWallClockDates() passed after 0.003 seconds.
+✔ Suite "Personal Platform session contract" passed after 0.005 seconds.
+✔ Test "The workbook actually unzips and every sheet is present" passed after 0.006 seconds.
+✔ Suite "Export" passed after 0.008 seconds.
+✔ Test "An in-memory container is usable and isolated" passed after 0.011 seconds.
+✔ Test "Seeding fills an empty store and never runs twice" passed after 0.032 seconds.
+✔ Test "Seeded history is deterministic, so screenshots don't churn" passed after 0.067 seconds.
+✔ Test "Seeded analytics are coherent, not just present" passed after 0.084 seconds.
+✔ Suite "Demo data" passed after 0.084 seconds.
+✔ Test "The seed materializes every current model without user content" passed after 0.092 seconds.
+✔ Suite "CloudKit schema seed" passed after 0.093 seconds.
+✔ Test "Unsigned app builds open a local-only container" passed after 0.102 seconds.
+✔ Suite "Store location" passed after 0.103 seconds.
+✔ Test receiptSurvivesRelaunchAndSuccessClearsFailure() passed after 0.128 seconds.
+✔ Suite "Significant Hobbies Hub status" passed after 0.129 seconds.
+✔ Test "Editing a routine reconciles only future unstarted occurrences" passed after 0.178 seconds.
+✔ Test "Every life direction has an actionable habit suggestion" passed after 0.178 seconds.
+✔ Test "A personalized recurring occurrence survives routine changes without rematerializing" passed after 0.178 seconds.
+✔ Test "Behavior profile round-trips typed selections" passed after 0.178 seconds.
+✔ Test "Habit streak follows the actual weekly schedule and ignores off-days" passed after 0.182 seconds.
+✔ Test "Every weekday can keep a different usual schedule" passed after 0.190 seconds.
+✔ Test "Any-time habits stay out of the schedule and can complete without invented time" passed after 0.202 seconds.
+✔ Test "Daily confirmation keeps the usual week separate from a today-only choice" passed after 0.202 seconds.
+✔ Test "Copying a day preserves projects and times without copying history or replacing destination entries" passed after 0.205 seconds.
+✔ Test "Resuming publishes a running snapshot" passed after 0.205 seconds.
+✔ Test "Habit slots never include ordinary recurring schedule items" passed after 0.219 seconds.
+✔ Test "Focus resolves the active, current, upcoming, then last unfinished block" passed after 0.221 seconds.
+✔ Test "Restoring an in-flight session on launch starts a Live Activity" passed after 0.230 seconds.
+✔ Test "Stopping a routine removes future planned occurrences and preserves history" passed after 0.230 seconds.
+✔ Test "Pausing publishes a paused snapshot" passed after 0.230 seconds.
+✔ Test "Importing an active session starts a Live Activity" passed after 0.230 seconds.
+✔ Test "Recurring templates materialize once on matching days" passed after 0.232 seconds.
+✔ Test "Placing a habit uses the chosen time without changing its suggestion" passed after 0.232 seconds.
+✔ Test "Two-day habits report progress out of two scheduled occurrences" passed after 0.232 seconds.
+✔ Test "Auto-completion at the plan boundary ends the Live Activity" passed after 0.232 seconds.
+✔ Test "Starting a session publishes a running snapshot" passed after 0.239 seconds.
+✔ Test "A template does not materialize on the wrong weekday" passed after 0.239 seconds.
+✔ Suite "Day planning" passed after 0.239 seconds.
+✔ Test "Ending a session ends the Live Activity" passed after 0.241 seconds.
+✔ Test "Surrendering ends the Live Activity" passed after 0.242 seconds.
+✔ Test "Extending publishes an updated planned duration" passed after 0.242 seconds.
+✔ Test "Parking a distraction updates the interruption count" passed after 0.259 seconds.
+✔ Test "Launching without an active session cleans up an orphaned activity" passed after 0.259 seconds.
+✔ Test "Starting a new session after ending starts a fresh Live Activity" passed after 0.259 seconds.
+✔ Test "A remotely finished session ends the Live Activity" passed after 0.259 seconds.
+✔ Test "Starting a second session closes the first" passed after 0.259 seconds.
+✔ Test "An empty capture can pause without inventing an interruption" passed after 0.259 seconds.
+✔ Test "A planned session stops itself at the exact finish instant" passed after 0.259 seconds.
+✔ Test "Parking without a session does nothing" passed after 0.259 seconds.
+✔ Test "A noop coordinator never throws and does not block lifecycle" passed after 0.260 seconds.
+✔ Test "Manual capture is distinguishable from a resume prompt" passed after 0.259 seconds.
+✔ Test "Parking a distraction keeps the session alive" passed after 0.259 seconds.
+✔ Test "A session imported after launch becomes the active timer" passed after 0.259 seconds.
+✔ Test "Extending a running plan keeps the session active" passed after 0.259 seconds.
+✔ Test "Completion notifications follow start, pause, resume, and manual end" passed after 0.259 seconds.
+✔ Test "Projects, saved tags, and entry text survive the full record path" passed after 0.259 seconds.
+✔ Test "Surrendering records the loss and ends the session as abandoned" passed after 0.259 seconds.
+✔ Test "Starting a session makes it current and running" passed after 0.259 seconds.
+✔ Test "A distraction logged on resume lands at the moment you stopped" passed after 0.259 seconds.
+✔ Test "A remotely finished session clears the active timer" passed after 0.259 seconds.
+✔ Test "An overdue running session completes safely when restored" passed after 0.259 seconds.
+✔ Test "Machine presence stays transient until the local timer changes state" passed after 0.259 seconds.
+✔ Test "A session that served its plan is recorded as completed even if stopped by hand" passed after 0.259 seconds.
+✔ Test "Snapshots carry the session and its distractions into the analytics layer" passed after 0.259 seconds.
+✔ Test "Ending early is recorded as such, and pause banks the time" passed after 0.259 seconds.
+✔ Suite "Live Activity lifecycle" passed after 0.260 seconds.
+✔ Test "Empty notes are not parked" passed after 0.259 seconds.
+✔ Test "Idle observations become aggregate active and tracked totals" passed after 0.259 seconds.
+✔ Test "Pausing from capture preserves the session and records recovery only on resume" passed after 0.259 seconds.
+✔ Test "Resuming always asks what pulled you away" passed after 0.259 seconds.
+✔ Suite "Machine activity" passed after 0.260 seconds.
+✔ Test "Saying it was just a break records nothing" passed after 0.259 seconds.
+✔ Test "An in-flight session is restored when the app relaunches" passed after 0.259 seconds.
+✔ Test "Open-ended and paused sessions never auto-complete" passed after 0.259 seconds.
+✔ Suite "Focus controller" passed after 0.261 seconds.
+✔ Test "Each identity gets independent fingerprints, versions, cursor and receipt" passed after 0.278 seconds.
+◇ Test "A failed queue survives B and relaunch without being sent as B" started.
+✔ Test "A failed queue survives B and relaunch without being sent as B" passed after 0.011 seconds.
+◇ Test "Legacy unscoped state is preserved byte-for-byte and never assigned" started.
+✔ Test "Legacy unscoped state is preserved byte-for-byte and never assigned" passed after 0.007 seconds.
+◇ Test "A delayed response cannot clear B's in-flight status or receipt" started.
+◇ Test case passing 1 argument status → 200 to "A delayed response cannot clear B's in-flight status or receipt" started.
+◇ Test case passing 1 argument status → 503 to "A delayed response cannot clear B's in-flight status or receipt" started.
+✔ Test "A delayed response cannot clear B's in-flight status or receipt" with 2 test cases passed after 0.016 seconds.
+◇ Test "Sign-out invalidates a delayed successful receipt and future exports" started.
+✔ Test "Sign-out invalidates a delayed successful receipt and future exports" passed after 0.005 seconds.
+◇ Test "Deletion verifies its identity and cannot sign out a later account" started.
+✔ Test "Deletion verifies its identity and cannot sign out a later account" passed after 0.005 seconds.
+◇ Test "A mismatched or expired bearer cannot select files or export" started.
+✔ Test "A mismatched or expired bearer cannot select files or export" passed after 0.003 seconds.
+✔ Suite "Account-scoped Hub transport" passed after 0.330 seconds.
+✔ Test run with 162 tests in 22 suites passed after 0.331 seconds.

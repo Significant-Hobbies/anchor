@@ -407,6 +407,14 @@ struct CompactCapture: View {
             .buttonStyle(PrimaryButtonStyle())
             .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
+            if !isReturningFromPause {
+                Button("Pause — come back later", systemImage: "pause.fill") {
+                    controller.pauseFromCapture(note: note)
+                    note = ""
+                }
+                .buttonStyle(QuietButtonStyle())
+            }
+
             Button(isReturningFromPause ? "Nothing — just a break" : "Cancel") {
                 controller.dismissCapture()
             }

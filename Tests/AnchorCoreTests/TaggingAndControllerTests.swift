@@ -162,6 +162,38 @@ struct FocusControllerTests {
         )
     }
 
+    @Test("Pausing from capture preserves the session and records recovery only on resume")
+    func pauseCapturedInterruption() throws {
+        let (controller, context) = try makeController()
+        let session = controller.start(goal: nil, intent: "Write", minutes: 25)
+        controller.beginManualCapture()
+        controller.pauseFromCapture(note: "Doorbell", kind: .person)
+        #expect(controller.isPaused)
+        #expect(!controller.isCapturing)
+        #expect(session.endedAt == nil)
+        let records = try context.fetch(FetchDescriptor<Distraction>())
+        #expect(records.count == 1)
+        #expect(records.first?.didReturnToFocus == false)
+        controller.resume()
+        #expect(controller.session?.id == session.id)
+        #expect(controller.isRunning)
+        #expect(controller.isCapturing)
+        #expect(records.first?.didReturnToFocus == true)
+        controller.dismissCapture()
+        #expect(try context.fetchCount(FetchDescriptor<Distraction>()) == 1)
+        controller.end()
+    }
+
+    @Test("An empty capture can pause without inventing an interruption")
+    func pauseWithoutNote() throws {
+        let (controller, context) = try makeController()
+        controller.start(goal: nil, intent: "Write", minutes: 25)
+        controller.pauseFromCapture(note: "  ")
+        #expect(controller.isPaused)
+        #expect(try context.fetchCount(FetchDescriptor<Distraction>()) == 0)
+        controller.end()
+    }
+
     @Test("Starting a session makes it current and running")
     func startSession() throws {
         let (controller, _) = try makeController()

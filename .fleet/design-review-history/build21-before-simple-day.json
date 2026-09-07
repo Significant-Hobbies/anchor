@@ -1,0 +1,108 @@
+{
+  "$schema": "fleet.design-review.v1",
+  "version": 1,
+  "project": "anchor",
+  "target": "Build 21 Mac direct-account polish over the approved Build 20 design: capability-aware provider UI",
+  "surfaceMode": "operate",
+  "mode": "preserve",
+  "register": "product",
+  "context": {
+    "product": "PRODUCT.md",
+    "design": "DESIGN.md"
+  },
+  "direction": {
+    "references": [],
+    "probes": [],
+    "selected": "existing-design",
+    "approval": "not-required",
+    "before": "artifacts/design/build19/catalog/editor-metadata-mac.png",
+    "library": {
+      "strategy": "upstream-first",
+      "primary": "existing-project-system",
+      "sources": [],
+      "runtime": "existing",
+      "customReplacement": {
+        "used": false,
+        "authorization": "not-required",
+        "reason": ""
+      }
+    },
+    "contract": {
+      "purpose": "Help a person plan a realistic day, follow the current intention, capture what changes it, and learn why the day lived differed from the day planned.",
+      "purposeSource": "PRODUCT.md and site-health projects.anchor purpose contract",
+      "canonicalPurpose": "Anchor helps a person plan a realistic day, keep the current intention visible, capture what changes it, and learn why the lived day differed from the plan.",
+      "purposeAlignment": "match",
+      "driftNote": "",
+      "audience": "A private owner who plans and focuses from a Mac and expects the app to behave like a polished native utility throughout the workday.",
+      "job": "Make the next planned action immediately startable, keep the timer reachable without context switching, and make reusable project and tag context trustworthy to edit.",
+      "thesis": "Preserve The Drawn Day while making Mac structure quieter and more native: one window, discoverable menus, a schedule-aware mini timer, and calm editable libraries.",
+      "system": "Existing neutral paper and charcoal surfaces, SF typography, one ink action, Anchor spacing and radii, native Mac menus and fields, and authored colour only for meaningful project or interruption context.",
+      "signature": "The scheduled intention moves directly from Today into the menu-bar timer, so Anchor stays present without pulling the owner out of their work.",
+      "risk": "Adding capability to the mini timer could make it noisy; scheduled context is limited to one current or next block and yields to the existing compact composer."
+    }
+  },
+  "evidence": {
+    "screenshots": [
+      {
+        "width": 390,
+        "path": "artifacts/design/mac-polish/after/compact-panel-390.png"
+      },
+      {
+        "width": 768,
+        "path": "artifacts/design/mac-polish/after/editor-metadata-mac-768.png"
+      },
+      {
+        "width": 1440,
+        "path": "artifacts/design/mac-polish/after/settings-mac-1440.png"
+      }
+    ],
+    "projectCheck": {
+      "command": "rtk swift test && xcodebuildmcp macos build --scheme Anchor (macOS) --configuration DebugLocal",
+      "status": "pass"
+    },
+    "critique": {
+      "score": 34,
+      "maximum": 40
+    },
+    "audit": {
+      "score": 19,
+      "maximum": 20
+    },
+    "unresolved": {
+      "p0": 0,
+      "p1": 0
+    },
+    "detector": {
+      "posture": "advisory",
+      "findings": [
+        "Native SwiftUI surface; browser UI detector is not applicable."
+      ]
+    },
+    "comprehension": {
+      "status": "not-applicable",
+      "reviewer": "",
+      "answers": {
+        "product": "",
+        "audience": "",
+        "value": "",
+        "mechanism": "",
+        "proof": "",
+        "nextAction": ""
+      },
+      "purposeScore": {
+        "product": 0,
+        "audience": 0,
+        "value": 0,
+        "mechanism": 0,
+        "proof": 0,
+        "nextAction": 0,
+        "total": 0
+      },
+      "mismatches": []
+    }
+  },
+  "ownerFeedback": {
+    "decision": "agent-selected",
+    "note": "The owner directed a Mac-only preserve pass and clarified the core: maintain habits, sort the calendar, start and stop focus, and review focus hours and blockers. No scope expansion was taken."
+  }
+}
