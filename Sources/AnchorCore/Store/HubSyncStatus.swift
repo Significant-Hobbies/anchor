@@ -1,4 +1,5 @@
 #if !os(watchOS)
+import CryptoKit
 import Foundation
 import PersonalSyncKit
 
@@ -106,6 +107,16 @@ public struct HubSyncReceiptStore {
     ) {
         self.defaults = defaults
         self.key = key
+    }
+
+    /// Stable IDs, rather than mutable email addresses or bearer tokens, own
+    /// receipts and runtime files. The legacy key remains untouched.
+    static func namespace(for userID: String) -> String {
+        SHA256.hash(data: Data(userID.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    func scoped(to userID: String) -> Self {
+        Self(defaults: defaults, key: "\(key).account.\(Self.namespace(for: userID))")
     }
 
     public func load() -> HubSyncReceipt {

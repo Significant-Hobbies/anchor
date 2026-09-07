@@ -188,6 +188,11 @@ Original requirements and discussion: [#41](https://github.com/Significant-Hobbi
 
 ### Verify signed Hub authentication and clean account provenance
 
-Verify signed Hub authentication and clean account provenance; preserve local data and do not infer success from a landing page.
+Account-scoped queues, fingerprints, versions, cursors and receipts now have
+[headless transport proof](docs/hub-account-qualification-2026-09-07.md), including
+account switching, failed retries and delayed responses. Legacy unscoped state
+is retained without assigning it to an identity. Signed Apple/Google sign-in,
+provider recovery and installed-app local/iCloud continuity remain unverified;
+these source checks do not close the acceptance task.
 
 Original requirements and discussion: [#40](https://github.com/Significant-Hobbies/anchor/issues/40).

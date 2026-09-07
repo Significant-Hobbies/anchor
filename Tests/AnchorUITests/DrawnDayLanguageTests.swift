@@ -204,7 +204,7 @@ struct DrawnDayLanguageTests {
         let sync = try source("Sources/AnchorCore/Store/AnchorPlatformSync.swift", in: repository)
 
         #expect(sync.contains("https://live.significanthobbies.com"))
-        #expect(sync.contains("identityURL: Self.identityURL"))
+        #expect(sync.contains("baseURL: Self.identityURL"))
     }
 
     private func source(_ path: String, in repository: URL) throws -> String {

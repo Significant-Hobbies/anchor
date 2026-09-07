@@ -19,61 +19,82 @@ public final class AnchorPlatformSync {
     nonisolated public static let importsRemoteSessions = false
 
     private let context: ModelContext
-    private let connection: PersonalPlatformConnection?
+    private let identity: PersonalIdentityClient?
+    private let supportDirectory: URL
+    private let deviceId: String
+    private let transport: URLSession
+    private let platformURL: URL
+    private let identityOrigin: URL
     private let sessionSynchronizationEnabled: Bool
     private let receiptStore: HubSyncReceiptStore
+    private var activeUserID: String?
+    private var generation = UUID()
+    private var activeRuntime: PersonalSyncRuntime?
+    private var busyAccounts: Set<String> = []
+    private var isDisconnecting = false
     public let account: PersonalAccountModel?
     public private(set) var isSyncing = false
     public private(set) var pendingCount = 0
-    public private(set) var receipt: HubSyncReceipt
+    public private(set) var receipt = HubSyncReceipt()
 
-    public init(
+    public convenience init(
         context: ModelContext,
         enabled: Bool = true,
         sessionSynchronizationEnabled: Bool = AnchorExternalSyncPolicy.allowsSessionSynchronization(),
         receiptStore: HubSyncReceiptStore = HubSyncReceiptStore()
     ) {
-        self.context = context
-        self.sessionSynchronizationEnabled = sessionSynchronizationEnabled
-        self.receiptStore = receiptStore
-        receipt = receiptStore.load()
-        guard enabled else {
-            connection = nil
-            account = nil
-            return
-        }
         let defaults = UserDefaults.standard
         let deviceKey = "personal-platform-device-id"
         let deviceId = defaults.string(forKey: deviceKey) ?? UUID().uuidString.lowercased()
-        defaults.set(deviceId, forKey: deviceKey)
-        let connection = try? PersonalPlatformConnection(
-            domain: .anchor,
-            keychainService: "com.significanthobbies.anchor.personal-platform",
+        if enabled { defaults.set(deviceId, forKey: deviceKey) }
+        self.init(
+            context: context,
+            identity: enabled ? PersonalIdentityClient(
+                baseURL: Self.identityURL,
+                tokenStore: KeychainBearerTokenStore(
+                    service: "com.significanthobbies.anchor.personal-platform"
+                )
+            ) : nil,
             supportDirectory: AnchorStore.storeURL().deletingLastPathComponent(),
             deviceId: deviceId,
-            identityURL: Self.identityURL
+            sessionSynchronizationEnabled: sessionSynchronizationEnabled,
+            receiptStore: receiptStore
         )
-        self.connection = connection
-        account = connection.map {
-            PersonalAccountModel(
-                identity: $0.identity,
-                callbackScheme: "anchor",
-                identityURL: Self.identityURL
-            )
+    }
+
+    /// Internal composition seam: tests use temporary files, in-memory tokens
+    /// and a URLSession transport, without opening the owner's Keychain.
+    init(
+        context: ModelContext,
+        identity: PersonalIdentityClient?,
+        supportDirectory: URL,
+        deviceId: String,
+        sessionSynchronizationEnabled: Bool = true,
+        receiptStore: HubSyncReceiptStore,
+        transport: URLSession = .shared,
+        platformURL: URL = URL(string: "https://personal-platform.sarthakagrawal927.workers.dev")!,
+        identityOrigin: URL = AnchorPlatformSync.identityURL
+    ) {
+        self.context = context
+        self.identity = identity
+        self.supportDirectory = supportDirectory
+        self.deviceId = deviceId
+        self.sessionSynchronizationEnabled = sessionSynchronizationEnabled
+        self.receiptStore = receiptStore
+        self.transport = transport
+        self.platformURL = platformURL
+        self.identityOrigin = identityOrigin
+        account = identity.map {
+            PersonalAccountModel(identity: $0, callbackScheme: "anchor", identityURL: identityOrigin)
         }
     }
 
     public func restoreAndSynchronize() async {
-        // Demo and redirected-store launches are isolated QA worlds. They may
-        // still render the optional account UI, but must not inspect the
-        // owner's shared Keychain or restore a production Hub session.
-        guard sessionSynchronizationEnabled else {
-            pendingCount = 0
-            return
-        }
+        // QA stores must never inspect the owner's shared Keychain.
+        guard sessionSynchronizationEnabled, !isDisconnecting else { return }
         let hadBearer = await hasBearerToken()
         await account?.restore()
-        await refreshPendingCount()
+        selectAccount()
         if account?.isSignedIn == false, let errorMessage = account?.errorMessage {
             let stillHasBearer = await hasBearerToken()
             let failure: HubSyncFailure = hadBearer && !stillHasBearer
@@ -85,99 +106,157 @@ public final class AnchorPlatformSync {
     }
 
     public func connect() async {
+        guard !isDisconnecting else { return }
         await account?.connect()
         await synchronize(announcing: true)
     }
 
     public func disconnect() async {
+        guard !isDisconnecting else { return }
+        isDisconnecting = true
+        selectAccount() // Invalidate callbacks before awaiting remote sign-out.
+        defer { isDisconnecting = false }
         await account?.signOut()
-        receipt.failure = nil
-        receipt.failedAt = nil
-        receiptStore.save(receipt)
-        await refreshPendingCount()
     }
 
     /// Permanently removes the connected Significant Hobbies account. Anchor's
     /// local and iCloud planner data remains independent and is not deleted.
     public func deleteAccount() async throws {
-        guard sessionSynchronizationEnabled, let connection else {
+        selectAccount()
+        let attempt = generation
+        guard sessionSynchronizationEnabled, !isDisconnecting, let identity,
+              let userID = activeUserID,
+              let bearerToken = try await identity.bearerToken() else {
             throw AnchorAccountDeletionError.signedOut
         }
-        guard let bearerToken = try await connection.identity.bearerToken() else {
-            throw AnchorAccountDeletionError.signedOut
-        }
-
+        _ = try await verifiedIdentity(token: bearerToken, userID: userID)
+        guard isCurrent(userID, attempt: attempt) else { throw AnchorAccountDeletionError.signedOut }
         let request = AnchorAccountDeletionRequest.make(
-            identityURL: Self.identityURL,
-            bearerToken: bearerToken
+            identityURL: identityOrigin, bearerToken: bearerToken
         )
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await transport.data(for: request)
         try AnchorAccountDeletionRequest.validate(data: data, response: response)
-
-        // Always clear the device token after the service confirms deletion.
-        // A subsequent sign-out request may receive 401 because the account no
-        // longer exists; PersonalIdentityClient still removes the Keychain item.
-        await account?.signOut()
-        receipt = HubSyncReceipt()
-        receiptStore.save(receipt)
-        await refreshPendingCount()
+        receiptStore.scoped(to: userID).save(HubSyncReceipt())
+        if isCurrent(userID, attempt: attempt) { await disconnect() }
     }
 
     public func synchronize(announcing _: Bool = false) async {
-        guard sessionSynchronizationEnabled else {
-            pendingCount = 0
-            return
-        }
-        guard let connection, account?.isSignedIn == true, !isSyncing else {
-            await refreshPendingCount()
-            return
-        }
+        guard sessionSynchronizationEnabled else { return }
+        selectAccount()
+        guard let identity, let userID = activeUserID,
+              !busyAccounts.contains(userID) else { return }
+        let attempt = generation
+        busyAccounts.insert(userID)
         isSyncing = true
-        defer { isSyncing = false }
+        defer {
+            busyAccounts.remove(userID)
+            if isCurrent(userID, attempt: attempt) { isSyncing = false }
+        }
         do {
-            try await enqueueFinishedSessions(using: connection)
-            pendingCount = await connection.sync.pendingMutationCount()
-            _ = try await connection.sync.synchronize()
-            pendingCount = await connection.sync.pendingMutationCount()
+            guard let token = try await identity.bearerToken() else {
+                throw PersonalIdentityError.missingSession
+            }
+            // Verify the exact token snapshot before choosing a namespace. A
+            // token change during an await must never send A's queue as B.
+            let boundIdentity = try await verifiedIdentity(token: token, userID: userID)
+            guard isCurrent(userID, attempt: attempt) else { return }
+            let runtime = try PersonalSyncRuntime(
+                domain: .anchor,
+                deviceId: deviceId,
+                supportDirectory: supportDirectory.appending(path: "hub-accounts-v1")
+                    .appending(path: HubSyncReceiptStore.namespace(for: userID)),
+                identity: boundIdentity,
+                client: PersonalSyncClient(baseURL: platformURL, session: transport)
+            )
+            activeRuntime = runtime
+            try await enqueueFinishedSessions(using: runtime)
+            guard isCurrent(userID, attempt: attempt) else { return }
+            let queued = await runtime.pendingMutationCount()
+            guard isCurrent(userID, attempt: attempt) else { return }
+            pendingCount = queued
+            // Hub history stays in Hub. It is never inserted into the planner.
+            _ = try await runtime.synchronize()
+            let pending = await runtime.pendingMutationCount()
+            guard isCurrent(userID, attempt: attempt) else { return }
+            pendingCount = pending
             receipt.recordSuccess(at: Date())
-            receiptStore.save(receipt)
+            receiptStore.scoped(to: userID).save(receipt)
         } catch {
-            pendingCount = await connection.sync.pendingMutationCount()
+            guard isCurrent(userID, attempt: attempt) else { return }
+            await refreshPendingCount()
+            guard isCurrent(userID, attempt: attempt) else { return }
             recordFailure(HubSyncFailure.classify(error))
         }
     }
 
     public func refreshPendingCount() async {
-        guard let connection else {
-            pendingCount = 0
-            return
-        }
-        pendingCount = await connection.sync.pendingMutationCount()
+        selectAccount()
+        guard let runtime = activeRuntime, let userID = activeUserID else { return }
+        let attempt = generation
+        let pending = await runtime.pendingMutationCount()
+        guard isCurrent(userID, attempt: attempt) else { return }
+        pendingCount = pending
+    }
+
+    private func selectAccount() {
+        let userID = isDisconnecting ? nil : account?.session?.userId
+        guard activeUserID != userID else { return }
+        activeUserID = userID
+        generation = UUID()
+        activeRuntime = nil
+        isSyncing = false
+        pendingCount = 0
+        // Legacy unscoped receipts/files are retained, never adopted by the
+        // next person who signs in. Only verified stable IDs own new state.
+        receipt = userID.map { receiptStore.scoped(to: $0).load() } ?? HubSyncReceipt()
+    }
+
+    private func isCurrent(_ userID: String, attempt: UUID) -> Bool {
+        !isDisconnecting && generation == attempt && activeUserID == userID
+            && account?.session?.userId == userID
+    }
+
+    private func verifiedIdentity(token: String, userID: String) async throws -> PersonalIdentityClient {
+        let boundIdentity = PersonalIdentityClient(
+            baseURL: identityOrigin,
+            session: transport,
+            tokenStore: AnchorSyncTokenSnapshot(token: token)
+        )
+        let verified = try await boundIdentity.restoreSession()
+        guard verified?.userId == userID else { throw PersonalIdentityError.missingSession }
+        return boundIdentity
     }
 
     private func hasBearerToken() async -> Bool {
-        guard let connection else { return false }
-        return (try? await connection.identity.bearerToken()) != nil
+        guard let identity else { return false }
+        return (try? await identity.bearerToken()) != nil
     }
 
     private func recordFailure(_ failure: HubSyncFailure) {
         receipt.recordFailure(failure, at: Date())
-        receiptStore.save(receipt)
+        if let userID = activeUserID { receiptStore.scoped(to: userID).save(receipt) }
     }
 
-    private func enqueueFinishedSessions(using connection: PersonalPlatformConnection) async throws {
+    private func enqueueFinishedSessions(using runtime: PersonalSyncRuntime) async throws {
         let sessions = try context.fetch(FetchDescriptor<FocusSession>())
             .filter { $0.endedAt != nil }
         for session in sessions {
             guard let endedAt = session.endedAt else { continue }
-            try await connection.sync.enqueue(
+            try await runtime.enqueue(
                 recordId: session.id.uuidString.lowercased(),
                 occurredAt: AnchorPlatformRecord.iso(session.startedAt),
                 record: AnchorPlatformRecord.encode(session, endedAt: endedAt)
             )
         }
     }
+}
 
+private actor AnchorSyncTokenSnapshot: PersonalBearerTokenStore {
+    private var token: String?
+    init(token: String) { self.token = token }
+    func load() -> String? { token }
+    func save(_ token: String) { self.token = token }
+    func delete() { token = nil }
 }
 
 public enum AnchorAccountDeletionError: LocalizedError, Equatable, Sendable {
