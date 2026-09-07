@@ -57,10 +57,16 @@ three Mac tests failed. A step's `conclusion: success` was misleading here: its
 Two Mac tests still used the removed usual-week setup button and button-role
 queries for a native popup menu. The mini-timer test timed out while scanning
 the entire accessibility tree for the saved title. Updated them to enter the
-weekly manager through a real recurring entry, use popup/menu-item roles, and
+weekly manager through a real recurring entry, use menu-button/menu-item roles, and
 query the actual title text directly. These preserve the tested requirements;
 no assertions or product capabilities were removed. The corrected native suite
 requires a fresh hosted run before claiming a pass.
+
+The exported failing Mac UI hierarchy identifies the habit control explicitly
+as `MenuButton`, labeled `More actions for Two-day reset`; the corrected query
+uses that observed native role. The mini-timer spindump shows an idle app main
+thread during the snapshot timeout, supporting a narrower text query rather
+than claiming the product was busy or changing its timing model.
 
 Stable-Xcode ReleaseDirect archive/export and Developer ID DMG verification
 succeeded. Notarization is blocked by the missing documented `anchor-notary`

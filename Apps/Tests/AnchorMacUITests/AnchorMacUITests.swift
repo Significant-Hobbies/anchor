@@ -202,7 +202,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Undo check-off"].click()
         XCTAssertTrue(app.buttons["anchor.habits.complete"].exists)
 
-        let habitMenu = app.popUpButtons["More actions for Two-day reset"]
+        let habitMenu = app.menuButtons["More actions for Two-day reset"]
         XCTAssertTrue(habitMenu.waitForExistence(timeout: 4))
         habitMenu.click()
         let editHabit = app.menuItems["Edit habit"]
