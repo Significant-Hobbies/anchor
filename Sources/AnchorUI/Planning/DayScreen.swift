@@ -221,7 +221,8 @@ struct PlanScreen: View {
             "TodayDoodle",
             eyebrow: today.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
             title: "Draw the day",
-            message: "Give the important things a place. The plan can move when life does."
+            message: "Check habits, plan entries, then play your day.",
+            compact: true
         )
     }
 

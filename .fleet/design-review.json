@@ -57,7 +57,7 @@
       }
     ],
     "projectCheck": {
-      "command": "swift test; scripts/render-visual-catalog.sh /tmp/anchor-simple-day-20260907/reviewed-visuals",
+      "command": "scripts/render-visual-catalog.sh /tmp/anchor-simple-day-20260907/compact-visuals; xcodebuildmcp simulator test --scheme \"Anchor (iOS)\" --configuration DebugLocal --extra-args \"-only-testing:AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal\"",
       "status": "pass"
     },
     "critique": {
@@ -76,8 +76,8 @@
       "posture": "advisory",
       "findings": [
         "Native SwiftUI review, not a browser rendering. Phone-width catalog images use macOS controls; actual iOS journeys are recorded separately.",
-        "Large drawn header retained from the existing system; a denser layout remains optional polish.",
-        "Full Mac UI and physical-device journeys remain release gates; visual scores do not qualify them."
+        "Full Mac UI and physical-device journeys remain release gates; visual scores do not qualify them.",
+        "Actual iOS density check led to the existing compact Today header. Native screenshot and local copy/persistence test pass; full Mac correction rerun remains a separate gate."
       ]
     },
     "comprehension": {

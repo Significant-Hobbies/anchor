@@ -66,3 +66,11 @@ Stable-Xcode ReleaseDirect archive/export and Developer ID DMG verification
 succeeded. Notarization is blocked by the missing documented `anchor-notary`
 Keychain profile. The signed package is prepared, not installed or released.
 A fresh Production CloudKit reread still lacks the two project fields.
+
+## Phone density follow-up
+
+The actual iPhone capture exposed an overly tall Today header. Switched only
+that scene to the existing compact style and shortened its guidance. The
+stable-Xcode copy/persistence journey passed again, and the actual screenshot
+and three new catalog widths were inspected. Evidence is in
+`compact-iphone-test.log` and `artifacts/design/simple-day-20260907/`.

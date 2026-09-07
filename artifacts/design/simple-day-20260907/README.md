@@ -20,3 +20,9 @@ Mac interaction suite are not newly qualified by this review.
 The iOS simulator separately passed pause/return, direct habit check-off with
 relaunch persistence, and copying a day without replacing the source. See the
 qualification receipt for exact tests and remaining release gates.
+
+The actual iPhone screenshot showed an overly tall daily header. Today now
+uses the existing compact DoodleScene, preserving the artwork while moving
+controls and entries upward. Re-rendered and inspected all three recorded
+widths. `iphone-compact-day.png` is an actual stable-Xcode iPhone simulator
+capture from the passing copy/persistence journey after that change.

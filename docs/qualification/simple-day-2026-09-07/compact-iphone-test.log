@@ -1,0 +1,21 @@
+
+🧪 Test
+
+   Scheme: Anchor (iOS)
+   Project: Apps/Anchor.xcodeproj
+   Configuration: DebugLocal
+   Platform: iOS Simulator
+   Simulator: 127D7C7E-7BE8-4E38-BA9B-778770E01577
+   Derived Data: /tmp/anchor-simple-day-20260907/compact-iphone-test
+   Selective Testing:
+     AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal
+
+Discovered 1 test(s):
+   AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal
+Running tests (1 completed, 0 failures, 0 skipped)
+
+✅ 1 test passed, 0 failed, 0 skipped (⏱️ 71.7s)
+  └ Files:
+     ├ Result Bundle: ~/Library/Developer/XcodeBuildMCP/workspaces/anchor-084ad8da25bb/result-bundles/test_sim_2026-09-07T18-57-39-976Z_pid86109_bc974340.xcresult
+     ├ Build Logs: ~/Library/Developer/XcodeBuildMCP/workspaces/anchor-084ad8da25bb/logs/test_sim_2026-09-07T18-57-39-975Z_pid86109_99d5e3c3.log
+     └ Test Products: ~/Library/Developer/XcodeBuildMCP/workspaces/anchor-084ad8da25bb/test-products/test_sim_2026-09-07T18-57-39-976Z_pid86109_82959665.xctestproducts
