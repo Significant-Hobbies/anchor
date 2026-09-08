@@ -268,11 +268,21 @@ final class AnchorIOSUITests: XCTestCase {
 
         app.buttons["anchor.toolbar.settings"].tap()
         let manage = app.buttons["anchor.settings.manage-metadata"]
-        for _ in 0..<8 where !manage.exists { app.swipeUp() }
-        XCTAssertTrue(manage.waitForExistence(timeout: 3))
+        for _ in 0..<8 {
+            if manage.exists && manage.isHittable { break }
+            app.swipeUp()
+        }
+        guard manage.exists && manage.isHittable else {
+            XCTFail("Manage projects and tags must be visible and tappable")
+            return
+        }
         manage.tap()
 
         let project = app.textFields["anchor.metadata.new-project"]
+        guard project.waitForExistence(timeout: 5) else {
+            XCTFail("Manage projects and tags did not open its editor")
+            return
+        }
         project.tap()
         project.typeText("Launch\n")
         XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.waitForExistence(timeout: 3))
