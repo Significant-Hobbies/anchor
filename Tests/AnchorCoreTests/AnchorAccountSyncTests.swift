@@ -9,12 +9,180 @@ import Testing
 @Suite("Account-scoped Hub transport", .serialized, .timeLimit(.minutes(1)))
 @MainActor
 struct AnchorAccountSyncTests {
+    @Test("A delayed approval cannot overwrite a newer account's notice or claim its history")
+    func ownedHistoryStaleApprovalPreservesNewAccount() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic unapproved history")
+        await fixture.signIn("A")
+        await fixture.server.holdPushes(for: "session-A")
+        let approval = Task { await fixture.sync.approveHubHistory() }
+        await fixture.server.waitUntilHeld("session-A")
+        await fixture.signIn("B")
+        await fixture.sync.synchronize()
+        let notice = fixture.sync.ownershipNotice
+        #expect(notice != nil)
+        await fixture.server.release("session-A", status: 200)
+        #expect(!(await approval.value))
+        #expect(fixture.sync.ownershipNotice == notice)
+        #expect(fixture.sync.account?.session?.userId == "stable-B")
+        #expect(local.hubAccountID == nil)
+        #expect(try HubHistoryOwnershipStore(directory: fixture.directory).owner() == nil)
+        #expect(await fixture.server.pushes.isEmpty)
+    }
+
+    @Test("Session ownership survives reopening the real local SwiftData store")
+    func ownedHistorySurvivesStoreReopen() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "anchor-owner-store-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appending(path: "history.store")
+        let id = UUID()
+        try autoreleasepool {
+            let container = try AnchorStore.makeContainer(kind: .localOnly, url: url)
+            let context = ModelContext(container)
+            let session = FocusSession(id: id, goal: nil, plannedSeconds: 60)
+            session.hubAccountID = "stable-A"
+            context.insert(session)
+            try context.save()
+        }
+        let reopened = try AnchorStore.makeContainer(kind: .localOnly, url: url)
+        let records = try ModelContext(reopened).fetch(FetchDescriptor<FocusSession>())
+        #expect(records.count == 1)
+        #expect(records.first?.id == id)
+        #expect(records.first?.hubAccountID == "stable-A")
+    }
+
+    @Test("A failed approval file write cannot start sync and can be retried")
+    func ownedHistoryApprovalWriteFailureCanRetry() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic approval retry")
+        try Data("Synthetic path obstruction".utf8).write(to: fixture.directory)
+        await fixture.signIn("A")
+        #expect(!(await fixture.sync.approveHubHistory()))
+        #expect(fixture.sync.ownershipNotice != nil)
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.pushes.isEmpty)
+        #expect(fixture.sync.receipt.lastSuccessfulAt == nil)
+        // The session's provenance was saved before the file failed. A retry
+        // must preserve it instead of assigning it to the next signed-in user.
+        #expect(local.hubAccountID == "stable-A")
+        try FileManager.default.removeItem(at: fixture.directory)
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
+        #expect(await fixture.server.pushes.count == 1)
+        #expect(local.hubAccountID == "stable-A")
+    }
+
+    @Test("Malformed approval is preserved and refuses account adoption")
+    func ownedHistoryMalformedApprovalFailsClosed() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic protected history")
+        try FileManager.default.createDirectory(at: fixture.directory, withIntermediateDirectories: true)
+        let file = fixture.directory.appending(path: "anchor-hub-history-owner.json")
+        let malformed = Data("Synthetic malformed approval".utf8)
+        try malformed.write(to: file)
+        await fixture.signIn("B")
+        #expect(!(await fixture.sync.approveHubHistory()))
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.pushes.isEmpty)
+        #expect(local.hubAccountID == nil)
+        #expect(try Data(contentsOf: file) == malformed)
+    }
+
+    @Test("Unapproved history stays local even after a verified sign-in")
+    func ownedHistoryNeedsApproval() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic unapproved history")
+        await fixture.signIn("A")
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.pushes.isEmpty)
+        #expect(local.hubAccountID == nil)
+        #expect(fixture.sync.ownershipNotice != nil)
+    }
+
+    @Test("Approval persists and never adopts another session owner")
+    func ownedHistoryPersistsAcrossRelaunch() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic A history")
+        let imported = fixture.addSession("Synthetic iCloud B history")
+        imported.hubAccountID = "stable-B"
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        #expect(local.hubAccountID == "stable-A")
+        #expect(imported.hubAccountID == "stable-B")
+        let reopened = fixture.makeSync()
+        await reopened.restoreAndSynchronize()
+        let pushed = await fixture.server.pushes.flatMap(\.mutations).map(\.id)
+        #expect(pushed == [local.id.uuidString.lowercased()])
+        #expect(try HubHistoryOwnershipStore(directory: fixture.directory).owner() == "stable-A")
+        await fixture.sync.disconnect()
+        await fixture.signIn("B")
+        #expect(!(await fixture.sync.approveHubHistory()))
+        #expect(local.hubAccountID == "stable-A")
+    }
+
+    @Test("Approval refuses active focus without changing timing or ownership")
+    func ownedHistoryApprovalPreservesActiveSession() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic active focus")
+        local.state = .paused
+        local.endedAt = nil
+        let before = local.account
+        await fixture.signIn("A")
+        let requests = await fixture.server.identityRequests
+        #expect(!(await fixture.sync.approveHubHistory()))
+        #expect(await fixture.server.identityRequests == requests)
+        #expect(local.hubAccountID == nil)
+        #expect(local.account == before)
+        #expect(try HubHistoryOwnershipStore(directory: fixture.directory).owner() == nil)
+        #expect(await fixture.server.pushes.isEmpty)
+    }
+
+    @Test("New focus captures the approved owner without any transport")
+    func ownedHistoryOfflineSessionInheritsOwner() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let store = HubHistoryOwnershipStore(directory: fixture.directory)
+        try store.approve("stable-A")
+        let controller = FocusController(context: fixture.context, hubOwner: { try? store.owner() })
+        let session = controller.start(goal: nil, intent: "Synthetic offline focus", minutes: 1)
+        #expect(session.hubAccountID == "stable-A")
+        controller.end(reason: .endedEarly)
+        #expect(session.hubAccountID == "stable-A")
+        #expect(await fixture.server.pushes.isEmpty)
+        #expect(await fixture.server.pulls.isEmpty)
+    }
+
+    @Test("Previously exported history must not automatically upload as another account")
+    func localHistoryMustNotFollowAccountSwitch() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic history exported by A")
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.pushes.count == 1)
+        await fixture.sync.disconnect()
+        await fixture.signIn("B")
+        await fixture.sync.synchronize()
+        let bPushes = await fixture.server.pushes.filter { $0.token == "B" }
+        #expect(bPushes.allSatisfy { !$0.mutations.contains { $0.id == local.id.uuidString.lowercased() } })
+    }
+
     @Test("Each identity gets independent fingerprints, versions, cursor and receipt")
     func independentInitialExports() async throws {
         let fixture = try SyncFixture()
         defer { fixture.cleanUp() }
         let local = fixture.addSession("Synthetic local summary")
         await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
         await fixture.sync.synchronize()
         #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
         #expect(try fixture.context.fetchCount(FetchDescriptor<FocusSession>()) == 1)
@@ -25,11 +193,11 @@ struct AnchorAccountSyncTests {
         #expect(fixture.sync.receipt == HubSyncReceipt())
         await fixture.sync.synchronize()
         let pushes = await fixture.server.pushes
-        #expect(pushes.count == 2)
-        #expect(pushes.map(\.token) == ["A", "B"])
+        #expect(pushes.count == 1)
+        #expect(pushes.map(\.token) == ["A"])
         #expect(pushes.allSatisfy { $0.mutations.first?.id == local.id.uuidString.lowercased() })
         #expect(pushes.allSatisfy { $0.mutations.first?.baseVersion == 0 })
-        #expect(await fixture.server.pulls.map(\.cursor) == [0, 0])
+        #expect(await fixture.server.pulls.map(\.cursor) == [0])
         #expect(try fixture.context.fetchCount(FetchDescriptor<FocusSession>()) == 1)
         #expect(local.intent == "Synthetic local summary")
         // A refreshed token and changed email still belong to stable user A.
@@ -38,7 +206,7 @@ struct AnchorAccountSyncTests {
         await fixture.sync.refreshPendingCount()
         #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
         await fixture.sync.synchronize()
-        #expect(await fixture.server.pushes.count == 2)
+        #expect(await fixture.server.pushes.count == 1)
         #expect(await fixture.server.pulls.last?.cursor == 11)
         // Editing A's local summary uses A's server version, not B's version.
         local.intent = "Synthetic amended summary"
@@ -53,6 +221,7 @@ struct AnchorAccountSyncTests {
         let a = fixture.addSession("Queued for A")
         await fixture.server.failPushes(for: "A")
         await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
         await fixture.sync.synchronize()
         #expect(fixture.sync.pendingCount == 1)
         #expect(fixture.sync.receipt.failure == .service)
@@ -63,10 +232,9 @@ struct AnchorAccountSyncTests {
         await fixture.sync.disconnect()
         await fixture.signIn("B")
         await fixture.sync.synchronize()
-        let bPush = try #require(await fixture.server.pushes.last)
-        #expect(bPush.token == "B")
-        #expect(bPush.mutations.map(\.id) == [b.id.uuidString.lowercased()])
-        #expect(bPush.mutations.allSatisfy { $0.idempotencyKey != first.idempotencyKey })
+        #expect(await fixture.server.pushes.allSatisfy { $0.token == "A" })
+        #expect(b.hubAccountID == nil)
+        #expect(fixture.sync.ownershipNotice != nil)
         fixture.context.delete(b)
         try fixture.context.save()
         await fixture.sync.disconnect()
@@ -90,6 +258,7 @@ struct AnchorAccountSyncTests {
         let local = fixture.addSession("Synthetic durable export")
         await fixture.server.holdPushes(for: "A")
         await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
         let attempt = Task { await fixture.sync.synchronize() }
         await fixture.server.waitUntilHeld("A")
         let accountDirectory = fixture.directory.appending(path: "hub-accounts-v1")
@@ -154,36 +323,30 @@ struct AnchorAccountSyncTests {
         #expect(try fixture.context.fetchCount(FetchDescriptor<FocusSession>()) == 0)
     }
 
-    @Test("A delayed response cannot clear B's in-flight status or receipt", arguments: [200, 503])
+    @Test("A delayed response cannot publish status for an unapproved B account", arguments: [200, 503])
     func delayedCompletionCannotMutateAnotherAccount(status: Int) async throws {
         let fixture = try SyncFixture()
         defer { fixture.cleanUp() }
         fixture.addSession("Synthetic delayed export")
         await fixture.server.holdPushes(for: "A")
-        await fixture.server.holdPushes(for: "B")
         await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
         let a = Task { await fixture.sync.synchronize() }
         await fixture.server.waitUntilHeld("A")
         await fixture.sync.disconnect()
-        #expect(!fixture.sync.isSyncing)
-        #expect(fixture.sync.pendingCount == 0)
         await fixture.signIn("B")
-        let b = Task { await fixture.sync.synchronize() }
-        await fixture.server.waitUntilHeld("B")
-        #expect(fixture.sync.isSyncing)
+        await fixture.sync.synchronize()
+        let bReceipt = fixture.sync.receipt
+        let bNotice = fixture.sync.ownershipNotice
+        #expect(!fixture.sync.isSyncing)
+        #expect(bNotice != nil)
         await fixture.server.release("A", status: status)
         await a.value
         #expect(fixture.sync.account?.session?.userId == "stable-B")
-        #expect(fixture.sync.isSyncing)
-        #expect(fixture.sync.pendingCount == 1)
-        #expect(fixture.sync.receipt == HubSyncReceipt())
-        await fixture.server.release("B", status: 200)
-        await b.value
-        #expect(!fixture.sync.isSyncing)
+        #expect(fixture.sync.receipt == bReceipt)
+        #expect(fixture.sync.ownershipNotice == bNotice)
         #expect(fixture.sync.pendingCount == 0)
-        #expect(fixture.sync.receipt.failure == nil)
-        #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
-        #expect(await fixture.server.pushes.map(\.token) == ["A", "B"])
+        #expect(await fixture.server.pushes.map(\.token) == ["A"])
     }
 
     @Test("Sign-out invalidates a delayed successful receipt and future exports")
@@ -193,6 +356,7 @@ struct AnchorAccountSyncTests {
         fixture.addSession("Synthetic in-flight export")
         await fixture.server.holdPushes(for: "A")
         await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
         let task = Task { await fixture.sync.synchronize() }
         await fixture.server.waitUntilHeld("A")
         await fixture.sync.disconnect()
@@ -323,6 +487,7 @@ private actor FixtureHub {
     struct Push: Sendable { let token: String; let mutations: [SyncMutation] }
     struct Pull: Sendable { let token: String; let cursor: Int }
     struct Reply: Sendable { let status: Int; let data: Data }
+    private(set) var identityRequests = 0
     private(set) var deletions: [String] = []
     private(set) var pushes: [Push] = []
     private(set) var pulls: [Pull] = []
@@ -351,6 +516,14 @@ private actor FixtureHub {
         }
         switch request.url!.path {
         case "/api/personal-platform/session":
+            identityRequests += 1
+            let key = "session-\(token)"
+            if holds.contains(key) {
+                _ = await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+                    held[key] = continuation
+                    waiting.removeValue(forKey: key)?.resume()
+                }
+            }
             return try json(["userId": "stable-\(user)", "email": "\(token)@example.invalid"])
         case "/api/auth/sign-out": return try json([:])
         case "/api/auth/delete-user":

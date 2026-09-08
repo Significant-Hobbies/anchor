@@ -54,16 +54,22 @@ public final class AnchorAppWorld {
             DemoData.seedIfNeeded(into: result.container.mainContext)
         }
 
+        let hubOwner: @MainActor () -> String? = {
+            guard AnchorExternalSyncPolicy.allowsSessionSynchronization() else { return nil }
+            return try? HubHistoryOwnershipStore(directory: AnchorStore.storeURL().deletingLastPathComponent()).owner()
+        }
         #if os(iOS)
         let focusController = FocusController(
             context: result.container.mainContext,
             completionNotifier: SystemSessionCompletionNotifier(),
-            liveActivityCoordinator: ActivityKitLiveActivityCoordinator()
+            liveActivityCoordinator: ActivityKitLiveActivityCoordinator(),
+            hubOwner: hubOwner
         )
         #else
         let focusController = FocusController(
             context: result.container.mainContext,
-            completionNotifier: SystemSessionCompletionNotifier()
+            completionNotifier: SystemSessionCompletionNotifier(),
+            hubOwner: hubOwner
         )
         #endif
         controller = focusController

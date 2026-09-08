@@ -144,7 +144,10 @@ final class AnchorIOSUITests: XCTestCase {
             XCTAssertTrue(realGoal.waitForExistence(timeout: 3))
             realGoal.tap()
             realGoal.typeText("Draft the launch note")
-            app.buttons["Start focusing"].tap()
+            XCTAssertTrue(app.keyboards.firstMatch.exists)
+            let start = app.buttons["Start focusing"]
+            XCTAssertTrue(start.isHittable, "Starting must remain reachable while the keyboard is open")
+            start.tap()
         }
         XCTAssertTrue(app.buttons["Lock a distraction"].waitForExistence(timeout: 4))
         app.buttons["End session"].tap()

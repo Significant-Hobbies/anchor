@@ -153,6 +153,22 @@ public struct HubAccountPanel: View {
                 .foregroundStyle(theme.positive)
                 .accessibilityIdentifier("anchor.hub.connected")
 
+            if let notice = platform.ownershipNotice {
+                Text(notice).font(.caption).foregroundStyle(theme.caution)
+            }
+            if platform.needsHistoryApproval {
+                Text("Approve unowned focus history and this account's waiting changes for the account above. History already owned by another account stays separate. Distraction notes stay private.")
+                    .font(.caption).foregroundStyle(theme.textSecondary)
+                Button("Approve history for this account") {
+                    Task {
+                        if await platform.approveHubHistory() { await platform.synchronize() }
+                    }
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .disabled(platform.isSyncing)
+                .accessibilityIdentifier("anchor.hub.approve-history")
+            }
+
             if presentation == .settings {
                 VStack(spacing: Space.xxs) {
                     labelled("Hub status", statusText(platform))

@@ -30,6 +30,7 @@ public final class FocusController {
 
     public private(set) var lastError: String?
 
+    private let hubOwner: @MainActor () -> String?
     private let context: ModelContext
     private let tagger: TaggingService
     private let completionNotifier: any SessionCompletionNotifying
@@ -44,9 +45,11 @@ public final class FocusController {
         context: ModelContext,
         tagger: TaggingService = TaggingService(),
         completionNotifier: any SessionCompletionNotifying = NoopSessionCompletionNotifier(),
-        liveActivityCoordinator: any LiveActivityCoordinating = NoopLiveActivityCoordinator()
+        liveActivityCoordinator: any LiveActivityCoordinating = NoopLiveActivityCoordinator(),
+        hubOwner: @escaping @MainActor () -> String? = { nil }
     ) {
         self.context = context
+        self.hubOwner = hubOwner
         self.tagger = tagger
         self.completionNotifier = completionNotifier
         self.liveActivityCoordinator = liveActivityCoordinator
@@ -174,6 +177,7 @@ public final class FocusController {
             plannedSeconds: max(0, minutes * 60),
             startedAt: Date()
         )
+        new.hubAccountID = hubOwner()
         context.insert(new)
         session = new
         resetMachineObservation()

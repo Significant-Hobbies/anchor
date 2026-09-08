@@ -23,7 +23,8 @@ public struct StartComposer: View {
     @State private var selectedTagIDs: [String] = []
     @State private var minutes: Int = 25
     @State private var showsMoreContext = false
-    @FocusState private var intentFocused: Bool
+    private enum EntryField: Hashable { case intent, notes }
+    @FocusState private var focusedField: EntryField?
 
     private let onStart: (Goal?, String, Int, Project?, String, [String]) -> Void
 
@@ -60,7 +61,7 @@ public struct StartComposer: View {
                             .font(.system(size: 20, weight: .medium, design: .rounded))
                             .foregroundStyle(theme.textPrimary)
                             .lineLimit(1...3)
-                            .focused($intentFocused)
+                            .focused($focusedField, equals: .intent)
                             .onSubmit(start)
 
                         Divider().overlay(theme.hairline)
@@ -70,6 +71,7 @@ public struct StartComposer: View {
                             .font(.system(size: 14))
                             .foregroundStyle(theme.textSecondary)
                             .lineLimit(2...5)
+                            .focused($focusedField, equals: .notes)
 
                         if !activeGoals.isEmpty {
                             Divider().overlay(theme.hairline)
@@ -126,20 +128,23 @@ public struct StartComposer: View {
         .scrollDismissesKeyboard(.interactively)
         #if os(iOS)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            // iOS 26's floating tab bar overlaps the scroll edge. A real inset,
-            // rather than padding inside the scroll content, keeps the action
-            // visible even when keyboard dismissal preserves the scroll offset.
-            startButton
-                .padding(.horizontal, Space.lg)
-                .padding(.top, Space.xs)
-                .padding(.bottom, Space.sm)
-                .background(theme.canvas)
+            if focusedField == nil {
+                startButton
+                    .padding(.horizontal, Space.lg)
+                    .padding(.top, Space.xs)
+                    .padding(.bottom, Space.sm)
+                    .background(theme.canvas)
+            }
         }
         #endif
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
+                #if os(iOS)
+                Button("Start focusing", action: start)
+                    .disabled(!canStart)
+                #endif
                 Spacer()
-                Button("Done") { intentFocused = false }
+                Button("Done") { focusedField = nil }
             }
         }
         .background(theme.canvas)
@@ -149,7 +154,7 @@ public struct StartComposer: View {
             // cover the duration picker and the start button before the user has
             // even seen them, so let them tap in when they're ready.
             #if os(macOS)
-            intentFocused = true
+            focusedField = .intent
             #endif
         }
     }
@@ -259,6 +264,7 @@ public struct StartComposer: View {
 
     private func start() {
         guard canStart else { return }
+        focusedField = nil
         let trimmed = intent.trimmingCharacters(in: .whitespacesAndNewlines)
         var goal = selectedGoal
 

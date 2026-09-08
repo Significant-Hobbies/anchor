@@ -35,6 +35,7 @@ public final class AnchorPlatformSync {
     public let account: PersonalAccountModel?
     public private(set) var isSyncing = false
     public private(set) var pendingCount = 0
+    public private(set) var ownershipNotice: String?
     public private(set) var receipt = HubSyncReceipt()
 
     public convenience init(
@@ -140,6 +141,73 @@ public final class AnchorPlatformSync {
         if isCurrent(userID, attempt: attempt) { await disconnect() }
     }
 
+    private var historyOwnership: HubHistoryOwnershipStore {
+        HubHistoryOwnershipStore(directory: supportDirectory)
+    }
+
+    public var needsHistoryApproval: Bool {
+        guard let owner = try? historyOwnership.owner() else { return true }
+        guard owner == account?.session?.userId else { return false }
+        if ownershipNotice != nil { return true }
+        return (try? context.fetch(FetchDescriptor<FocusSession>()).contains { $0.hubAccountID == nil }) ?? false
+    }
+
+    private func runtime(for identity: PersonalIdentityClient, userID: String) throws -> PersonalSyncRuntime {
+        try PersonalSyncRuntime(
+            domain: .anchor, deviceId: deviceId,
+            supportDirectory: supportDirectory.appending(path: "hub-accounts-v1")
+                .appending(path: HubSyncReceiptStore.namespace(for: userID)),
+            identity: identity,
+            client: PersonalSyncClient(baseURL: platformURL, session: transport)
+        )
+    }
+
+    /// No network or owner change is allowed inside a running focus session.
+    /// Save each session's provenance before adopting any legacy account queue.
+    func approveLocalHistory(for userID: String) throws {
+        guard !userID.isEmpty else { throw HubHistoryOwnershipError.invalidOwner }
+        if let owner = try historyOwnership.owner(), owner != userID {
+            throw HubHistoryOwnershipError.differentAccount
+        }
+        let sessions = try context.fetch(FetchDescriptor<FocusSession>())
+        guard !sessions.contains(where: { $0.isActive }) else { throw HubHistoryOwnershipError.activeSession }
+        let unowned = sessions.filter { $0.hubAccountID == nil }
+        for session in unowned { session.hubAccountID = userID }
+        do { try context.save() }
+        catch {
+            for session in unowned { session.hubAccountID = nil }
+            throw error
+        }
+        try historyOwnership.approve(userID)
+    }
+
+    @discardableResult
+    public func approveHubHistory() async -> Bool {
+        guard sessionSynchronizationEnabled, !isDisconnecting, !isSyncing, let identity else { return false }
+        selectAccount()
+        guard let userID = activeUserID else { return false }
+        let attempt = generation
+        do {
+            let sessions = try context.fetch(FetchDescriptor<FocusSession>())
+            guard !sessions.contains(where: { $0.isActive }) else { throw HubHistoryOwnershipError.activeSession }
+            guard let verified = try await identity.verifiedSyncAccount(),
+                  verified.userID == userID, isCurrent(userID, attempt: attempt) else { throw PersonalIdentityError.missingSession }
+            try approveLocalHistory(for: verified.userID)
+            try await identity.requireCurrentAccount(verified)
+            let approvedRuntime = try runtime(for: identity, userID: verified.userID)
+            try await approvedRuntime.bindAccount(verified, adoptingUnownedData: true)
+            guard isCurrent(userID, attempt: attempt) else { return false }
+            ownershipNotice = nil
+            return true
+        } catch {
+            guard isCurrent(userID, attempt: attempt) else { return false }
+            ownershipNotice = error is HubHistoryOwnershipError
+                ? error.localizedDescription
+                : "Could not approve this Hub connection. Local history and waiting changes are preserved."
+            return false
+        }
+    }
+
     public func synchronize(announcing _: Bool = false) async {
         guard sessionSynchronizationEnabled else { return }
         selectAccount()
@@ -153,30 +221,27 @@ public final class AnchorPlatformSync {
             if isCurrent(userID, attempt: attempt) { isSyncing = false }
         }
         do {
-            guard let token = try await identity.bearerToken() else {
+            guard let verified = try await identity.verifiedSyncAccount(), verified.userID == userID else {
                 throw PersonalIdentityError.missingSession
             }
-            // Verify the exact token snapshot before choosing a namespace. A
-            // token change during an await must never send A's queue as B.
-            let boundIdentity = try await verifiedIdentity(token: token, userID: userID)
             guard isCurrent(userID, attempt: attempt) else { return }
-            let runtime = try PersonalSyncRuntime(
-                domain: .anchor,
-                deviceId: deviceId,
-                supportDirectory: supportDirectory.appending(path: "hub-accounts-v1")
-                    .appending(path: HubSyncReceiptStore.namespace(for: userID)),
-                identity: boundIdentity,
-                client: PersonalSyncClient(baseURL: platformURL, session: transport)
-            )
+            guard let owner = try historyOwnership.owner() else { throw HubHistoryOwnershipError.approvalRequired }
+            guard owner == userID else { throw HubHistoryOwnershipError.differentAccount }
+            let runtime = try runtime(for: identity, userID: userID)
+            try await runtime.bindAccount(verified)
             activeRuntime = runtime
-            try await enqueueFinishedSessions(using: runtime)
+            ownershipNotice = nil
+            try await enqueueFinishedSessions(using: runtime, account: verified)
             guard isCurrent(userID, attempt: attempt) else { return }
             let queued = await runtime.pendingMutationCount()
             guard isCurrent(userID, attempt: attempt) else { return }
             pendingCount = queued
             // This is an outbound summary integration. Acknowledge Hub history
             // without importing it: iCloud owns the planner and native history.
-            try await runtime.synchronize { _ in }
+            try await runtime.synchronize(account: verified) { _ in
+                try await identity.requireCurrentAccount(verified)
+            }
+            try await identity.requireCurrentAccount(verified)
             let pending = await runtime.pendingMutationCount()
             guard isCurrent(userID, attempt: attempt) else { return }
             pendingCount = pending
@@ -186,6 +251,9 @@ public final class AnchorPlatformSync {
             guard isCurrent(userID, attempt: attempt) else { return }
             await refreshPendingCount()
             guard isCurrent(userID, attempt: attempt) else { return }
+            if error is HubHistoryOwnershipError || error is PersonalSyncOwnershipError {
+                ownershipNotice = error.localizedDescription
+            }
             recordFailure(HubSyncFailure.classify(error))
         }
     }
@@ -205,6 +273,7 @@ public final class AnchorPlatformSync {
         activeUserID = userID
         generation = UUID()
         activeRuntime = nil
+        ownershipNotice = nil
         isSyncing = false
         pendingCount = 0
         // Legacy unscoped receipts/files are retained, never adopted by the
@@ -238,15 +307,15 @@ public final class AnchorPlatformSync {
         if let userID = activeUserID { receiptStore.scoped(to: userID).save(receipt) }
     }
 
-    private func enqueueFinishedSessions(using runtime: PersonalSyncRuntime) async throws {
+    private func enqueueFinishedSessions(using runtime: PersonalSyncRuntime, account: PersonalSyncAccount) async throws {
         let sessions = try context.fetch(FetchDescriptor<FocusSession>())
-            .filter { $0.endedAt != nil }
+            .filter { $0.endedAt != nil && $0.hubAccountID == account.userID }
         for session in sessions {
-            guard let endedAt = session.endedAt else { continue }
+            guard session.hubAccountID == account.userID, let endedAt = session.endedAt else { continue }
             try await runtime.enqueue(
                 recordId: session.id.uuidString.lowercased(),
                 occurredAt: AnchorPlatformRecord.iso(session.startedAt),
-                record: AnchorPlatformRecord.encode(session, endedAt: endedAt)
+                record: AnchorPlatformRecord.encode(session, endedAt: endedAt), account: account
             )
         }
     }

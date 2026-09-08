@@ -7,6 +7,8 @@ public final class FocusSession {
     public var id: UUID = UUID()
     public var startedAt: Date = Date()
     public var endedAt: Date?
+    /// Travels with the session through iCloud; nil requires explicit Hub approval.
+    public var hubAccountID: String?
 
     // MARK: Timing (mirrors `TimeAccount`, flattened for a primitive schema)
     public var plannedSeconds: Int = 0

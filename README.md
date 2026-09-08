@@ -35,7 +35,7 @@ distraction text always stays on your device.
 - **Apple Watch** as a remote: start, pause, and catch the interruption at the
   moment it happens without picking anything up.
 - **Sync** through your own private iCloud database, plus optional Significant
-  Hobbies Hub session summaries after you connect.
+  Hobbies Hub session summaries after you connect and approve local history.
 - **On-device tagging** — Apple Intelligence sorts goals into themes and
   distractions into categories, so analytics work without you tagging anything.
 - **Analytics** — where your hours and billable value go, what interrupts you,
@@ -203,5 +203,17 @@ account switching, failed retries and delayed responses. Legacy unscoped state
 is retained without assigning it to an identity. Signed Apple/Google sign-in,
 provider recovery and installed-app local/iCloud continuity remain unverified;
 these source checks do not close the acceptance task.
+
+Build 24 adds explicit history approval, device-local ownership, and session
+ownership that travels with iCloud records. Signing into another Hub account
+cannot automatically re-export the same local history. Finish active focus
+before approval; new phone/Mac sessions inherit the approved owner offline.
+The approval control is in the existing Hub panel. A failed approval or account
+switch preserves local history and pending changes.
+
+This change adds optional `FocusSession.hubAccountID` to the SwiftData schema.
+Production CloudKit support for that field and real two-device ownership
+continuity must be verified before claiming this build's sync is ready. Package
+and synthetic transport tests do not establish that provider compatibility.
 
 Original requirements and discussion: [#40](https://github.com/Significant-Hobbies/anchor/issues/40).
