@@ -174,8 +174,9 @@ public final class AnchorPlatformSync {
             let queued = await runtime.pendingMutationCount()
             guard isCurrent(userID, attempt: attempt) else { return }
             pendingCount = queued
-            // Hub history stays in Hub. It is never inserted into the planner.
-            _ = try await runtime.synchronize()
+            // This is an outbound summary integration. Acknowledge Hub history
+            // without importing it: iCloud owns the planner and native history.
+            try await runtime.synchronize { _ in }
             let pending = await runtime.pendingMutationCount()
             guard isCurrent(userID, attempt: attempt) else { return }
             pendingCount = pending

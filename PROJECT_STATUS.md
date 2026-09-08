@@ -34,6 +34,20 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-08** — Prepared build 23 with PersonalSyncKit `e52fc1c`.
+  A failed on-disk acknowledgement previously showed zero pending exports even
+  though the durable queue still contained one. An isolated checkout reproduced
+  that failure against the committed old dependency; the updated dependency
+  retains the pending count and retries the same mutation after restart.
+  All 186 package tests pass against the pinned remote revision. The main
+  checkout's pre-existing editable shared-package override was preserved and
+  was not used as release evidence. Hub remains an outbound summary service;
+  the explicit sync callback does not import remote sessions or private notes.
+  Full hosted native review is still required for this source. Build 23 has not
+  been installed or distributed. Phone build 22 and Mac build 21 remain the
+  last verified installations; Production CloudKit and notarization gates
+  remain open in issue 51.
+
 - **2026-09-07** — Implemented the owner's simpler daily loop for build 22:
   check off habits directly, optionally schedule them, select/edit/copy a day,
   carry project context into sessions, and pause from interruption capture.

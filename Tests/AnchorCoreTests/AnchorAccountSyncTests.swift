@@ -83,6 +83,44 @@ struct AnchorAccountSyncTests {
         #expect(try fixture.context.fetchCount(FetchDescriptor<FocusSession>()) == 0)
     }
 
+    @Test("Failed acknowledgement retains the pending export and retries without importing history")
+    func failedAcknowledgementRetainsPendingExport() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Synthetic durable export")
+        await fixture.server.holdPushes(for: "A")
+        await fixture.signIn("A")
+        let attempt = Task { await fixture.sync.synchronize() }
+        await fixture.server.waitUntilHeld("A")
+        let accountDirectory = fixture.directory.appending(path: "hub-accounts-v1")
+            .appending(path: HubSyncReceiptStore.namespace(for: "stable-A"))
+        let outbox = accountDirectory.appending(path: "personal-sync-outbox.json")
+        let backup = accountDirectory.appending(path: "synthetic-outbox-backup.json")
+        try FileManager.default.moveItem(at: outbox, to: backup)
+        try FileManager.default.createDirectory(at: outbox, withIntermediateDirectories: false)
+        await fixture.server.release("A", status: 200)
+        await attempt.value
+        #expect(fixture.sync.pendingCount == 1)
+        #expect(fixture.sync.receipt.lastSuccessfulAt == nil)
+        #expect(fixture.sync.receipt.failure != nil)
+        #expect(await fixture.server.pulls.isEmpty)
+        #expect(local.intent == "Synthetic durable export")
+        try FileManager.default.removeItem(at: outbox)
+        try FileManager.default.moveItem(at: backup, to: outbox)
+        let relaunched = fixture.makeSync()
+        await fixture.server.allowPushes(for: "A")
+        await fixture.server.stopHoldingPushes(for: "A")
+        await relaunched.restoreAndSynchronize()
+        let pushes = await fixture.server.pushes
+        #expect(pushes.count == 2)
+        #expect(pushes.first?.mutations == pushes.last?.mutations)
+        #expect(relaunched.pendingCount == 0)
+        #expect(relaunched.receipt.lastSuccessfulAt != nil)
+        #expect(relaunched.receipt.failure == nil)
+        #expect(try fixture.context.fetchCount(FetchDescriptor<FocusSession>()) == 1)
+        #expect(!AnchorPlatformSync.importsRemoteSessions)
+    }
+
     @Test("Legacy unscoped state is preserved byte-for-byte and never assigned")
     func legacyStateIsUnassigned() async throws {
         let fixture = try SyncFixture()
@@ -295,6 +333,7 @@ private actor FixtureHub {
     func failPushes(for token: String) { failures.insert(token) }
     func allowPushes(for token: String) { failures.remove(token) }
     func holdPushes(for token: String) { holds.insert(token) }
+    func stopHoldingPushes(for token: String) { holds.remove(token) }
     func waitUntilHeld(_ token: String) async {
         if held[token] != nil { return }
         await withCheckedContinuation { waiting[token] = $0 }
