@@ -80,3 +80,14 @@ that scene to the existing compact style and shortened its guidance. The
 stable-Xcode copy/persistence journey passed again, and the actual screenshot
 and three new catalog widths were inspected. Evidence is in
 `compact-iphone-test.log` and `artifacts/design/simple-day-20260907/`.
+# Remaining Mac query correction — 2026-09-08
+
+Hosted run 34154195520 passed all eight iPhone tests and the Watch build, but
+failed two of fourteen Mac tests. The mini-timer journey now passes. The saved
+weekday accessibility tree reports `Your usual week · 1 item, Manage`; the
+test expected a shorter exact label. Habit editing reaches direct completion,
+then the all-descendant text query times out at line221. The correction uses
+the observed full weekday label and restricts completion text matching to
+static text, retaining the existing scheduling and completion assertions.
+These test-only changes require a new hosted result; they do not alter the
+prepared product binary or qualify CloudKit, notarization, or physical use.

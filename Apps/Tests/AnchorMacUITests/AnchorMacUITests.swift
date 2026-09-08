@@ -218,7 +218,10 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Today"].click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 4))
         app.buttons["anchor.today.habit.done"].click()
-        XCTAssertTrue(element(containing: "Completed today", in: app).waitForExistence(timeout: 3))
+        let completedHabit = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "Completed today", "Completed today")
+        ).firstMatch
+        XCTAssertTrue(completedHabit.waitForExistence(timeout: 3))
         app.buttons["anchor.today.habit.undo"].click()
         app.buttons["anchor.today.habit.place"].click()
         let placeHabitTitle = app.staticTexts["Place habit"]
@@ -245,7 +248,7 @@ final class AnchorMacUITests: XCTestCase {
         initialTitle.typeText("Initial weekly entry")
         app.checkBoxes["Repeat weekly"].click()
         app.buttons["Save"].click()
-        let usualWeek = app.buttons["Your usual week · 1 item"]
+        let usualWeek = app.buttons["Your usual week · 1 item, Manage"]
         XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))
         usualWeek.click()
         XCTAssertTrue(app.radioButtons["Monday"].waitForExistence(timeout: 4))
