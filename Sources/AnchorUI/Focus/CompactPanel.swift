@@ -141,6 +141,13 @@ public struct CompactPanel: View {
                 .buttonStyle(QuietButtonStyle())
             }
 
+            if controller.isPaused, let error = controller.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(theme.negative)
+                    .accessibilityIdentifier("anchor.focus.resume-error")
+            }
+
             if !controller.parked.isEmpty {
                 Text("\(controller.parked.count) parked this session")
                     .font(.system(size: 11))

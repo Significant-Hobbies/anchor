@@ -274,6 +274,9 @@ public final class FocusController {
     /// interruptions you actually had rather than only the ones you logged.
     public func resume() {
         guard let session, session.state == .paused else { return }
+        let previousAccount = session.account
+        let previousPausedAt = session.pausedAt
+        let previousReturns = parked.map { ($0, $0.didReturnToFocus) }
         let now = Date()
         let awaySeconds = session.pausedAt.map { max(0, now.timeIntervalSince($0)) } ?? 0
 
@@ -288,8 +291,18 @@ public final class FocusController {
         session.apply(account)
         session.state = .running
         session.pausedAt = nil
+        guard save() else {
+            session.apply(previousAccount)
+            session.state = .paused
+            session.pausedAt = previousPausedAt
+            for (distraction, didReturn) in previousReturns {
+                distraction.didReturnToFocus = didReturn
+            }
+            lastError = "Anchor could not resume this session. It is still paused. Please try again."
+            refreshNow()
+            return
+        }
         resetMachineObservation()
-        save()
         refreshNow()
         scheduleCompletionNotification()
         startTicking()

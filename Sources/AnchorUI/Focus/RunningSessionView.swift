@@ -130,6 +130,13 @@ public struct RunningSessionView: View {
 
     private var transport: some View {
         VStack(spacing: Space.md) {
+            if controller.isPaused, let error = controller.lastError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(theme.negative)
+                    .accessibilityIdentifier("anchor.focus.resume-error")
+            }
+
             // The main event: parking a distraction is the biggest, easiest target.
             Button {
                 controller.beginManualCapture()

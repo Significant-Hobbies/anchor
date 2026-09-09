@@ -326,4 +326,96 @@ import Testing
         let afterRetry = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
         #expect(try afterRetry.fetch(FetchDescriptor<FocusSession>()).first?.endReason == .endedEarly)
     }
+
+    @Test func failedResumeKeepsPausedStateAndDoesNotPublishSuccess() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let pausedAt = Date().addingTimeInterval(-120)
+        do {
+            let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+            let session = FocusSession(goal: nil, intent: "Synthetic paused session", plannedSeconds: 1500, startedAt: pausedAt.addingTimeInterval(-60))
+            var account = session.account
+            account.pause(at: pausedAt)
+            session.apply(account)
+            session.state = .paused
+            session.pausedAt = pausedAt
+            context.insert(session)
+            let distraction = Distraction(note: "", session: session)
+            distraction.capturedAt = pausedAt
+            distraction.didReturnToFocus = false
+            context.insert(distraction)
+            try context.save()
+        }
+        let config = ModelConfiguration(schema: AnchorStore.schema, url: url, allowsSave: false, cloudKitDatabase: .none)
+        let context = ModelContext(try ModelContainer(for: AnchorStore.schema, configurations: config))
+        context.autosaveEnabled = false
+        let notifier = FocusControllerTests.RecordingNotifier()
+        let activity = LiveActivityLifecycleTests.RecordingCoordinator()
+        let controller = FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false), completionNotifier: notifier, liveActivityCoordinator: activity)
+        let session = try #require(controller.session)
+        let before = session.account
+        let beforeCalls = activity.calls
+        let beforeSchedules = notifier.scheduled.count
+        controller.resume()
+        #expect(controller.isPaused && !controller.isCapturing && controller.lastError != nil)
+        #expect(session.account == before && session.pausedAt == pausedAt)
+        #expect(controller.parked.first?.didReturnToFocus == false)
+        #expect(activity.calls == beforeCalls && notifier.scheduled.count == beforeSchedules)
+        let reopened = ModelContext(try rawContainer(url))
+        #expect(try reopened.fetch(FetchDescriptor<FocusSession>()).first?.state == .paused)
+        #expect(try reopened.fetch(FetchDescriptor<Distraction>()).first?.didReturnToFocus == false)
+    }
+
+
+    @Test func resumeRetryCommitsOnceAndSurvivesReopen() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        context.autosaveEnabled = false
+        @MainActor final class FailurePlan { var enabled = false }
+        let failure = FailurePlan()
+        let notifier = FocusControllerTests.RecordingNotifier()
+        let activity = LiveActivityLifecycleTests.RecordingCoordinator()
+        let controller = FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false), completionNotifier: notifier, liveActivityCoordinator: activity, persistContext: { context in
+            if failure.enabled { throw CocoaError(.fileWriteOutOfSpace) }
+            try AnchorStore.save(context)
+        })
+        let session = controller.start(goal: nil, intent: "Synthetic resume retry", minutes: 25)
+        controller.beginManualCapture()
+        #expect(controller.pauseFromCapture(note: "Synthetic interruption", kind: .person))
+        let account = session.account
+        let pausedAt = session.pausedAt
+        let activityBefore = activity.calls
+        let schedulesBefore = notifier.scheduled.count
+        failure.enabled = true
+        controller.resume()
+        controller.resume()
+        #expect(controller.isPaused && !controller.isCapturing)
+        #expect(session.account == account && session.pausedAt == pausedAt)
+        #expect(controller.parked.count == 1 && controller.parked.first?.didReturnToFocus == false)
+        #expect(activity.calls == activityBefore && notifier.scheduled.count == schedulesBefore)
+        let afterFailure = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        #expect(try afterFailure.fetch(FetchDescriptor<FocusSession>()).first?.state == .paused)
+        #expect(try afterFailure.fetch(FetchDescriptor<Distraction>()).first?.didReturnToFocus == false)
+        failure.enabled = false
+        controller.resume()
+        #expect(controller.isRunning && controller.isCapturing && controller.lastError == nil)
+        #expect(session.account.bankedSeconds == account.bankedSeconds)
+        #expect(session.pausedAt == nil && session.account.runningSince != nil)
+        #expect(controller.parked.count == 1 && controller.parked.first?.didReturnToFocus == true)
+        let callsAfterSuccess = activity.calls
+        let schedulesAfterSuccess = notifier.scheduled.count
+        #expect(schedulesAfterSuccess == schedulesBefore + 1)
+        controller.resume()
+        #expect(activity.calls == callsAfterSuccess && notifier.scheduled.count == schedulesAfterSuccess)
+        controller.dismissCapture()
+        #expect(!controller.isCapturing && controller.parked.count == 1)
+        let reopened = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        let saved = try #require(reopened.fetch(FetchDescriptor<FocusSession>()).first)
+        #expect(saved.state == .running && saved.account == session.account)
+        #expect(try reopened.fetch(FetchDescriptor<Distraction>()).count == 1)
+        #expect(try reopened.fetch(FetchDescriptor<Distraction>()).first?.didReturnToFocus == true)
+        controller.end()
+    }
+
 }
