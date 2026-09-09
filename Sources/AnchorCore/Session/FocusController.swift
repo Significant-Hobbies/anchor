@@ -172,7 +172,9 @@ public final class FocusController {
         notes: String = "",
         tagIDStrings: [String] = []
     ) -> FocusSession {
-        end(reason: .endedEarly)
+        if let current = session, current.isActive, !end(reason: .endedEarly) {
+            return current
+        }
 
         let new = FocusSession(
             goal: goal,
@@ -324,33 +326,50 @@ public final class FocusController {
         publishLiveActivityUpdate()
     }
 
-    public func end(reason: SessionEndReason = .endedEarly) {
-        guard let session, session.isActive else { return }
-        finish(session, reason: reason, at: Date(), cancelNotification: true)
+    @discardableResult
+    public func end(reason: SessionEndReason = .endedEarly) -> Bool {
+        guard let session, session.isActive else { return true }
+        return finish(session, reason: reason, at: Date(), cancelNotification: true)
     }
 
+    @discardableResult
     private func finish(
         _ session: FocusSession,
         reason: SessionEndReason,
         at stopAt: Date,
         cancelNotification: Bool
-    ) {
-        var account = session.account
+    ) -> Bool {
+        let previousAccount = session.account
+        let previousState = session.stateRaw
+        let previousEndedAt = session.endedAt
+        let previousReason = session.endReasonRaw
+        let previousActive = session.computerActiveSeconds
+        let previousAway = session.computerAwaySeconds
+        var account = previousAccount
         account.stop(at: stopAt)
         session.apply(account)
         session.state = .finished
         session.endedAt = stopAt
-        // Honour the real outcome: if the plan was met, it completed regardless
-        // of which button ended it.
         session.endReason = account.hasMetPlan(at: stopAt) ? .completed : reason
+        session.computerActiveSeconds += pendingMachineActiveSeconds
+        session.computerAwaySeconds += pendingMachineAwaySeconds
+        guard save() else {
+            session.apply(previousAccount)
+            session.stateRaw = previousState
+            session.endedAt = previousEndedAt
+            session.endReasonRaw = previousReason
+            session.computerActiveSeconds = previousActive
+            session.computerAwaySeconds = previousAway
+            return false
+        }
+        resetMachineObservation()
         if cancelNotification {
             completionNotifier.cancel(sessionID: session.id)
         }
-        commitMachineObservation(to: session)
         self.session = nil
-        save()
         stopTicking()
         publishLiveActivityEnd()
+        return true
     }
 
     /// Park a distraction and stay in the session. This is the core interaction.
@@ -413,10 +432,14 @@ public final class FocusController {
     /// produces analytics you cannot act on.
     @discardableResult
     public func surrender(to note: String, tagIDStrings: [String] = []) -> Bool {
-        guard let distraction = park(note: note, tagIDStrings: tagIDStrings) else { return false }
+        guard let distraction = makeDistraction(note: note, kind: nil, tagIDStrings: tagIDStrings) else { return false }
         distraction.didReturnToFocus = false
-        end(reason: .abandoned)
-        return save()
+        guard end(reason: .abandoned) else {
+            discardUncommittedDistraction(distraction)
+            return false
+        }
+        tagDistraction(distraction)
+        return true
     }
 
     public func markHandled(_ distraction: Distraction, handled: Bool = true) {
@@ -452,7 +475,7 @@ public final class FocusController {
 
     private func tagDistraction(_ distraction: Distraction) {
         let note = distraction.privateNote
-        let goalTitle = session?.goal?.title ?? session?.intent ?? ""
+        let goalTitle = distraction.session?.goal?.title ?? distraction.session?.intent ?? ""
         Task { [weak self, tagger] in
             let result = await tagger.classifyDistraction(note: note, duringGoal: goalTitle)
             guard let self else { return }

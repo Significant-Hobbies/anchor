@@ -251,4 +251,79 @@ import Testing
         #expect(try reopened.fetch(FetchDescriptor<FocusSession>()).first?.state == .running)
     }
 
+
+    @Test func surrenderFailureMustPreserveActiveSessionAndAvoidPartialCapture() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        context.autosaveEnabled = false
+        @MainActor final class FailurePlan { var enabled = false }
+        let failure = FailurePlan()
+        let notifier = FocusControllerTests.RecordingNotifier()
+        let activity = LiveActivityLifecycleTests.RecordingCoordinator()
+        let controller = FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false), completionNotifier: notifier, liveActivityCoordinator: activity, persistContext: { context in
+            if failure.enabled {
+                if try context.fetch(FetchDescriptor<FocusSession>()).contains(where: { $0.state == .finished }) { throw CocoaError(.fileWriteOutOfSpace) }
+            }
+            try AnchorStore.save(context)
+        })
+        let session = controller.start(goal: nil, intent: "Synthetic surrender failure", minutes: 25)
+        controller.beginManualCapture()
+        failure.enabled = true
+        #expect(!controller.surrender(to: "Synthetic draft"))
+        #expect(controller.session?.id == session.id)
+        #expect(controller.isRunning)
+        #expect(controller.parked.isEmpty)
+        let reopened = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        #expect(try reopened.fetchCount(FetchDescriptor<Distraction>()) == 0)
+        #expect(try reopened.fetch(FetchDescriptor<FocusSession>()).last?.state == .running)
+        failure.enabled = false
+        #expect(controller.surrender(to: "Synthetic draft"))
+        #expect(controller.session == nil)
+        let afterRetry = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        let notes = try afterRetry.fetch(FetchDescriptor<Distraction>())
+        #expect(notes.count == 1 && notes.first?.privateNote == "Synthetic draft")
+        #expect(notes.first?.didReturnToFocus == false)
+        #expect(notes.first?.session?.endReason == .abandoned)
+    }
+
+    @Test func failedEndAndReplacementKeepOriginalSessionUntilRetryCommits() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        context.autosaveEnabled = false
+        @MainActor final class FailurePlan { var enabled = false }
+        let failure = FailurePlan()
+        let notifier = FocusControllerTests.RecordingNotifier()
+        let activity = LiveActivityLifecycleTests.RecordingCoordinator()
+        let controller = FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false), completionNotifier: notifier, liveActivityCoordinator: activity, persistContext: { context in
+            if failure.enabled { throw CocoaError(.fileWriteOutOfSpace) }
+            try AnchorStore.save(context)
+        })
+        let session = controller.start(goal: nil, intent: "Original", minutes: 25)
+        let before = session.account
+        let observation = Date()
+        controller.observeMachineIdle(seconds: 0, at: observation)
+        controller.observeMachineIdle(seconds: 3, at: observation.addingTimeInterval(10))
+        failure.enabled = true
+        let activityBefore = activity.calls
+        #expect(!controller.end())
+        #expect(notifier.cancelled.isEmpty && activity.calls == activityBefore)
+        #expect(controller.isRunning && controller.session?.id == session.id)
+        #expect(session.account == before && session.endedAt == nil && session.endReason == nil)
+        #expect(session.computerActiveSeconds == 0 && session.computerAwaySeconds == 0)
+        let replacement = controller.start(goal: nil, intent: "Must not replace", minutes: 10)
+        #expect(replacement.id == session.id && controller.session?.id == session.id)
+        #expect(notifier.cancelled.isEmpty && activity.calls == activityBefore)
+        let reopened = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        let sessions = try reopened.fetch(FetchDescriptor<FocusSession>())
+        #expect(sessions.count == 1 && sessions.first?.state == .running)
+        failure.enabled = false
+        #expect(controller.end())
+        #expect(controller.session == nil)
+        #expect(notifier.cancelled == [session.id] && activity.calls.last == .end)
+        #expect(session.computerActiveSeconds == 7 && session.computerAwaySeconds == 3)
+        let afterRetry = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        #expect(try afterRetry.fetch(FetchDescriptor<FocusSession>()).first?.endReason == .endedEarly)
+    }
 }

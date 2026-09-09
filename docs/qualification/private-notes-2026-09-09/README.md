@@ -30,7 +30,21 @@ This is source/local-store evidence, not a production CloudKit or installed-devi
 
 Existing notarization, physical unlocked-device use, signed account authentication, and production CloudKit compatibility gates remain. Do not install or publish this migration over owner data solely because package or hosted tests pass. The privacy and migration issue remains open for those gates.
 
-The older surrender/end path still performs multiple saves; this bounded migration does not establish transaction-wide rollback for an end failure after a successful capture. Capture/park and capture/pause failures have the explicit regression proof above.
+A subsequent injected-write disk test reproduced the older surrender/end defect:
+`park` committed the note, then failed end writes cleared the active controller
+while disk still contained a running session and the partial distraction. One
+test failed three assertions in
+`swift_package_test_2026-09-09T07-44-09-593Z_pid19490_d9148f55.log`.
+
+The follow-up repair commits surrender metadata and session completion together.
+Failed saves restore session timing, outcome and machine counters; notification
+cancellation, activity ending and controller clearing happen only after the
+commit succeeds. Start refuses to replace an active session whose end failed.
+A failed surrender removes its uncommitted capture and retains the draft for
+retry. Two real-disk regressions verify failure/reopen, retry without duplicates,
+successful end/abandonment and unchanged notification/activity state on failure.
+All 208 package tests pass. This closes the demonstrated local partial-save
+path; it does not qualify signed devices or production CloudKit behavior.
 
 ## Exact source and hosted attempt
 

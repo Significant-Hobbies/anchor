@@ -1,0 +1,29 @@
+{
+  "base": "1c628eaad87218205d93178b369e30ba6e82d42c",
+  "build": 25,
+  "baseline": {
+    "tests": 1,
+    "failedAssertions": 3,
+    "log": "swift_package_test_2026-09-09T07-44-09-593Z_pid19490_d9148f55.log"
+  },
+  "package": {
+    "passed": 208,
+    "failed": 0,
+    "skipped": 0,
+    "log": "swift_package_test_2026-09-09T07-48-45-032Z_pid19490_d206f50f.log"
+  },
+  "compileOnly": {
+    "mac": "build_macos_2026-09-09T07-47-58-133Z_pid18979_ac9c2be9.log",
+    "ios": "build_sim_2026-09-09T07-48-25-195Z_pid20336_9d9c850f.log",
+    "configuration": "DebugLocal",
+    "warnings": 0
+  },
+  "installed": false,
+  "launched": false,
+  "providerOperations": false,
+  "limits": [
+    "Historical CloudKit copies and mixed-version behavior unqualified",
+    "Signed/device/account and distribution acceptance remain open",
+    "Hosted native source attempt required"
+  ]
+}
