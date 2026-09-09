@@ -189,6 +189,9 @@ uninstalled; physical-device acceptance remains separate.
 The [scheduled-start transaction receipt](docs/qualification/scheduled-start-2026-09-09/README.md)
 closes the later link-save gap for Today, Focus and the mini timer with one
 new-session/link/replan save.
+A [stable-Xcode isolated Mac UI attempt](docs/qualification/mac-runner-2026-09-09/README.md)
+compiled successfully but could not connect its native test runner; no product
+assertion ran. Rendered Mac daily-loop acceptance remains open.
 
 ### Sync with Apple Reminders
 

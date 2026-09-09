@@ -8,9 +8,12 @@ final class AnchorMacUITests: XCTestCase {
     @MainActor
     func testFocusInterruptionAndReturnJourneyPersists() throws {
         let app = XCUIApplication()
-        let storePath = URL(fileURLWithPath: "/tmp", isDirectory: true)
-            .appendingPathComponent("anchor-mac-focus-\(UUID().uuidString).store")
-            .path
+        let fixtureDirectory = try isolatedDirectory(named: "focus")
+        defer {
+            app.terminate()
+            try? FileManager.default.removeItem(at: fixtureDirectory)
+        }
+        let storePath = fixtureDirectory.appendingPathComponent("anchor.store").path
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launchEnvironment["ANCHOR_STORE_PATH"] = storePath
         app.launch()
@@ -35,6 +38,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["anchor.capture.pause"].click()
         let resume = app.buttons["Resume"]
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
+        keepScreenshot(app, named: "anchor-build25-mac-paused")
         resume.click()
         let decline = app.buttons["Nothing — just a break"]
         XCTAssertTrue(decline.waitForExistence(timeout: 3))
@@ -53,6 +57,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["History"].click()
         app.radioButtons["Interruptions"].click()
         XCTAssertTrue(parkedRow.waitForExistence(timeout: 3))
+        keepScreenshot(app, named: "anchor-build25-mac-interruption-reopened")
     }
 
     @MainActor
@@ -564,6 +569,13 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["This build stores appearance on this device only"].exists)
         XCTAssertFalse(app.staticTexts["Talk to your data"].exists)
         XCTAssertTrue(app.staticTexts["Local library"].exists)
+    }
+
+    private func isolatedDirectory(named name: String) throws -> URL {
+        let directory = URL(fileURLWithPath: "/tmp", isDirectory: true)
+            .appendingPathComponent("anchor-mac-\(name)-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
     private func isolatedStore(named name: String) -> String {

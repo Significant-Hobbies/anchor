@@ -1,0 +1,27 @@
+{
+  "sourceBaseline": "b7f1e999d25e2c643a3a58ba5656923aead51952",
+  "tool": "XcodeBuildMCP 2.7.0 macos test",
+  "developerDir": "/Applications/Xcode-26.6.0.app/Contents/Developer",
+  "scheme": "Anchor (macOS)",
+  "configuration": "DebugLocal",
+  "selectedTest": "AnchorMacUITests/AnchorMacUITests/testFocusInterruptionAndReturnJourneyPersists",
+  "testBuild": "passed",
+  "testExecution": "runner-unavailable-before-connection",
+  "productAssertionsExecuted": 0,
+  "renderedScreenshots": 0,
+  "runnerPID": 51816,
+  "runnerError": "Early unexpected exit, operation never finished bootstrapping; signal kill before establishing connection",
+  "specificCause": "not established; no task-time runner crash report found",
+  "newRetries": 0,
+  "ownerAppOrStoreTouched": false,
+  "installedOrReleased": false,
+  "fixtureDirectoryCreated": false,
+  "timeoutSeconds": 120,
+  "extraArgs": [
+    "-only-testing:AnchorMacUITests/AnchorMacUITests/testFocusInterruptionAndReturnJourneyPersists",
+    "-test-timeouts-enabled",
+    "YES",
+    "-maximum-test-execution-time-allowance",
+    "120"
+  ]
+}

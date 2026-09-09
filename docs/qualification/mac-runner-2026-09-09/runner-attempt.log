@@ -1,0 +1,7 @@
+Stable Xcode 26.6.0; XcodeBuildMCP 2.7.0; DebugLocal; selected existing testFocusInterruptionAndReturnJourneyPersists.
+Original tool log: test_macos_2026-09-09T08-58-06-769Z_pid49457_6e9d1cdb.log
+
+Checking out 118fc5552b08078ac06e3339c0c65a304e103e7d of package ‘significanthobbies’
+** TEST BUILD SUCCEEDED **
+	AnchorMacUITests-Runner (51816) encountered an error (Early unexpected exit, operation never finished bootstrapping - no restart will be attempted. (Underlying Error: Test crashed with signal kill before establishing connection.))
+** TEST EXECUTE FAILED **
