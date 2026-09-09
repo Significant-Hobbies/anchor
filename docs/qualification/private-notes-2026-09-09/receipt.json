@@ -21,5 +21,12 @@
     "reason": "GitHub account payment or spending-limit block"
   },
   "ownerDataTouched": false,
-  "installedOrReleased": false
+  "installedOrReleased": false,
+  "localMacBuild": {
+    "configuration": "DebugLocal",
+    "result": "passed",
+    "warnings": 0,
+    "launched": false,
+    "log": "build_macos_2026-09-09T06-57-04-358Z_pid88558_f0b5ce41.log"
+  }
 }

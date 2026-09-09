@@ -35,3 +35,5 @@ The older surrender/end path still performs multiple saves; this bounded migrati
 ## Exact source and hosted attempt
 
 Build 25 source: `c9927b9b7abb7d2bec281a9c1d3d047f50a0483a`. [Hosted native review 34321290511](https://github.com/Significant-Hobbies/anchor/actions/runs/34321290511) failed before any job steps on 2026-09-09. GitHub reported: “The job was not started because recent account payments have failed or your spending limit needs to be increased.” No native UI/platform result exists for this source yet. The prior build-24 hosted pass does not qualify this migration.
+
+A non-foreground XcodeBuildMCP Mac `DebugLocal` app build also passes with no warnings (`build_macos_2026-09-09T06-57-04-358Z_pid88558_f0b5ce41.log`). Bundle ID is `com.significanthobbies.anchor.local`; nothing was launched or installed. This is local compilation only, not native UI, signed account, iPhone/Watch or hosted qualification.
