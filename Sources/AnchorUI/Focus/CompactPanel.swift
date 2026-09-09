@@ -313,7 +313,7 @@ public struct CompactPanel: View {
                 showsAdHocComposer = false
                 startError = nil
             } catch {
-                startError = controller.lastError ?? "Focus started, but the schedule change could not be saved."
+                startError = controller.lastError ?? "Anchor could not start this planned session. Please try again."
             }
             return
         }
@@ -338,7 +338,7 @@ public struct CompactPanel: View {
             )
             startError = nil
         } catch {
-            startError = controller.lastError ?? "Focus started, but the schedule link could not be saved."
+            startError = controller.lastError ?? "Anchor could not start this planned session. Please try again."
         }
     }
 

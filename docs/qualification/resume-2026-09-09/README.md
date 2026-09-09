@@ -53,3 +53,6 @@ Evidence:
 Final follow-up DebugLocal compile-only checks also pass on all three platforms: `build_macos_2026-09-09T08-41-26-075Z_pid1418_8b099b6c.log`, `build_sim_2026-09-09T08-41-27-092Z_pid1504_5fea3105.log`, and `build_sim_2026-09-09T08-41-28-369Z_pid1597_ff20e38b.log`. No app or simulator was launched or installed; rendered error-state layout is not claimed.
 
 This is still uninstalled build25 source. No build number, entitlements, migration, cloud config or production data changed. The repository’s native workflow is dispatch-only; no automatic CI ran for the resume push. The previous exact baseline run34325826905 has no executed job steps; no billing retry loop was started. A hosted/device acceptance pass must be obtained after the account billing/spending gate is resolved, before treating this as installed native qualification.
+
+
+The later scheduled-start link-save gap retained above was subsequently repaired and qualified in the [scheduled-start transaction receipt](../scheduled-start-2026-09-09/README.md). That follow-up keeps new session, plan link and optional replan in one save; native/device and CloudKit gates remain.

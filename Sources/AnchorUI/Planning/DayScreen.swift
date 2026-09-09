@@ -467,32 +467,12 @@ struct PlanScreen: View {
             onOpenFocus()
             return
         }
-        guard let session = controller.start(
-            goal: nil,
-            intent: block.title,
-            minutes: max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
-            project: projects.first { $0.id == block.projectID },
-            notes: block.details
-        ) else {
-            loadError = controller.lastError
-            return
-        }
-        let previousSessionID = block.sessionID
-        let previousStart = block.actualStartedAt
-        let previousState = block.state
-        let previousUpdatedAt = block.updatedAt
-        block.sessionID = session.id
-        block.actualStartedAt = session.startedAt
-        block.state = .inProgress
         do {
-            try context.save()
+            try PlanBlockFocusStarter.start(block, controller: controller, context: context)
             loadError = nil
         } catch {
-            block.sessionID = previousSessionID
-            block.actualStartedAt = previousStart
-            block.state = previousState
-            block.updatedAt = previousUpdatedAt
-            loadError = "Focus started, but Anchor could not attach it to this plan block. It will appear as unplanned in Review."
+            loadError = controller.lastError ?? "Anchor could not start this planned session. Please try again."
+            return
         }
         onOpenFocus()
     }

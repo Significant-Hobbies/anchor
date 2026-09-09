@@ -218,7 +218,7 @@ public struct FocusScreen: View {
             )
             loadError = nil
         } catch {
-            loadError = controller.lastError ?? "Focus started, but Anchor could not link it to the schedule. It will still appear in History."
+            loadError = controller.lastError ?? "Anchor could not start this planned session. Please try again."
             return
         }
         isChangingActivity = false
@@ -244,26 +244,14 @@ enum PlanBlockFocusStarter {
         guard !resolvedIntent.isEmpty else { return }
         let project = try context.fetch(FetchDescriptor<Project>()).first { $0.id == block.projectID }
 
-        guard let session = controller.start(
+        guard controller.start(
             goal: nil,
             intent: resolvedIntent,
             minutes: minutes ?? max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
             project: project,
-            notes: block.details
-        ) else { throw StartFailure.persistence }
-        block.sessionID = session.id
-        block.actualStartedAt = session.startedAt
-        block.state = .inProgress
-
-        if resolvedIntent != block.title {
-            context.insert(DivergenceEvent(
-                blockID: block.id,
-                sessionID: session.id,
-                kind: .deliberateReplan,
-                note: "Did \(resolvedIntent) instead of \(block.title)."
-            ))
-        }
-        try context.save()
+            notes: block.details,
+            planBlock: block
+        ) != nil else { throw StartFailure.persistence }
     }
 }
 

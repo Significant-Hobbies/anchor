@@ -170,8 +170,16 @@ public final class FocusController {
         minutes: Int,
         project: Project? = nil,
         notes: String = "",
-        tagIDStrings: [String] = []
+        tagIDStrings: [String] = [],
+        planBlock: PlanBlock? = nil
     ) -> FocusSession? {
+        if let planBlock, let current = session, current.isActive,
+           planBlock.sessionID == current.id,
+           current.intent == intent.trimmingCharacters(in: .whitespacesAndNewlines),
+           current.plannedSeconds == max(0, minutes * 60),
+           current.goal?.id == goal?.id, current.project?.id == project?.id,
+           current.notes == notes.trimmingCharacters(in: .whitespacesAndNewlines),
+           current.tagIDStrings == tagIDStrings { return current }
         if let current = session, current.isActive, !end(reason: .endedEarly) {
             return nil
         }
@@ -189,7 +197,29 @@ public final class FocusController {
         )
         new.hubAccountID = hubOwner()
         context.insert(new)
+        let previousBlock = planBlock.map { ($0.sessionID, $0.actualStartedAt, $0.stateRaw, $0.updatedAt) }
+        var replan: DivergenceEvent?
+        if let planBlock {
+            planBlock.sessionID = new.id
+            planBlock.actualStartedAt = new.startedAt
+            planBlock.state = .inProgress
+            if new.intent != planBlock.title {
+                let event = DivergenceEvent(
+                    blockID: planBlock.id, sessionID: new.id, kind: .deliberateReplan,
+                    note: "Did \(new.intent) instead of \(planBlock.title)."
+                )
+                context.insert(event)
+                replan = event
+            }
+        }
         guard save() else {
+            if let planBlock, let previousBlock {
+                planBlock.sessionID = previousBlock.0
+                planBlock.actualStartedAt = previousBlock.1
+                planBlock.stateRaw = previousBlock.2
+                planBlock.updatedAt = previousBlock.3
+            }
+            if let replan { context.delete(replan) }
             context.delete(new)
             lastError = "Anchor could not start this session. Your entry is still here. Please try again."
             return nil

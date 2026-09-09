@@ -185,8 +185,10 @@ and [#51](https://github.com/Significant-Hobbies/anchor/issues/51).
 The [2026-09-09 daily-flow audit](docs/qualification/resume-2026-09-09/README.md)
 adds disk-backed resume/start/extension failure and retry proof, including
 composer draft retention and schedule handoff. Current native source remains
-uninstalled; physical-device acceptance and later schedule-link save failure
-remain separate gates.
+uninstalled; physical-device acceptance remains separate.
+The [scheduled-start transaction receipt](docs/qualification/scheduled-start-2026-09-09/README.md)
+closes the later link-save gap for Today, Focus and the mini timer with one
+new-session/link/replan save.
 
 ### Sync with Apple Reminders
 
