@@ -146,6 +146,7 @@ public struct CaptureSheet: View {
             Spacer(minLength: 0)
 
             VStack(spacing: Space.xs) {
+                if let error = controller.lastError { Text(error).font(.caption).foregroundStyle(theme.textSecondary) }
                 Button(action: park) {
                     Label(
                         isReturningFromPause ? "Log it — back to work" : "Park it — back to work",
@@ -158,8 +159,7 @@ public struct CaptureSheet: View {
 
                 if !isReturningFromPause {
                     Button {
-                        controller.pauseFromCapture(note: note, kind: chosenKind, tagIDStrings: selectedTagIDs)
-                        dismiss()
+                        if controller.pauseFromCapture(note: note, kind: chosenKind, tagIDStrings: selectedTagIDs) { dismiss() }
                     } label: {
                         Label("Pause — come back later", systemImage: "pause.fill")
                     }
@@ -260,7 +260,7 @@ public struct CaptureSheet: View {
         guard canPark else { return }
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let session = controller.session
-        controller.park(note: trimmed, kind: chosenKind, tagIDStrings: selectedTagIDs)
+        guard controller.park(note: trimmed, kind: chosenKind, tagIDStrings: selectedTagIDs) != nil else { return }
         parked = Parked(
             note: trimmed,
             goal: session?.intent.isEmpty == false
@@ -273,10 +273,10 @@ public struct CaptureSheet: View {
 
     private func surrender() {
         guard canPark else { return }
-        controller.surrender(
+        guard controller.surrender(
             to: note.trimmingCharacters(in: .whitespacesAndNewlines),
             tagIDStrings: selectedTagIDs
-        )
+        ) else { return }
         dismiss()
     }
 }

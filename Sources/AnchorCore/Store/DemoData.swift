@@ -186,7 +186,7 @@ public enum DemoData {
                         tagIDStrings: random.chance(35) ? [tags[2].storageID] : []
                     )
                     distraction.kind = spec.kind
-                    distraction.keywords = spec.keywords
+                    distraction.privateKeywords = spec.keywords
                     distraction.kindConfidence = 0.6 + Double(random.next(35)) / 100
                     // A few remain open so the "to deal with" list isn't empty.
                     if random.chance(65) {
@@ -206,6 +206,6 @@ public enum DemoData {
             )
         }
 
-        try? context.save()
+        try? AnchorStore.save(context)
     }
 }

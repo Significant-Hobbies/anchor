@@ -46,6 +46,7 @@ let package = Package(
                 "AnchorCore",
                 .product(name: "PersonalSyncKit", package: "significanthobbies"),
             ],
+            resources: [.copy("Fixtures/LegacyNotes.store")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(

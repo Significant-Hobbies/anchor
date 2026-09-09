@@ -4,6 +4,25 @@ import SwiftData
 /// Schema + container construction, in one place so the app, the previews, the
 /// MCP server and the tests all agree on what "the database" is.
 public enum AnchorStore {
+    @MainActor public private(set) static var privateNoteStorageWarning: String?
+    struct PrivateNoteMigrationFailure: Error {}
+
+    @MainActor static func preparePrivateNotes(_ context: ModelContext) throws {
+        do { try migratePrivateNotes(in: context) }
+        catch { throw PrivateNoteMigrationFailure() }
+    }
+
+    @MainActor static func preserveLocalStoreAfterNoteFailure(url: URL? = nil) -> (container: ModelContainer, kind: StoreKind) {
+        privateNoteStorageWarning = "iCloud continuity is paused because private notes could not be secured on this device. Existing local data is preserved. Check available storage and reopen Anchor."
+        do {
+            return (try ModelContainer(for: schema, configurations: configuration(kind: .localOnly, url: url)), .localOnly)
+        } catch {
+            // Never substitute an empty memory store for an existing store whose
+            // note migration failed: that would conceal the preserved history.
+            fatalError("Anchor preserved its store but could not open it safely. Check available storage before reopening.")
+        }
+    }
+
     public static let schema = Schema([
         Project.self,
         SavedTag.self,
@@ -72,17 +91,32 @@ public enum AnchorStore {
 
     /// Build a container. Throws rather than trapping so the app can show a real
     /// error instead of dying on launch with a corrupt store.
-    public static func makeContainer(
+    @MainActor public static func makeContainer(
         kind: StoreKind = .persistent,
         url: URL? = nil
     ) throws -> ModelContainer {
-        try ModelContainer(for: schema, configurations: configuration(kind: kind, url: url))
+        if kind == .inMemory {
+            return try ModelContainer(for: schema, configurations: configuration(kind: kind, url: url))
+        }
+        let resolvedURL = url ?? storeURL()
+        // The legacy fields are never opened with a CloudKit mirror until their
+        // local copy has been written, read-verified and committed empty.
+        if kind == .persistent {
+            try autoreleasepool {
+                let local = try ModelContainer(for: schema, configurations: configuration(kind: .localOnly, url: resolvedURL))
+                try preparePrivateNotes(ModelContext(local))
+            }
+            return try ModelContainer(for: schema, configurations: configuration(kind: kind, url: resolvedURL))
+        }
+        let local = try ModelContainer(for: schema, configurations: configuration(kind: .localOnly, url: resolvedURL))
+        try preparePrivateNotes(ModelContext(local))
+        return local
     }
 
     /// Best-effort container: tries CloudKit, falls back to local-only, then to
     /// memory. The app stays usable even when iCloud is misconfigured — losing
     /// sync should never mean losing the ability to start a timer.
-    public static func makeResilientContainer() -> (container: ModelContainer, kind: StoreKind) {
+    @MainActor public static func makeResilientContainer() -> (container: ModelContainer, kind: StoreKind) {
         if CloudKitSchemaSeed.isRequested {
             guard let url = CloudKitSchemaSeed.storeURL() else {
                 fatalError("Anchor schema seeding requires the signed app-group entitlement.")
@@ -97,9 +131,9 @@ public enum AnchorStore {
         for kind in resilientStoreKinds(
             hasExplicitStorePath: ProcessInfo.processInfo.environment["ANCHOR_STORE_PATH"]?.isEmpty == false
         ) {
-            if let container = try? makeContainer(kind: kind) {
-                return (container, kind)
-            }
+            do { return (try makeContainer(kind: kind), kind) }
+            catch is PrivateNoteMigrationFailure { return preserveLocalStoreAfterNoteFailure() }
+            catch { continue }
         }
         // If even in-memory fails the process is unrecoverable.
         fatalError("Anchor could not open any model container.")
@@ -109,13 +143,10 @@ public enum AnchorStore {
     /// CloudKit mirror. Container construction can appear to succeed before
     /// Core Data discovers the missing entitlement on its background queue, so
     /// this boundary cannot rely on the catch-and-fallback path above.
-    public static func makeLocalResilientContainer(url: URL? = nil) -> (container: ModelContainer, kind: StoreKind) {
-        if let container = try? ModelContainer(
-            for: schema,
-            configurations: configuration(kind: .localOnly, url: url)
-        ) {
-            return (container, .localOnly)
-        }
+    @MainActor public static func makeLocalResilientContainer(url: URL? = nil) -> (container: ModelContainer, kind: StoreKind) {
+        do { return (try makeContainer(kind: .localOnly, url: url), .localOnly) }
+        catch is PrivateNoteMigrationFailure { return preserveLocalStoreAfterNoteFailure(url: url) }
+        catch { /* Existing local-store resilience for non-migration errors. */ }
         if let container = try? makeContainer(kind: .inMemory) {
             return (container, .inMemory)
         }

@@ -259,8 +259,7 @@ struct WatchCaptureView: View {
 
                 ForEach(Self.quickKinds, id: \.self) { kind in
                     Button {
-                        controller.park(note: kind.label, kind: kind)
-                        controller.dismissCapture()
+                        if controller.park(note: kind.label, kind: kind) != nil { controller.dismissCapture() }
                     } label: {
                         HStack(spacing: Space.xs) {
                             KindGlyph(kind, size: 24)
@@ -275,6 +274,7 @@ struct WatchCaptureView: View {
                     .buttonStyle(.plain)
                 }
 
+                if let error = controller.lastError { Text(error).font(.caption) }
                 Button(isReturningFromPause ? "Just a break" : "Cancel") {
                     controller.dismissCapture()
                 }
@@ -288,7 +288,7 @@ struct WatchCaptureView: View {
     private func saveTyped() {
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        controller.park(note: trimmed)
+        guard controller.park(note: trimmed) != nil else { return }
         note = ""
         controller.dismissCapture()
     }

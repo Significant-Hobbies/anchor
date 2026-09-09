@@ -75,10 +75,10 @@ public struct LogScreen: View {
         }
         .background(theme.canvas)
         .sheet(item: $editingDistraction) { distraction in
-            DistractionEditSheet(distraction: distraction) { try? context.save() }
+            DistractionEditSheet(distraction: distraction) { try AnchorStore.save(context) }
         }
         .sheet(item: $editingSession) { session in
-            SessionEditSheet(session: session) { try? context.save() }
+            SessionEditSheet(session: session) { try? AnchorStore.save(context) }
         }
     }
 
@@ -113,7 +113,7 @@ public struct LogScreen: View {
             Button {
                 withAnimation(Motion.snappy) {
                     distraction.handledAt = distraction.isHandled ? nil : Date()
-                    try? context.save()
+                    try? AnchorStore.save(context)
                 }
             } label: {
                 Image(systemName: distraction.isHandled ? "checkmark.circle.fill" : "circle")
@@ -127,7 +127,7 @@ public struct LogScreen: View {
                 editingDistraction = distraction
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(distraction.note)
+                    Text(distraction.privateNote.isEmpty ? "Private note unavailable on this device" : distraction.privateNote)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(distraction.isHandled ? theme.textTertiary : theme.textPrimary)
                         .strikethrough(distraction.isHandled, color: theme.textTertiary)
@@ -268,19 +268,21 @@ public struct LogScreen: View {
 struct DistractionEditSheet: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
 
     let distraction: Distraction
-    let onSave: () -> Void
+    let onSave: () throws -> Void
 
+    @State private var saveError: String?
     @State private var note: String
     @State private var chosenKind: DistractionKind?
     @State private var tagIDs: [String]
     @State private var didChooseKind = false
 
-    init(distraction: Distraction, onSave: @escaping () -> Void) {
+    init(distraction: Distraction, onSave: @escaping () throws -> Void) {
         self.distraction = distraction
         self.onSave = onSave
-        _note = State(initialValue: distraction.note)
+        _note = State(initialValue: distraction.privateNote)
         _chosenKind = State(initialValue: distraction.kind)
         _tagIDs = State(initialValue: distraction.tagIDStrings)
     }
@@ -326,6 +328,12 @@ struct DistractionEditSheet: View {
                 }
             }
 
+            if !distraction.retainedLegacyNotes.isEmpty {
+                DisclosureGroup("Preserved earlier-device notes") {
+                    ForEach(distraction.retainedLegacyNotes, id: \.self) { Text($0).textSelection(.enabled) }
+                }
+            }
+            if let saveError { Text(saveError).font(.caption) }
             HStack(spacing: Space.xs) {
                 Button("Cancel") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
@@ -341,15 +349,24 @@ struct DistractionEditSheet: View {
     }
 
     private func save() {
-        distraction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            try distraction.updatePrivateNote(note.trimmingCharacters(in: .whitespacesAndNewlines), in: context)
+        } catch {
+            saveError = "Could not save the private note on this device. Your draft is still available."
+            return
+        }
         distraction.tagIDStrings = tagIDs
         if didChooseKind, let chosenKind {
             distraction.kind = chosenKind
             distraction.kindIsUserSet = true
             distraction.kindConfidence = 1
         }
-        onSave()
-        dismiss()
+        do {
+            try onSave()
+            dismiss()
+        } catch {
+            saveError = "Could not save the private note on this device. Your draft is still available."
+        }
     }
 }
 

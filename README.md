@@ -217,3 +217,7 @@ continuity must be verified before claiming this build's sync is ready. Package
 and synthetic transport tests do not establish that provider compatibility.
 
 Original requirements and discussion: [#40](https://github.com/Significant-Hobbies/anchor/issues/40).
+
+### Device-only distraction-note migration
+
+Source migration work and failure/restart evidence are tracked in [#52](https://github.com/Significant-Hobbies/anchor/issues/52) and [the qualification receipt](docs/qualification/private-notes-2026-09-09/README.md). Existing installed builds can still store distraction notes in private CloudKit. Historical cloud copies, mixed-version provider behavior and signed-device qualification remain release gates; local/package checks alone do not qualify owner-data rollout.

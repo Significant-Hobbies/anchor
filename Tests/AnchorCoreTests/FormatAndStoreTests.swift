@@ -52,7 +52,7 @@ struct FormatTests {
 }
 
 @Suite("Store location")
-struct AnchorStoreTests {
+@MainActor struct AnchorStoreTests {
     @Test("An in-memory container is usable and isolated")
     func inMemoryContainer() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)

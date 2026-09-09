@@ -409,12 +409,12 @@ struct CompactCapture: View {
 
             if !isReturningFromPause {
                 Button("Pause — come back later", systemImage: "pause.fill") {
-                    controller.pauseFromCapture(note: note)
-                    note = ""
+                    if controller.pauseFromCapture(note: note) { note = "" }
                 }
                 .buttonStyle(QuietButtonStyle())
             }
 
+            if let error = controller.lastError { Text(error).font(.caption) }
             Button(isReturningFromPause ? "Nothing — just a break" : "Cancel") {
                 controller.dismissCapture()
             }
@@ -427,7 +427,7 @@ struct CompactCapture: View {
     private func save() {
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        controller.park(note: trimmed)
+        guard controller.park(note: trimmed) != nil else { return }
         note = ""
         controller.dismissCapture()
     }

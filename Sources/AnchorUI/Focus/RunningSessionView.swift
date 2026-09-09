@@ -178,7 +178,7 @@ public struct RunningSessionView: View {
                         HStack(spacing: Space.sm) {
                             KindGlyph(distraction.displayKind, size: 28)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(distraction.note)
+                                Text(distraction.privateNote.isEmpty ? "Private note unavailable on this device" : distraction.privateNote)
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(theme.textPrimary)
                                     .lineLimit(2)

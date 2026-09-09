@@ -146,9 +146,9 @@ public extension Distraction {
     func snapshot(tagNamesByID: [String: String] = [:]) -> DistractionRecord {
         DistractionRecord(
             id: id,
-            note: note,
+            note: privateNote,
             kind: displayKind,
-            keywords: keywords,
+            keywords: privateKeywords,
             capturedAt: capturedAt,
             offsetSeconds: offsetSeconds,
             didReturnToFocus: didReturnToFocus,
@@ -209,6 +209,12 @@ public extension ModelContext {
         if let since {
             descriptor.predicate = #Predicate { $0.startedAt >= since }
         }
-        return try fetch(descriptor).map { $0.snapshot(at: now, tagNamesByID: tagNamesByID) }
+        let sessions = try fetch(descriptor)
+        for session in sessions {
+            for distraction in session.distractions ?? [] {
+                _ = try localDistractionNotes?.read(distraction.id)
+            }
+        }
+        return sessions.map { $0.snapshot(at: now, tagNamesByID: tagNamesByID) }
     }
 }

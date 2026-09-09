@@ -32,6 +32,7 @@ public final class FocusController {
 
     private let hubOwner: @MainActor () -> String?
     private let context: ModelContext
+    private let persistContext: @MainActor (ModelContext) throws -> Void
     private let tagger: TaggingService
     private let completionNotifier: any SessionCompletionNotifying
     private let liveActivityCoordinator: any LiveActivityCoordinating
@@ -46,9 +47,11 @@ public final class FocusController {
         tagger: TaggingService = TaggingService(),
         completionNotifier: any SessionCompletionNotifying = NoopSessionCompletionNotifier(),
         liveActivityCoordinator: any LiveActivityCoordinating = NoopLiveActivityCoordinator(),
-        hubOwner: @escaping @MainActor () -> String? = { nil }
+        hubOwner: @escaping @MainActor () -> String? = { nil },
+        persistContext: @escaping @MainActor (ModelContext) throws -> Void = { try AnchorStore.save($0) }
     ) {
         self.context = context
+        self.persistContext = persistContext
         self.hubOwner = hubOwner
         self.tagger = tagger
         self.completionNotifier = completionNotifier
@@ -110,6 +113,11 @@ public final class FocusController {
     /// concrete active session. Without this bridge, a session created on another
     /// device can exist in the store while the timer surface still says idle.
     public func synchronizeActiveSessionFromStore() {
+        do { try AnchorStore.migratePrivateNotes(in: context) }
+        catch {
+            lastError = "An older-device note could not be secured locally. Check available storage before continuing."
+            return
+        }
         let imported = fetchLatestActiveSession()
 
         if session?.id != imported?.id {
@@ -192,36 +200,68 @@ public final class FocusController {
     }
 
     public func pause() {
-        guard let session, session.state == .running else { return }
+        _ = pauseSession()
+    }
+
+    private func pauseSession(captured: Distraction? = nil) -> Bool {
+        guard let session, session.state == .running else { return false }
+        let previousAccount = session.account
+        let previousPausedAt = session.pausedAt
+        let previousActive = session.computerActiveSeconds
+        let previousAway = session.computerAwaySeconds
+        let previousPendingActive = pendingMachineActiveSeconds
+        let previousPendingAway = pendingMachineAwaySeconds
+        let previousObservation = lastMachineObservation
         let now = Date()
-        var account = session.account
+        var account = previousAccount
         account.pause(at: now)
         session.apply(account)
         session.state = .paused
         session.pausedAt = now
+        captured?.capturedAt = now
+        captured?.didReturnToFocus = false
         commitMachineObservation(to: session)
+        guard save() else {
+            session.apply(previousAccount)
+            session.state = .running
+            session.pausedAt = previousPausedAt
+            session.computerActiveSeconds = previousActive
+            session.computerAwaySeconds = previousAway
+            pendingMachineActiveSeconds = previousPendingActive
+            pendingMachineAwaySeconds = previousPendingAway
+            lastMachineObservation = previousObservation
+            refreshNow()
+            return false
+        }
         completionNotifier.cancel(sessionID: session.id)
-        save()
         refreshNow()
         stopTicking()
         publishLiveActivityUpdate()
+        return true
     }
 
     /// Capture an interruption and step away without ending the current session.
     /// An empty note is a plain break; a recorded interruption only counts as a
     /// return to focus after the owner actually resumes.
+    @discardableResult
     public func pauseFromCapture(
         note: String,
         kind: DistractionKind? = nil,
         tagIDStrings: [String] = []
-    ) {
-        guard isRunning else { return }
-        pause()
-        if let distraction = park(note: note, kind: kind, tagIDStrings: tagIDStrings) {
-            distraction.didReturnToFocus = false
-            save()
+    ) -> Bool {
+        guard isRunning else { return false }
+        var captured: Distraction?
+        if !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard let distraction = makeDistraction(note: note, kind: kind, tagIDStrings: tagIDStrings) else { return false }
+            captured = distraction
         }
+        guard pauseSession(captured: captured) else {
+            if let captured { discardUncommittedDistraction(captured) }
+            return false
+        }
+        if let captured, kind == nil { tagDistraction(captured) }
         dismissCapture()
+        return true
     }
 
     /// Resuming always asks what pulled you away.
@@ -320,6 +360,17 @@ public final class FocusController {
         kind: DistractionKind? = nil,
         tagIDStrings: [String] = []
     ) -> Distraction? {
+        guard let distraction = makeDistraction(note: note, kind: kind, tagIDStrings: tagIDStrings) else { return nil }
+        guard save() else {
+            discardUncommittedDistraction(distraction)
+            return nil
+        }
+        publishLiveActivityUpdate()
+        if kind == nil { tagDistraction(distraction) }
+        return distraction
+    }
+
+    private func makeDistraction(note: String, kind: DistractionKind?, tagIDStrings: [String]) -> Distraction? {
         guard let session else { return nil }
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -328,7 +379,7 @@ public final class FocusController {
             note: trimmed,
             capturedAt: Date(),
             offsetSeconds: session.account.elapsed(at: Date()),
-            session: session,
+            session: nil,
             didReturnToFocus: true,
             tagIDStrings: tagIDStrings
         )
@@ -337,21 +388,35 @@ public final class FocusController {
             distraction.kindIsUserSet = true
             distraction.kindConfidence = 1
         }
+        do { try distraction.persistPrivateContent(in: context) }
+        catch {
+            lastError = "Could not save the private note on this device. Your draft is still available."
+            return nil
+        }
+        distraction.session = session
         context.insert(distraction)
-        save()
-        publishLiveActivityUpdate()
-
-        if kind == nil { tagDistraction(distraction) }
         return distraction
+    }
+
+    private func discardUncommittedDistraction(_ distraction: Distraction) {
+        // Clear the inverse immediately: ModelContext.delete alone can leave a
+        // phantom parked item visible until the next successful save.
+        distraction.session = nil
+        context.delete(distraction)
+        do { try context.localDistractionNotes?.delete(distraction.id) }
+        catch {
+            lastError = "The note was not confirmed. Your draft remains available; an uncommitted local copy also needs cleanup."
+        }
     }
 
     /// The distraction won. Record it honestly — a tool that only logs your wins
     /// produces analytics you cannot act on.
-    public func surrender(to note: String, tagIDStrings: [String] = []) {
-        let distraction = park(note: note, tagIDStrings: tagIDStrings)
-        distraction?.didReturnToFocus = false
+    @discardableResult
+    public func surrender(to note: String, tagIDStrings: [String] = []) -> Bool {
+        guard let distraction = park(note: note, tagIDStrings: tagIDStrings) else { return false }
+        distraction.didReturnToFocus = false
         end(reason: .abandoned)
-        save()
+        return save()
     }
 
     public func markHandled(_ distraction: Distraction, handled: Bool = true) {
@@ -386,7 +451,7 @@ public final class FocusController {
     // MARK: - Tagging (on-device)
 
     private func tagDistraction(_ distraction: Distraction) {
-        let note = distraction.note
+        let note = distraction.privateNote
         let goalTitle = session?.goal?.title ?? session?.intent ?? ""
         Task { [weak self, tagger] in
             let result = await tagger.classifyDistraction(note: note, duringGoal: goalTitle)
@@ -394,7 +459,7 @@ public final class FocusController {
             guard !distraction.kindIsUserSet else { return }
             distraction.kind = result.kind
             distraction.kindConfidence = result.confidence
-            distraction.keywords = result.keywords
+            distraction.privateKeywords = result.keywords
             self.save()
         }
     }
@@ -474,12 +539,15 @@ public final class FocusController {
         pendingMachineAwaySeconds = 0
     }
 
-    private func save() {
+    @discardableResult
+    private func save() -> Bool {
         do {
-            try context.save()
+            try persistContext(context)
             lastError = nil
+            return true
         } catch {
-            lastError = error.localizedDescription
+            lastError = "Could not save Anchor data on this device. Your draft has not been confirmed."
+            return false
         }
     }
 

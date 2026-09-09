@@ -12,7 +12,23 @@ public final class Distraction {
     public var capturedAt: Date = Date()
 
     /// What the user typed, in their own words. The raw material for tagging.
-    public var note: String = ""
+    // Legacy mirrored fields retain their exact schema names for CloudKit.
+    // Only migration reads them; new user content uses the private accessors.
+    var note: String = ""
+
+    @Transient var privateDraft: LocalDistractionNotes.Content?
+
+    public var privateNote: String {
+        get { privateContent.note }
+        set { privateDraft = .init(note: newValue, keywords: privateContent.keywords) }
+    }
+
+    private var privateContent: LocalDistractionNotes.Content {
+        if let privateDraft { return privateDraft }
+        if let context = modelContext, let vault = context.localDistractionNotes,
+           let record = try? vault.read(id) { return record.current }
+        return .init(note: note, keywords: keywords)
+    }
 
     /// Category assigned on-device. Nil until tagging runs (or if it fails).
     public var kindRaw: String?
@@ -22,7 +38,12 @@ public final class Distraction {
     public var kindIsUserSet: Bool = false
 
     /// On-device keywords used to cluster near-identical distractions together.
-    public var keywords: [String] = []
+    var keywords: [String] = []
+
+    public var privateKeywords: [String] {
+        get { privateContent.keywords }
+        set { privateDraft = .init(note: privateContent.note, keywords: newValue) }
+    }
 
     /// Stable IDs of reusable tags explicitly selected by the user.
     public var tagIDStrings: [String] = []
@@ -49,7 +70,7 @@ public final class Distraction {
         tagIDStrings: [String] = []
     ) {
         self.id = id
-        self.note = note
+        self.privateDraft = .init(note: note, keywords: [])
         self.capturedAt = capturedAt
         self.offsetSeconds = offsetSeconds
         self.session = session

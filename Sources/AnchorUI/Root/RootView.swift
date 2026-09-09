@@ -434,6 +434,11 @@ public struct RootView: View {
                 appShell
             }
         }
+        .safeAreaInset(edge: .top) {
+            if let warning = AnchorStore.privateNoteStorageWarning {
+                Text(warning).font(.caption).padding().accessibilityIdentifier("anchor.private-notes.storage-warning")
+            }
+        }
         .onChange(of: activeSessionSignature, initial: true) {
             controller.synchronizeActiveSessionFromStore()
         }
