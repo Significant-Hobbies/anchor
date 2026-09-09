@@ -1,0 +1,40 @@
+{
+  "original": {
+    "runnerSHA256": "0bbdb29579fa1235c65fa7c7071b14b42524c98ea84b087e6525d6b76d6056a1",
+    "coreSHA256": "e8cba15781d8ae4b4935b88474b775cec0584c107793ee99c1b44276aa22e186",
+    "CoreSymbolicationRelativeResolution": "/private/tmp/anchor-runner-diagnostic-20260909/derived/SharedFrameworks/CoreSymbolicationDT.framework/Versions/A/CoreSymbolicationDT",
+    "resolvedExists": false,
+    "signatureResourcesFileExists": false,
+    "signature": {
+      "exit": 0,
+      "output": "Executable=/private/tmp/anchor-runner-diagnostic-20260909/derived/Build/Products/DebugLocal/AnchorMacUITests-Runner.app/Contents/MacOS/AnchorMacUITests-Runner\nIdentifier=com.apple.XCTRunner\nFormat=app bundle with Mach-O universal (arm64)\nCodeDirectory v=20400 size=631 flags=0x0(none) hashes=14+2 location=embedded\nSignature size=4412\nInfo.plist=not bound\nTeamIdentifier=59GAB85EFG\nSealed Resources=none\nInternal requirements count=1 size=68"
+    },
+    "verify": {
+      "exit": 1,
+      "output": "/tmp/anchor-runner-diagnostic-20260909/derived/Build/Products/DebugLocal/AnchorMacUITests-Runner.app: code has no resources but signature indicates they must be present"
+    },
+    "rpath": {
+      "exit": 0,
+      "output": "path /usr/lib/swift (offset 12)\npath @loader_path/../../../ (offset 12)\npath @loader_path/../../../../../usr/lib/ (offset 12)\npath @loader_path/../../../../../../../../../SharedFrameworks/ (offset 12)\npath /System/Library/PrivateFrameworks (offset 12)"
+    }
+  },
+  "exported": {
+    "runnerSHA256": "0bbdb29579fa1235c65fa7c7071b14b42524c98ea84b087e6525d6b76d6056a1",
+    "coreSHA256": "e8cba15781d8ae4b4935b88474b775cec0584c107793ee99c1b44276aa22e186",
+    "CoreSymbolicationRelativeResolution": "/private/tmp/anchor-runner-diagnostic-20260909/Anchor.xctestproducts/SharedFrameworks/CoreSymbolicationDT.framework/Versions/A/CoreSymbolicationDT",
+    "resolvedExists": false,
+    "signatureResourcesFileExists": false,
+    "signature": {
+      "exit": 0,
+      "output": "Executable=/private/tmp/anchor-runner-diagnostic-20260909/Anchor.xctestproducts/Binaries/0/DebugLocal/AnchorMacUITests-Runner.app/Contents/MacOS/AnchorMacUITests-Runner\nIdentifier=com.apple.XCTRunner\nFormat=app bundle with Mach-O universal (arm64)\nCodeDirectory v=20400 size=631 flags=0x0(none) hashes=14+2 location=embedded\nSignature size=4412\nInfo.plist=not bound\nTeamIdentifier=59GAB85EFG\nSealed Resources=none\nInternal requirements count=1 size=68"
+    },
+    "verify": {
+      "exit": 1,
+      "output": "/tmp/anchor-runner-diagnostic-20260909/Anchor.xctestproducts/Binaries/0/DebugLocal/AnchorMacUITests-Runner.app: code has no resources but signature indicates they must be present"
+    },
+    "rpath": {
+      "exit": 0,
+      "output": "path /usr/lib/swift (offset 12)\npath @loader_path/../../../ (offset 12)\npath @loader_path/../../../../../usr/lib/ (offset 12)\npath @loader_path/../../../../../../../../../SharedFrameworks/ (offset 12)\npath /System/Library/PrivateFrameworks (offset 12)"
+    }
+  }
+}

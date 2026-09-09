@@ -428,3 +428,18 @@ Known gaps carried forward:
   protected app-group store. Ship an app-mediated bridge before restoring MCP
   setup to Settings.
 See [`docs/decisions.md`](docs/decisions.md#known-gaps).
+
+
+### Mac runner diagnostic checkpoint — 9 September 2026
+
+[Bounded runner diagnosis](docs/qualification/mac-runner-diagnosis-2026-09-09/README.md)
+identified Gatekeeper killing the earlier unsigned runner before connection.
+Original and exported test bundles both failed signature verification, so a
+path-only retry was not justified. Invocation-only normal Apple Development
+signing, with DebugLocal app/store isolation retained, produced verified bundles
+without changing profiles, project signing or system security. One selected
+prepared test then connected to testmanagerd but timed out enabling automation
+mode. No product assertion, screenshot or fixture was produced. The same-run logs
+do not establish an explicit permission denial or justified setting change.
+Rendered Mac daily-loop acceptance remains open in issue 51; no owner app/store,
+physical device, install or release was involved in this diagnostic.

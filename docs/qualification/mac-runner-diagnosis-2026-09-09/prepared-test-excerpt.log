@@ -1,0 +1,3 @@
+2026-09-09 15:39:34.947099+0530 AnchorMacUITests-Runner[43163:20597859] [Default] Running tests...
+	AnchorMacUITests-Runner (43163) encountered an error (The test runner failed to initialize for UI testing. (Underlying Error: Timed out while enabling automation mode.))
+** TEST EXECUTE FAILED **

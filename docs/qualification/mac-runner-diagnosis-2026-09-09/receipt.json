@@ -1,0 +1,61 @@
+{
+  "source": "c3704f6a8ceb1771621605d38e981ec8fe449989",
+  "priorRunnerPID": 51816,
+  "immediateTerminationCause": "Gatekeeper rejection confirmed by syspolicyd at 2026-09-09 14:28:52.853 local time",
+  "priorExecutionAssertions": 0,
+  "diagnostic": "One XcodeBuildMCP 2.7.0 macos build --build-for-testing; stable Xcode26.6; DebugLocal",
+  "diagnosticBuild": "passed",
+  "durationMs": 39647,
+  "diagnosticExecution": false,
+  "originalAndExportedRunnerIdentical": true,
+  "bothSignatureVerification": "failed: code has no resources but signature indicates they must be present",
+  "exportOnlyDefectEstablished": false,
+  "xctestrun": {
+    "TestHostPath": "__TESTROOT__/DebugLocal/AnchorMacUITests-Runner.app",
+    "TestHostBundleIdentifier": "com.significanthobbies.anchor.mac-ui-tests.xctrunner",
+    "TestBundlePath": "__TESTHOST__/Contents/PlugIns/AnchorMacUITests.xctest",
+    "UITargetAppPath": "__TESTROOT__/DebugLocal/Anchor Local.app",
+    "DependentProductPaths": [
+      "__TESTROOT__/DebugLocal/Anchor Local.app",
+      "__TESTROOT__/DebugLocal/AnchorMacUITests-Runner.app",
+      "__TESTROOT__/DebugLocal/AnchorMacUITests-Runner.app/Contents/PlugIns/AnchorMacUITests.xctest"
+    ]
+  },
+  "securitySigningOrOwnerStateChanged": false,
+  "nextStep": "Working macOS XCTest automation initialization is still required. Same-run evidence does not identify an explicit permission denial or justified setting change; no further retry until new evidence or a separately qualified native host.",
+  "signedDiagnostic": {
+    "build": "passed",
+    "durationMs": 35930,
+    "configuration": "DebugLocal",
+    "invocationOnlyOverrides": [
+      "CODE_SIGNING_ALLOWED=YES",
+      "CODE_SIGNING_REQUIRED=YES",
+      "CODE_SIGN_STYLE=Automatic",
+      "CODE_SIGN_IDENTITY=Apple Development",
+      "DEVELOPMENT_TEAM=8F7LXHTJZR"
+    ],
+    "localOnlyCompilationFlagVerified": true,
+    "provisioningUpdatesRequested": false,
+    "originalAndExportedAppAndRunnerStrictSignatureVerification": "passed",
+    "appCloudKitOrAppGroupEntitlements": false,
+    "relativeFrameworkCandidateStillMissing": true,
+    "executed": false
+  },
+  "preparedTest": {
+    "selectedTest": "AnchorMacUITests/AnchorMacUITests/testFocusInterruptionAndReturnJourneyPersists",
+    "durationMs": 62640,
+    "testExecutionCapSeconds": 120,
+    "runnerPID": 43163,
+    "runnerConnectedToTestmanagerd": true,
+    "result": "System failure: timed out while enabling automation mode",
+    "automationRequestTime": "2026-09-09 15:39:35.002 +0530",
+    "automationTimeoutTime": "2026-09-09 15:40:35.024 +0530",
+    "productAssertionsExecuted": 0,
+    "screenshots": 0,
+    "fixtureDirectoryCreated": false,
+    "explicitPermissionDenialFound": false,
+    "developerToolPreflight": "Auth Right: Unknown (None), DB Action:None",
+    "runnerExited": true,
+    "repeated": false
+  }
+}

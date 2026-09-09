@@ -1,0 +1,80 @@
+{
+  "original": {
+    "runner": {
+      "bundle": "com.significanthobbies.anchor.mac-ui-tests.xctrunner",
+      "CodeResourcesExists": true,
+      "signature": {
+        "exit": 0,
+        "output": "Executable=/private/tmp/anchor-runner-signed-diagnostic-20260909/derived/Build/Products/DebugLocal/AnchorMacUITests-Runner.app/Contents/MacOS/AnchorMacUITests-Runner\nIdentifier=com.significanthobbies.anchor.mac-ui-tests.xctrunner\nFormat=app bundle with Mach-O universal (arm64)\nCodeDirectory v=20400 size=504 flags=0x0(none) hashes=4+7 location=embedded\nSignature size=4787\nSigned Time=9 Sep 2026 at 3:37:40\u202fPM\nInfo.plist entries=45\nTeamIdentifier=8F7LXHTJZR\nSealed Resources version=2 rules=13 files=12\nInternal requirements count=1 size=216"
+      },
+      "verify": {
+        "exit": 0,
+        "output": ""
+      },
+      "entitlements": {
+        "exit": 0,
+        "output": "{\"com.apple.application-identifier\": \"8F7LXHTJZR.com.significanthobbies.anchor.mac-ui-tests.xctrunner\", \"com.apple.security.app-sandbox\": true, \"com.apple.security.get-task-allow\": true, \"com.apple.security.network.client\": true, \"com.apple.security.temporary-exception.files.absolute-path.read-only\": [\"/\", \"/\"], \"com.apple.security.temporary-exception.mach-lookup.global-name\": [\"com.apple.testmanagerd\", \"com.apple.dt.testmanagerd.runner\", \"com.apple.coresymbolicationd\", \"com.apple.coredevice.version\", \"com.apple.coredevice.service\", \"com.apple.remoted\", \"com.apple.testmanagerd\", \"com.apple.dt.testmanagerd.runner\", \"com.apple.coresymbolicationd\"], \"com.apple.security.temporary-exception.mach-lookup.local-name\": [\"com.apple.axserver\"], \"com.apple.security.temporary-exception.sbpl\": [\"(allow hid-control)\", \"(allow signal)\"]}"
+      }
+    },
+    "app": {
+      "bundle": "com.significanthobbies.anchor.local",
+      "CodeResourcesExists": true,
+      "signature": {
+        "exit": 0,
+        "output": "Executable=/private/tmp/anchor-runner-signed-diagnostic-20260909/derived/Build/Products/DebugLocal/Anchor Local.app/Contents/MacOS/Anchor Local\nIdentifier=com.significanthobbies.anchor.local\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20400 size=455 flags=0x0(none) hashes=3+7 location=embedded\nSignature size=4787\nSigned Time=9 Sep 2026 at 3:37:39\u202fPM\nInfo.plist entries=27\nTeamIdentifier=8F7LXHTJZR\nSealed Resources version=2 rules=13 files=5\nInternal requirements count=1 size=200"
+      },
+      "verify": {
+        "exit": 0,
+        "output": ""
+      },
+      "entitlements": {
+        "exit": 0,
+        "output": "{\"com.apple.security.get-task-allow\": true, \"com.apple.security.temporary-exception.files.absolute-path.read-only\": [\"/\"], \"com.apple.security.temporary-exception.mach-lookup.global-name\": [\"com.apple.testmanagerd\", \"com.apple.dt.testmanagerd.runner\", \"com.apple.coresymbolicationd\"]}"
+      }
+    },
+    "coreSHA256": "ef2bf2d812c8f93c55a7d90766382887a6b489eb3b1ac4f3e849aac181d42e61",
+    "relativeFrameworkResolution": {
+      "path": "/private/tmp/anchor-runner-signed-diagnostic-20260909/derived/SharedFrameworks/CoreSymbolicationDT.framework/Versions/A/CoreSymbolicationDT",
+      "exists": false
+    }
+  },
+  "exported": {
+    "runner": {
+      "bundle": "com.significanthobbies.anchor.mac-ui-tests.xctrunner",
+      "CodeResourcesExists": true,
+      "signature": {
+        "exit": 0,
+        "output": "Executable=/private/tmp/anchor-runner-signed-diagnostic-20260909/Anchor.xctestproducts/Binaries/0/DebugLocal/AnchorMacUITests-Runner.app/Contents/MacOS/AnchorMacUITests-Runner\nIdentifier=com.significanthobbies.anchor.mac-ui-tests.xctrunner\nFormat=app bundle with Mach-O universal (arm64)\nCodeDirectory v=20400 size=504 flags=0x0(none) hashes=4+7 location=embedded\nSignature size=4787\nSigned Time=9 Sep 2026 at 3:37:40\u202fPM\nInfo.plist entries=45\nTeamIdentifier=8F7LXHTJZR\nSealed Resources version=2 rules=13 files=12\nInternal requirements count=1 size=216"
+      },
+      "verify": {
+        "exit": 0,
+        "output": ""
+      },
+      "entitlements": {
+        "exit": 0,
+        "output": "{\"com.apple.application-identifier\": \"8F7LXHTJZR.com.significanthobbies.anchor.mac-ui-tests.xctrunner\", \"com.apple.security.app-sandbox\": true, \"com.apple.security.get-task-allow\": true, \"com.apple.security.network.client\": true, \"com.apple.security.temporary-exception.files.absolute-path.read-only\": [\"/\", \"/\"], \"com.apple.security.temporary-exception.mach-lookup.global-name\": [\"com.apple.testmanagerd\", \"com.apple.dt.testmanagerd.runner\", \"com.apple.coresymbolicationd\", \"com.apple.coredevice.version\", \"com.apple.coredevice.service\", \"com.apple.remoted\", \"com.apple.testmanagerd\", \"com.apple.dt.testmanagerd.runner\", \"com.apple.coresymbolicationd\"], \"com.apple.security.temporary-exception.mach-lookup.local-name\": [\"com.apple.axserver\"], \"com.apple.security.temporary-exception.sbpl\": [\"(allow hid-control)\", \"(allow signal)\"]}"
+      }
+    },
+    "app": {
+      "bundle": "com.significanthobbies.anchor.local",
+      "CodeResourcesExists": true,
+      "signature": {
+        "exit": 0,
+        "output": "Executable=/private/tmp/anchor-runner-signed-diagnostic-20260909/Anchor.xctestproducts/Binaries/0/DebugLocal/Anchor Local.app/Contents/MacOS/Anchor Local\nIdentifier=com.significanthobbies.anchor.local\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20400 size=455 flags=0x0(none) hashes=3+7 location=embedded\nSignature size=4787\nSigned Time=9 Sep 2026 at 3:37:39\u202fPM\nInfo.plist entries=27\nTeamIdentifier=8F7LXHTJZR\nSealed Resources version=2 rules=13 files=5\nInternal requirements count=1 size=200"
+      },
+      "verify": {
+        "exit": 0,
+        "output": ""
+      },
+      "entitlements": {
+        "exit": 0,
+        "output": "{\"com.apple.security.get-task-allow\": true, \"com.apple.security.temporary-exception.files.absolute-path.read-only\": [\"/\"], \"com.apple.security.temporary-exception.mach-lookup.global-name\": [\"com.apple.testmanagerd\", \"com.apple.dt.testmanagerd.runner\", \"com.apple.coresymbolicationd\"]}"
+      }
+    },
+    "coreSHA256": "ef2bf2d812c8f93c55a7d90766382887a6b489eb3b1ac4f3e849aac181d42e61",
+    "relativeFrameworkResolution": {
+      "path": "/private/tmp/anchor-runner-signed-diagnostic-20260909/Anchor.xctestproducts/SharedFrameworks/CoreSymbolicationDT.framework/Versions/A/CoreSymbolicationDT",
+      "exists": false
+    }
+  }
+}

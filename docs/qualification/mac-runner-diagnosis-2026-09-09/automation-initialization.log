@@ -1,0 +1,38 @@
+Timestamp               Ty Process[PID:TID]
+2026-09-09 15:39:34.091 A  xpcproxy[43163:13a4c5b] (libsystem_info.dylib) Retrieve User by ID
+2026-09-09 15:39:34.092 A  xpcproxy[43163:13a4c5b] (libsystem_info.dylib) Resolve user group list
+2026-09-09 15:39:34.093 A  xpcproxy[43163:13a4c5b] (libsystem_info.dylib) Membership API: translate identifier
+2026-09-09 15:39:34.744 I  tccd[620:13a33dc] [com.apple.TCC:access] REQUEST_MSG: msgID=691.673, msg={
+	require_purpose=<xpc_null>
+	service="kTCCServiceDeveloperTool"
+	function="TCCAccessRequest"
+	preflight=true
+	target_token={pid:43163, auid:501, euid:501}
+	TCCD_MSG_ID="691.673"
+	background_session=false
+}
+2026-09-09 15:39:34.745 I  tccd[620:13a33dc] [com.apple.TCC:access] AttributionChain: accessing={TCCDProcess: identifier=com.significanthobbies.anchor.mac-ui-tests.xctrunner, pid=43163, auid=501, euid=501, binary_path=/private/tmp/anchor-runner-signed-diagnostic-20260909/Anchor.xctestproducts/Binaries/0/DebugLocal/AnchorMacUITests-Runner.app/Contents/MacOS/AnchorMacUITests-Runner}, requesting={TCCDProcess: identifier=com.apple.syspolicyd, pid=691, auid=0, euid=0, binary_path=/usr/libexec/syspolicyd},
+2026-09-09 15:39:34.745 I  tccd[620:13a33dc] [com.apple.TCC:access] AttributionChain: accessing={TCCDProcess: identifier=com.significanthobbies.anchor.mac-ui-tests.xctrunner, pid=43163, auid=501, euid=501, binary_path=/private/tmp/anchor-runner-signed-diagnostic-20260909/Anchor.xctestproducts/Binaries/0/DebugLocal/AnchorMacUITests-Runner.app/Contents/MacOS/AnchorMacUITests-Runner}, requesting={TCCDProcess: identifier=com.apple.syspolicyd, pid=691, auid=0, euid=0, binary_path=/usr/libexec/syspolicyd},
+2026-09-09 15:39:34.750 I  tccd[620:13a33dc] [com.apple.TCC:access] Handling access request to kTCCServiceDeveloperTool, from Sub:{com.significanthobbies.anchor.mac-ui-tests.xctrunner}Resp:{TCCDProcess: identifier=com.significanthobbies.anchor.mac-ui-tests.xctrunner, pid=43163, auid=501, euid=501, binary_path=/private/tmp/anchor-runner-signed-diagnostic-20260909/Anchor.xctestproducts/Binaries/0/DebugLocal/AnchorMacUITests-Runner.app/Contents/MacOS/AnchorMacUITests-Runner}, ReqResult(Auth Right: Unknown (None), promptType: 1,DB Action:None, UpdateVerifierData)
+2026-09-09 15:39:34.831 A  AnchorMacUITests-Runner[43163:13a4c63] (libsystem_secinit.dylib) AppSandbox
+2026-09-09 15:39:34.918 A  AnchorMacUITests-Runner[43163:13a4c63] (libsystem_info.dylib) Retrieve User by ID
+2026-09-09 15:39:34.922 Df AnchorMacUITests-Runner[43163:13a4c63] [com.apple.xpc:connection] [0x105bfdb60] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.daemon
+2026-09-09 15:39:34.922 Df AnchorMacUITests-Runner[43163:13a4cd1] [com.apple.xpc:connection] [0x105bfe220] activating connection: mach=true listener=false peer=false name=com.apple.cfprefsd.agent
+2026-09-09 15:39:34.940 Df AnchorMacUITests-Runner[43163:13a4c63] [com.apple.dt.xctest:Default] Running tests...
+2026-09-09 15:39:34.941 A  AnchorMacUITests-Runner[43163:13a4c63] (libsystem_info.dylib) Retrieve Group by ID
+2026-09-09 15:39:34.942 I  AnchorMacUITests-Runner[43163:13a4c63] [com.apple.CarbonCore:coreservicesdaemon] SCSession():SCSession( id=100, this=0x0x765b074300 option=65538) created, forUID=501 mach_port_t=0x2103.
+2026-09-09 15:39:34.942 I  AnchorMacUITests-Runner[43163:13a4c63] [com.apple.CarbonCore:coreservicesdaemon] SCSession():SCSession( id=101, this=0x0x765b074400 option=65538) created, forUID=501 mach_port_t=0x2903.
+2026-09-09 15:39:34.942 I  AnchorMacUITests-Runner[43163:13a4c63] [com.apple.CarbonCore:coreservicesdaemon] connectToCoreServicesD():Instantiating server (coreservicesd based) SCSession, port=0x2103 serverOptions=0x10002.
+2026-09-09 15:39:34.944 Df AnchorMacUITests-Runner[43163:13a4c63] [com.apple.xpc:connection] [0x105bf9ac0] activating connection: mach=true listener=false peer=false name=com.apple.testmanagerd
+2026-09-09 15:39:34.945 Df testmanagerd[19260:13a4c3e] [com.apple.dt.xctest:Default] Received new test session connection from process with PID 43163
+2026-09-09 15:39:34.953 Df testmanagerd[19260:13a4c3e] [com.apple.dt.xctest:Default] <XCTestSession: 0x788c438180> pid 43163 resuming connection
+2026-09-09 15:39:34.953 Df testmanagerd[19260:13a4c3e] [com.apple.xpc:connection] [0x788d0708c0] activating connection: mach=false listener=false peer=true name=com.apple.testmanagerd.peer[43163].0x788d0708c0
+2026-09-09 15:39:34.988 Df testmanagerd[19260:13a4c3f] [com.apple.dt.xctest:Default] XCTDAuthorizedProcessTracker has started monitoring and tracking dispatch source for pid 43163
+2026-09-09 15:39:34.989 Df testmanagerd[19260:13a4c3f] [com.apple.dt.xctest:Default] Current mappings: {
+    43163 = "<OS_dispatch_source: 0x788d06a780>";
+}
+2026-09-09 15:39:34.999 Df AnchorMacUITests-Runner[43163:13a4c63] [com.apple.xpc:connection] [0x765b18c000] activating connection: mach=true listener=false peer=false name=com.apple.distributed_notifications@Uv3
+2026-09-09 15:39:35.002 Df testmanagerd[19260:13a4c40] [com.apple.dt.xctest:Default] Test session with pid 43163 requesting automation mode
+2026-09-09 15:39:35.002 Df testmanagerd[19260:13a4c40] [com.apple.dt.xctest:Default] Added Automation Mode client <XCTestSession: 0x788c438180> pid 43163. Total clients: 1
+2026-09-09 15:40:35.024 E  AnchorMacUITests-Runner[43163:13a4c63] [com.apple.dt.xctest:Default] Failed to initialize for UI testing: Error Domain=com.apple.dt.XCTest.XCTFuture Code=1000 "Timed out while enabling automation mode." UserInfo={NSLocalizedDescription=Timed out while enabling automation mode.}
+2026-09-09 15:40:35.027 Df testmanagerd[19260:13a4c3f] [com.apple.dt.xctest:Default] XCTDAuthorizedProcessTracker has cancelled dispatch source for pid 43163 and removed it from its list of dispatch sources to track

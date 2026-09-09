@@ -231,3 +231,18 @@ Original requirements and discussion: [#40](https://github.com/Significant-Hobbi
 ### Device-only distraction-note migration
 
 Source migration work and failure/restart evidence are tracked in [#52](https://github.com/Significant-Hobbies/anchor/issues/52) and [the qualification receipt](docs/qualification/private-notes-2026-09-09/README.md). Existing installed builds can still store distraction notes in private CloudKit. Historical cloud copies, mixed-version provider behavior and signed-device qualification remain release gates; local/package checks alone do not qualify owner-data rollout.
+
+
+### Mac runner diagnostic checkpoint — 9 September 2026
+
+[Bounded runner diagnosis](docs/qualification/mac-runner-diagnosis-2026-09-09/README.md)
+identified Gatekeeper killing the earlier unsigned runner before connection.
+Original and exported test bundles both failed signature verification, so a
+path-only retry was not justified. Invocation-only normal Apple Development
+signing, with DebugLocal app/store isolation retained, produced verified bundles
+without changing profiles, project signing or system security. One selected
+prepared test then connected to testmanagerd but timed out enabling automation
+mode. No product assertion, screenshot or fixture was produced. The same-run logs
+do not establish an explicit permission denial or justified setting change.
+Rendered Mac daily-loop acceptance remains open in issue 51; no owner app/store,
+physical device, install or release was involved in this diagnostic.
