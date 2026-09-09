@@ -174,7 +174,7 @@ struct LiveActivityLifecycleTests {
     @Test("Starting a session publishes a running snapshot")
     func startPublishesSnapshot() throws {
         let (controller, _, coordinator) = try makeController()
-        let session = controller.start(goal: nil, intent: "Ship auth", minutes: 25)
+        let session = try #require(controller.start(goal: nil, intent: "Ship auth", minutes: 25))
 
         guard case let .start(snapshot)? = coordinator.calls.first else {
             Issue.record("expected a start call")
@@ -369,7 +369,7 @@ struct LiveActivityLifecycleTests {
         controller.start(goal: nil, intent: "First", minutes: 25)
         controller.end(reason: .endedEarly)
         coordinator.calls.removeAll()
-        let second = controller.start(goal: nil, intent: "Second", minutes: 25)
+        let second = try #require(controller.start(goal: nil, intent: "Second", minutes: 25))
 
         guard case let .start(snapshot)? = coordinator.calls.first else {
             Issue.record("expected a start call")

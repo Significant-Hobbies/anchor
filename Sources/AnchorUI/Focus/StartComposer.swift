@@ -16,19 +16,17 @@ public struct StartComposer: View {
     @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
     @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
 
-    @State private var intent: String = ""
-    @State private var notes: String = ""
-    @State private var selectedGoalID: UUID?
-    @State private var selectedProjectID: UUID?
-    @State private var selectedTagIDs: [String] = []
+    @State private var draft = StartComposerDraft()
     @State private var minutes: Int = 25
     @State private var showsMoreContext = false
     private enum EntryField: Hashable { case intent, notes }
     @FocusState private var focusedField: EntryField?
 
-    private let onStart: (Goal?, String, Int, Project?, String, [String]) -> Void
+    private let error: String?
+    private let onStart: (Goal?, String, Int, Project?, String, [String]) -> Bool
 
-    public init(onStart: @escaping (Goal?, String, Int, Project?, String, [String]) -> Void) {
+    public init(error: String? = nil, onStart: @escaping (Goal?, String, Int, Project?, String, [String]) -> Bool) {
+        self.error = error
         self.onStart = onStart
     }
 
@@ -37,26 +35,32 @@ public struct StartComposer: View {
     private var activeGoals: [Goal] { goals.filter { !$0.isArchived } }
 
     private var selectedGoal: Goal? {
-        activeGoals.first { $0.id == selectedGoalID }
+        activeGoals.first { $0.id == draft.selectedGoalID }
     }
 
     private var selectedProject: Project? {
-        projects.first { $0.id == selectedProjectID && !$0.isArchived }
+        projects.first { $0.id == draft.selectedProjectID && !$0.isArchived }
     }
 
     private var canStart: Bool {
-        !intent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedGoal != nil
+        !draft.intent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedGoal != nil
     }
 
     public var body: some View {
         ScrollView {
+            if let error {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(theme.negative)
+                    .accessibilityIdentifier("anchor.focus.start-error")
+            }
             VStack(spacing: Space.lg) {
                 header
 
                 Card(padding: Space.lg) {
                     VStack(alignment: .leading, spacing: Space.md) {
                         fieldLabel("What are you working on?")
-                        TextField("Ship the auth flow", text: $intent, axis: .vertical)
+                        TextField("Ship the auth flow", text: $draft.intent, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.system(size: 20, weight: .medium, design: .rounded))
                             .foregroundStyle(theme.textPrimary)
@@ -66,7 +70,7 @@ public struct StartComposer: View {
 
                         Divider().overlay(theme.hairline)
                         fieldLabel("Entry notes — optional")
-                        TextField("Context, plan, or what success looks like", text: $notes, axis: .vertical)
+                        TextField("Context, plan, or what success looks like", text: $draft.notes, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.system(size: 14))
                             .foregroundStyle(theme.textSecondary)
@@ -89,9 +93,9 @@ public struct StartComposer: View {
                     DisclosureGroup(isExpanded: $showsMoreContext) {
                         VStack(alignment: .leading, spacing: Space.md) {
                             Divider().overlay(theme.hairline)
-                            ProjectPicker(selectedID: $selectedProjectID)
+                            ProjectPicker(selectedID: $draft.selectedProjectID)
                             Divider().overlay(theme.hairline)
-                            SavedTagPicker(selectedIDs: $selectedTagIDs)
+                            SavedTagPicker(selectedIDs: $draft.selectedTagIDs)
                         }
                         .padding(.top, Space.sm)
                     } label: {
@@ -189,21 +193,21 @@ public struct StartComposer: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Space.xs) {
                 Button {
-                    withAnimation(Motion.snappy) { selectedGoalID = nil }
+                    withAnimation(Motion.snappy) { draft.selectedGoalID = nil }
                 } label: {
-                    Chip("No goal", symbol: "circle.dashed", isSelected: selectedGoalID == nil)
+                    Chip("No goal", symbol: "circle.dashed", isSelected: draft.selectedGoalID == nil)
                 }
                 .buttonStyle(.plain)
 
                 ForEach(activeGoals) { goal in
                     Button {
-                        withAnimation(Motion.snappy) { selectedGoalID = goal.id }
+                        withAnimation(Motion.snappy) { draft.selectedGoalID = goal.id }
                     } label: {
                         Chip(
                             goal.title,
                             symbol: goal.symbolName,
                             tint: AnchorTheme.tint(goal.tintIndex),
-                            isSelected: selectedGoalID == goal.id
+                            isSelected: draft.selectedGoalID == goal.id
                         )
                     }
                     .buttonStyle(.plain)
@@ -265,26 +269,45 @@ public struct StartComposer: View {
     private func start() {
         guard canStart else { return }
         focusedField = nil
-        let trimmed = intent.trimmingCharacters(in: .whitespacesAndNewlines)
-        var goal = selectedGoal
+        _ = draft.submit(
+            selectedGoal: selectedGoal, selectedProject: selectedProject,
+            minutes: minutes, goalTintIndex: activeGoals.count % AnchorTheme.goalTints.count,
+            context: context, onStart: onStart
+        )
+    }
+}
 
-        // Typing an intention with no goal selected creates one, so the goal list
-        // fills itself in from ordinary use rather than from a setup chore.
+/// The actual composer submission handler owns draft clearing and transient-goal cleanup.
+/// Keeping the value intact on failure lets the same entry be retried.
+@MainActor
+struct StartComposerDraft: Equatable {
+    var intent = ""
+    var notes = ""
+    var selectedGoalID: UUID?
+    var selectedProjectID: UUID?
+    var selectedTagIDs: [String] = []
+
+    mutating func submit(
+        selectedGoal: Goal?, selectedProject: Project?, minutes: Int,
+        goalTintIndex: Int, context: ModelContext,
+        onStart: (Goal?, String, Int, Project?, String, [String]) -> Bool
+    ) -> Bool {
+        let trimmed = intent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty || selectedGoal != nil else { return false }
+        var goal = selectedGoal
+        var createdGoal: Goal?
         if goal == nil, !trimmed.isEmpty {
-            let created = Goal(
-                title: trimmed,
-                tintIndex: activeGoals.count % AnchorTheme.goalTints.count
-            )
+            let created = Goal(title: trimmed, tintIndex: goalTintIndex)
             context.insert(created)
+            createdGoal = created
             goal = created
         }
-
-        onStart(goal, trimmed, minutes, selectedProject, notes, selectedTagIDs)
-        intent = ""
-        notes = ""
-        selectedGoalID = nil
-        selectedProjectID = nil
-        selectedTagIDs = []
+        guard onStart(goal, trimmed, minutes, selectedProject, notes, selectedTagIDs) else {
+            if let createdGoal { context.delete(createdGoal) }
+            return false
+        }
+        self = StartComposerDraft()
+        return true
     }
 }
 #endif

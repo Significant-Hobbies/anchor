@@ -68,8 +68,8 @@ public struct FocusScreen: View {
                         .frame(maxWidth: 980)
                         Spacer()
                     } else {
-                        StartComposer { goal, intent, minutes, project, notes, tagIDs in
-                            _ = withAnimation(Motion.gentle) {
+                        StartComposer(error: controller.lastError) { goal, intent, minutes, project, notes, tagIDs in
+                            let started = withAnimation(Motion.gentle) {
                                 controller.start(
                                     goal: goal,
                                     intent: intent,
@@ -79,7 +79,9 @@ public struct FocusScreen: View {
                                     tagIDStrings: tagIDs
                                 )
                             }
+                            guard started != nil else { return false }
                             showsAdHocComposer = false
+                            return true
                         }
                     }
                 }
@@ -216,7 +218,8 @@ public struct FocusScreen: View {
             )
             loadError = nil
         } catch {
-            loadError = "Focus started, but Anchor could not link it to the schedule. It will still appear in History."
+            loadError = controller.lastError ?? "Focus started, but Anchor could not link it to the schedule. It will still appear in History."
+            return
         }
         isChangingActivity = false
         actualIntent = ""
@@ -228,6 +231,8 @@ public struct FocusScreen: View {
 /// start from becoming an unplanned session in the evening review.
 @MainActor
 enum PlanBlockFocusStarter {
+    enum StartFailure: Error { case persistence }
+
     static func start(
         _ block: PlanBlock,
         intent: String? = nil,
@@ -239,13 +244,13 @@ enum PlanBlockFocusStarter {
         guard !resolvedIntent.isEmpty else { return }
         let project = try context.fetch(FetchDescriptor<Project>()).first { $0.id == block.projectID }
 
-        let session = controller.start(
+        guard let session = controller.start(
             goal: nil,
             intent: resolvedIntent,
             minutes: minutes ?? max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
             project: project,
             notes: block.details
-        )
+        ) else { throw StartFailure.persistence }
         block.sessionID = session.id
         block.actualStartedAt = session.startedAt
         block.state = .inProgress

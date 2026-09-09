@@ -213,7 +213,7 @@ import Testing
             if failNext { failNext = false; throw CocoaError(.fileWriteOutOfSpace) }
             try AnchorStore.save(context)
         })
-        let session = controller.start(goal: nil, intent: "Write", minutes: 25)
+        let session = try #require(controller.start(goal: nil, intent: "Write", minutes: 25))
         let account = session.account
         controller.beginManualCapture()
         failNext = true
@@ -267,7 +267,7 @@ import Testing
             }
             try AnchorStore.save(context)
         })
-        let session = controller.start(goal: nil, intent: "Synthetic surrender failure", minutes: 25)
+        let session = try #require(controller.start(goal: nil, intent: "Synthetic surrender failure", minutes: 25))
         controller.beginManualCapture()
         failure.enabled = true
         #expect(!controller.surrender(to: "Synthetic draft"))
@@ -300,7 +300,7 @@ import Testing
             if failure.enabled { throw CocoaError(.fileWriteOutOfSpace) }
             try AnchorStore.save(context)
         })
-        let session = controller.start(goal: nil, intent: "Original", minutes: 25)
+        let session = try #require(controller.start(goal: nil, intent: "Original", minutes: 25))
         let before = session.account
         let observation = Date()
         controller.observeMachineIdle(seconds: 0, at: observation)
@@ -313,7 +313,7 @@ import Testing
         #expect(session.account == before && session.endedAt == nil && session.endReason == nil)
         #expect(session.computerActiveSeconds == 0 && session.computerAwaySeconds == 0)
         let replacement = controller.start(goal: nil, intent: "Must not replace", minutes: 10)
-        #expect(replacement.id == session.id && controller.session?.id == session.id)
+        #expect(replacement == nil && controller.session?.id == session.id)
         #expect(notifier.cancelled.isEmpty && activity.calls == activityBefore)
         let reopened = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
         let sessions = try reopened.fetch(FetchDescriptor<FocusSession>())
@@ -380,7 +380,7 @@ import Testing
             if failure.enabled { throw CocoaError(.fileWriteOutOfSpace) }
             try AnchorStore.save(context)
         })
-        let session = controller.start(goal: nil, intent: "Synthetic resume retry", minutes: 25)
+        let session = try #require(controller.start(goal: nil, intent: "Synthetic resume retry", minutes: 25))
         controller.beginManualCapture()
         #expect(controller.pauseFromCapture(note: "Synthetic interruption", kind: .person))
         let account = session.account
@@ -415,6 +415,104 @@ import Testing
         #expect(saved.state == .running && saved.account == session.account)
         #expect(try reopened.fetch(FetchDescriptor<Distraction>()).count == 1)
         #expect(try reopened.fetch(FetchDescriptor<Distraction>()).first?.didReturnToFocus == true)
+        controller.end()
+    }
+
+    @Test func failedStartPublishesNothingAndRetryCreatesOnlyOneSession() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        context.autosaveEnabled = false
+        @MainActor final class FailurePlan { var enabled = true }
+        let failure = FailurePlan()
+        let notifier = FocusControllerTests.RecordingNotifier()
+        let activity = LiveActivityLifecycleTests.RecordingCoordinator()
+        let controller = FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false), completionNotifier: notifier, liveActivityCoordinator: activity, persistContext: { context in
+            if failure.enabled { throw CocoaError(.fileWriteOutOfSpace) }
+            try AnchorStore.save(context)
+        })
+        let before = activity.calls
+        let failed = controller.start(goal: nil, intent: "Synthetic draft", minutes: 25)
+        #expect(failed == nil)
+        #expect(!controller.hasSession && controller.lastError != nil)
+        #expect(notifier.scheduled.isEmpty && activity.calls == before)
+        // A later unrelated save must not resurrect the failed insertion.
+        failure.enabled = false
+        try AnchorStore.save(context)
+        let afterFailure = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        #expect(try afterFailure.fetch(FetchDescriptor<FocusSession>()).isEmpty)
+        controller.start(goal: nil, intent: "Synthetic draft", minutes: 25)
+        #expect(controller.isRunning && controller.lastError == nil)
+        #expect(notifier.scheduled.count == 1)
+        let reopened = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        let saved = try reopened.fetch(FetchDescriptor<FocusSession>())
+        #expect(saved.count == 1 && saved.first?.intent == "Synthetic draft")
+        controller.end()
+    }
+
+    @Test func failedExtensionPreservesPausedAccountAndRetryAddsTimeOnce() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        context.autosaveEnabled = false
+        @MainActor final class FailurePlan { var enabled = false }
+        let failure = FailurePlan()
+        let notifier = FocusControllerTests.RecordingNotifier()
+        let activity = LiveActivityLifecycleTests.RecordingCoordinator()
+        let controller = FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false), completionNotifier: notifier, liveActivityCoordinator: activity, persistContext: { context in
+            if failure.enabled { throw CocoaError(.fileWriteOutOfSpace) }
+            try AnchorStore.save(context)
+        })
+        controller.start(goal: nil, intent: "Synthetic extension", minutes: 25)
+        controller.pause()
+        let session = try #require(controller.session)
+        let before = session.account
+        let pausedAt = session.pausedAt
+        let calls = activity.calls
+        let schedules = notifier.scheduled.count
+        failure.enabled = true
+        controller.extend(byMinutes: 5)
+        controller.extend(byMinutes: 5)
+        #expect(controller.isPaused && controller.lastError != nil)
+        #expect(session.account == before && session.pausedAt == pausedAt)
+        #expect(activity.calls == calls && notifier.scheduled.count == schedules)
+        failure.enabled = false
+        try AnchorStore.save(context)
+        let afterFailure = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        #expect(try afterFailure.fetch(FetchDescriptor<FocusSession>()).first?.account == before)
+        controller.extend(byMinutes: 5)
+        #expect(controller.isRunning && controller.lastError == nil)
+        #expect(session.account.plannedSeconds == before.plannedSeconds + 300)
+        #expect(session.account.bankedSeconds == before.bankedSeconds)
+        let reopened = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        #expect(try reopened.fetch(FetchDescriptor<FocusSession>()).first?.account == session.account)
+        controller.end()
+    }
+
+    @Test func failedReplacementCreationKeepsCommittedPreviousHistory() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        context.autosaveEnabled = false
+        @MainActor final class FailurePlan { var saves = 0; var failAt = 3 }
+        let failure = FailurePlan()
+        let controller = FocusController(context: context, tagger: TaggingService(allowsOnDeviceModel: false), persistContext: { context in
+            failure.saves += 1
+            if failure.saves == failure.failAt { throw CocoaError(.fileWriteOutOfSpace) }
+            try AnchorStore.save(context)
+        })
+        let original = try #require(controller.start(goal: nil, intent: "Original", minutes: 25))
+        // Replacement first commits the old end, then fails creating the new record.
+        let replacement = controller.start(goal: nil, intent: "Replacement draft", minutes: 15)
+        #expect(replacement == nil && !controller.hasSession && controller.lastError != nil)
+        #expect(original.state == .finished && original.endReason == .endedEarly)
+        try AnchorStore.save(context)
+        let reopened = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        let saved = try reopened.fetch(FetchDescriptor<FocusSession>())
+        #expect(saved.count == 1 && saved.first?.id == original.id && saved.first?.state == .finished)
+        let retry = try #require(controller.start(goal: nil, intent: "Replacement draft", minutes: 15))
+        #expect(retry.id != original.id && controller.isRunning)
+        #expect(try context.fetchCount(FetchDescriptor<FocusSession>()) == 2)
         controller.end()
     }
 

@@ -467,13 +467,16 @@ struct PlanScreen: View {
             onOpenFocus()
             return
         }
-        let session = controller.start(
+        guard let session = controller.start(
             goal: nil,
             intent: block.title,
             minutes: max(1, Int(ceil(Double(block.plannedSeconds) / 60))),
             project: projects.first { $0.id == block.projectID },
             notes: block.details
-        )
+        ) else {
+            loadError = controller.lastError
+            return
+        }
         let previousSessionID = block.sessionID
         let previousStart = block.actualStartedAt
         let previousState = block.state

@@ -171,9 +171,9 @@ public final class FocusController {
         project: Project? = nil,
         notes: String = "",
         tagIDStrings: [String] = []
-    ) -> FocusSession {
+    ) -> FocusSession? {
         if let current = session, current.isActive, !end(reason: .endedEarly) {
-            return current
+            return nil
         }
 
         let new = FocusSession(
@@ -189,9 +189,13 @@ public final class FocusController {
         )
         new.hubAccountID = hubOwner()
         context.insert(new)
+        guard save() else {
+            context.delete(new)
+            lastError = "Anchor could not start this session. Your entry is still here. Please try again."
+            return nil
+        }
         session = new
         resetMachineObservation()
-        save()
         refreshNow()
         scheduleCompletionNotification()
         startTicking()
@@ -327,12 +331,20 @@ public final class FocusController {
 
     public func extend(byMinutes minutes: Int) {
         guard let session, session.isActive else { return }
-        var account = session.account
+        let previousAccount = session.account
+        let previousState = session.state
+        var account = previousAccount
         account.extend(by: minutes * 60)
         if account.runningSince == nil { account.resume(at: Date()) }
         session.apply(account)
         session.state = .running
-        save()
+        guard save() else {
+            session.apply(previousAccount)
+            session.state = previousState
+            lastError = "Anchor could not extend this session. Its time is unchanged. Please try again."
+            refreshNow()
+            return
+        }
         refreshNow()
         scheduleCompletionNotification()
         startTicking()

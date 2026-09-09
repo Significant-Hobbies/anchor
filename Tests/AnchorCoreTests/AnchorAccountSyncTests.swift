@@ -152,7 +152,7 @@ struct AnchorAccountSyncTests {
         let store = HubHistoryOwnershipStore(directory: fixture.directory)
         try store.approve("stable-A")
         let controller = FocusController(context: fixture.context, hubOwner: { try? store.owner() })
-        let session = controller.start(goal: nil, intent: "Synthetic offline focus", minutes: 1)
+        let session = try #require(controller.start(goal: nil, intent: "Synthetic offline focus", minutes: 1))
         #expect(session.hubAccountID == "stable-A")
         controller.end(reason: .endedEarly)
         #expect(session.hubAccountID == "stable-A")

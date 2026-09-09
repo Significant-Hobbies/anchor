@@ -183,8 +183,10 @@ use, Production CloudKit promotion and the notarized Mac release remain open.
 See [the qualification receipt](docs/qualification/simple-day-2026-09-07/README.md)
 and [#51](https://github.com/Significant-Hobbies/anchor/issues/51).
 The [2026-09-09 daily-flow audit](docs/qualification/resume-2026-09-09/README.md)
-adds disk-backed failed-resume/retry proof and records remaining start/extension
-save-failure work separately from physical-device acceptance.
+adds disk-backed resume/start/extension failure and retry proof, including
+composer draft retention and schedule handoff. Current native source remains
+uninstalled; physical-device acceptance and later schedule-link save failure
+remain separate gates.
 
 ### Sync with Apple Reminders
 

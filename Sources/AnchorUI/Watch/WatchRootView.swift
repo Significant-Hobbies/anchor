@@ -187,6 +187,12 @@ struct WatchStartView: View {
                     isContinuous: false
                 )
 
+                if let error = controller.lastError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(theme.negative)
+                        .accessibilityIdentifier("anchor.focus.start-error")
+                }
                 if activeGoals.isEmpty {
                     Text("Start a session on your phone or Mac first — its goals show up here.")
                         .font(.system(size: 12))

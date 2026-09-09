@@ -313,14 +313,17 @@ public struct CompactPanel: View {
                 showsAdHocComposer = false
                 startError = nil
             } catch {
-                startError = "Focus started, but the schedule change could not be saved."
+                startError = controller.lastError ?? "Focus started, but the schedule change could not be saved."
             }
             return
         }
         // Reuse a goal with the same name rather than growing a duplicate every
         // time the menu bar is used for the same work.
         let existing = goals.first { !$0.isArchived && $0.title == trimmed }
-        controller.start(goal: existing, intent: trimmed, minutes: minutes)
+        guard controller.start(goal: existing, intent: trimmed, minutes: minutes) != nil else {
+            startError = controller.lastError
+            return
+        }
         intent = ""
         showsAdHocComposer = false
         startError = nil
@@ -335,7 +338,7 @@ public struct CompactPanel: View {
             )
             startError = nil
         } catch {
-            startError = "Focus started, but the schedule link could not be saved."
+            startError = controller.lastError ?? "Focus started, but the schedule link could not be saved."
         }
     }
 

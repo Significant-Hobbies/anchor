@@ -165,7 +165,7 @@ struct FocusControllerTests {
     @Test("Pausing from capture preserves the session and records recovery only on resume")
     func pauseCapturedInterruption() throws {
         let (controller, context) = try makeController()
-        let session = controller.start(goal: nil, intent: "Write", minutes: 25)
+        let session = try #require(controller.start(goal: nil, intent: "Write", minutes: 25))
         controller.beginManualCapture()
         controller.pauseFromCapture(note: "Doorbell", kind: .person)
         #expect(controller.isPaused)
@@ -464,7 +464,7 @@ struct FocusControllerTests {
     func notificationLifecycle() throws {
         let notifier = RecordingNotifier()
         let (controller, _) = try makeController(completionNotifier: notifier)
-        let session = controller.start(goal: nil, intent: "Paid work", minutes: 25)
+        let session = try #require(controller.start(goal: nil, intent: "Paid work", minutes: 25))
         #expect(notifier.scheduled.count == 1)
         #expect(notifier.scheduled.first?.0 == session.id)
         #expect(notifier.scheduled.first?.1 == "Paid work")
