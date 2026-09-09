@@ -31,3 +31,7 @@ This is source/local-store evidence, not a production CloudKit or installed-devi
 Existing notarization, physical unlocked-device use, signed account authentication, and production CloudKit compatibility gates remain. Do not install or publish this migration over owner data solely because package or hosted tests pass. The privacy and migration issue remains open for those gates.
 
 The older surrender/end path still performs multiple saves; this bounded migration does not establish transaction-wide rollback for an end failure after a successful capture. Capture/park and capture/pause failures have the explicit regression proof above.
+
+## Exact source and hosted attempt
+
+Build 25 source: `c9927b9b7abb7d2bec281a9c1d3d047f50a0483a`. [Hosted native review 34321290511](https://github.com/Significant-Hobbies/anchor/actions/runs/34321290511) failed before any job steps on 2026-09-09. GitHub reported: “The job was not started because recent account payments have failed or your spending limit needs to be increased.” No native UI/platform result exists for this source yet. The prior build-24 hosted pass does not qualify this migration.

@@ -1,0 +1,25 @@
+{
+  "sourceSha": "c9927b9b7abb7d2bec281a9c1d3d047f50a0483a",
+  "build": 25,
+  "packageTests": {
+    "passed": 206,
+    "failed": 0,
+    "skipped": 0,
+    "warnings": 0,
+    "log": "swift_package_test_2026-09-09T06-54-01-220Z_pid88558_fc864e0f.log"
+  },
+  "migrationTests": {
+    "passed": 11,
+    "log": "swift_package_test_2026-09-09T06-50-37-434Z_pid88558_ab8eccdd.log"
+  },
+  "fixtureSourceSha": "b75c1c2161752fc531721b69f2ef1a8655787b9a",
+  "fixtureSha256": "d52cda4a4b9c673f5d8121b5528856f6b35f022fc3ea259bb9e23ab32a5530dd",
+  "personalSyncKit": "118fc5552b08078ac06e3339c0c65a304e103e7d",
+  "hostedRun": {
+    "id": 34321290511,
+    "status": "blocked-before-steps",
+    "reason": "GitHub account payment or spending-limit block"
+  },
+  "ownerDataTouched": false,
+  "installedOrReleased": false
+}
