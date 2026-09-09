@@ -28,5 +28,21 @@
     "warnings": 0,
     "launched": false,
     "log": "build_macos_2026-09-09T06-57-04-358Z_pid88558_f0b5ce41.log"
-  }
+  },
+  "localSimulatorBuilds": [
+    {
+      "platform": "iOS",
+      "result": "passed",
+      "configuration": "DebugLocal",
+      "warnings": 0,
+      "log": "build_sim_2026-09-09T06-59-19-822Z_pid92314_2084d65a.log"
+    },
+    {
+      "platform": "watchOS",
+      "result": "passed",
+      "configuration": "DebugLocal",
+      "warnings": 0,
+      "log": "build_sim_2026-09-09T06-59-47-633Z_pid94087_3c19b3dc.log"
+    }
+  ]
 }
