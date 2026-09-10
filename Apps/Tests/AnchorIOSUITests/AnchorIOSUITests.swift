@@ -37,7 +37,7 @@ final class AnchorIOSUITests: XCTestCase {
 
     func testFocusInterruptionAndReturnJourneyPersists() {
         let app = XCUIApplication()
-        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-ui-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "~/tmp/anchor-ui-\(UUID().uuidString).store"
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
