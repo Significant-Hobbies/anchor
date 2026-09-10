@@ -112,7 +112,9 @@ import sys, plistlib
 raw = sys.stdin.buffer.read()
 start = raw.find(b"<?xml")
 entitlements = plistlib.loads(raw[start:]) if start >= 0 else {}
-sys.exit(1 if entitlements.get("get-task-allow") else 0)
+sys.exit(1 if any(entitlements.get(key) for key in (
+    "get-task-allow", "com.apple.security.get-task-allow"
+)) else 0)
 '; then
   echo "✘ get-task-allow is true — notarisation would reject this." >&2
   exit 1
@@ -128,7 +130,10 @@ start = raw.find(b"<?xml")
 e = plistlib.loads(raw[start:]) if start >= 0 else {}
 problems = []
 if not e.get("com.apple.developer.icloud-services"): problems.append("iCloud services missing")
-if not e.get("com.apple.developer.icloud-container-identifiers"): problems.append("iCloud container missing")
+if e.get("com.apple.developer.icloud-container-environment") != "Production":
+    problems.append("Production iCloud environment missing")
+if "iCloud.com.significanthobbies.anchor" not in e.get("com.apple.developer.icloud-container-identifiers", []):
+    problems.append("Anchor iCloud container missing")
 if not e.get("com.apple.security.application-groups"): problems.append("app group missing")
 for problem in problems: print("   x", problem)
 if not problems: print("   production CloudKit entitlements: ok")
