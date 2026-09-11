@@ -1,5 +1,25 @@
 # Mac build 25 qualification — 11 September 2026
 
+## September 12 correction: installed build and distribution gate
+
+The installed `/Applications/Anchor.app` now reports build **25**. A fresh
+`codesign --verify --deep --strict --verbose=2` passes, but
+`spctl --assess --type execute --verbose=2` exits 3 with
+`source=Unnotarized Developer ID`. A valid signature therefore does not yet
+qualify this build for public Mac distribution.
+
+The later September 11 isolated-store receipts recorded a passing Mac
+schedule/focus/pause/resume/distraction/history flow and saved-block persistence
+after relaunch. Those checks supersede the earlier installed-build and local-UI
+limitations below. They do not prove legacy private-note migration under a
+production CloudKit account, mixed-version device continuity, or historical
+cloud-copy removal. Issue 52 remains open. This September 12 check only inspected
+the app bundle and Gatekeeper result; it did not launch the app, open an owner
+store, change security settings, or publish a release.
+
+The remainder is the historical September 11 release attempt, retained with its
+original scope and limitations.
+
 Product source: `56d5a67b7783d66623f77d3cb3f9ebcc710365f1`. Its only change
 from hosted-tested `077f8564ee3e85631f1807c365b03e9d283c41db` is the physical
 iPhone UI test's sandbox path; production code is identical.
