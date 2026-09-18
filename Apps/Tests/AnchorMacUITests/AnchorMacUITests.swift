@@ -239,6 +239,43 @@ final class AnchorMacUITests: XCTestCase {
     }
 
     @MainActor
+    func testHabitCanBeArchivedInspectedAndRestored() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "habit-archive")
+        app.launch()
+
+        app.buttons["Habits"].click()
+        XCTAssertTrue(app.buttons["anchor.habits.add"].waitForExistence(timeout: 5))
+        app.buttons["anchor.habits.add"].click()
+        let title = app.textFields["What will you do?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        title.click()
+        title.typeText("Evening reset")
+        app.buttons["Save"].click()
+
+        let habitMenu = app.menuButtons["More actions for Evening reset"]
+        XCTAssertTrue(habitMenu.waitForExistence(timeout: 4))
+        habitMenu.click()
+        XCTAssertTrue(app.menuItems["Archive habit"].waitForExistence(timeout: 3))
+        app.menuItems["Archive habit"].click()
+
+        let archivedToggle = app.buttons["anchor.habits.archived-toggle"]
+        XCTAssertTrue(archivedToggle.waitForExistence(timeout: 4))
+        XCTAssertEqual(archivedToggle.value as? String, "expanded")
+        XCTAssertTrue(app.buttons["Inspect Evening reset"].waitForExistence(timeout: 3))
+
+        app.buttons["Inspect Evening reset"].click()
+        XCTAssertTrue(app.textFields["What will you do?"].waitForExistence(timeout: 3))
+        app.buttons["Cancel"].click()
+
+        XCTAssertTrue(app.buttons["Restore"].waitForExistence(timeout: 3))
+        app.buttons["Restore"].click()
+        XCTAssertTrue(element(containing: "Evening reset", in: app).waitForExistence(timeout: 4))
+        XCTAssertTrue(archivedToggle.waitForNonExistence(timeout: 3))
+    }
+
+    @MainActor
     func testEveryWeekdayCanHaveADifferentSchedule() throws {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
