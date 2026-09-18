@@ -399,7 +399,10 @@ enum OnboardingGate {
 public struct RootView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var context
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \PlanBlock.plannedStart) private var planBlocks: [PlanBlock]
+    @StateObject private var remindersCoordinator = RemindersSyncCoordinator()
     // The product tour changed materially with the schedule/habit overhaul.
     // A versioned key ensures existing owners see this tour once as well.
     @AppStorage("anchor.product-tour.seen.v4") private var unifiedOnboardingSeen = false
@@ -435,9 +438,24 @@ public struct RootView: View {
         .onChange(of: activeSessionSignature, initial: true) {
             controller.synchronizeActiveSessionFromStore()
         }
+        .onChange(of: planSignature) {
+            syncReminders()
+        }
         .onChange(of: scenePhase) {
             guard scenePhase == .active else { return }
             controller.synchronizeActiveSessionFromStore()
+            syncReminders()
+        }
+    }
+
+    private func syncReminders() {
+        let blocks = planBlocks
+        Task { await remindersCoordinator.sync(context: context, blocks: blocks) }
+    }
+
+    private var planSignature: [String] {
+        planBlocks.map {
+            "\($0.id.uuidString):\($0.updatedAt.timeIntervalSince1970):\($0.stateRaw):\($0.reminderExternalIdentifier ?? "-")"
         }
     }
 
@@ -463,7 +481,7 @@ public struct RootView: View {
             onSettings: { navigation.showSettings() }
         ) {
             if navigation.showsSettings {
-                SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding)
+                SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding, remindersCoordinator: remindersCoordinator)
             } else {
                 screen(for: navigation.selectedTab)
             }
@@ -485,7 +503,7 @@ public struct RootView: View {
                             }
                         }
                         .navigationDestination(isPresented: $navigation.showsSettings) {
-                            SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding)
+                            SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding, remindersCoordinator: remindersCoordinator)
                                 .navigationTitle("Settings")
                                 .toolbar(.hidden, for: .tabBar)
                         }

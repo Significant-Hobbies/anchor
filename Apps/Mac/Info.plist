@@ -27,7 +27,9 @@
 			<array>
 				<string>anchor</string>
 			</array>
-		</dict>
+			<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings.</string>
+</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
@@ -41,5 +43,7 @@
 	<false/>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings.</string>
 </dict>
 </plist>

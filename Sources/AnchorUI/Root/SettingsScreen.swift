@@ -25,13 +25,20 @@ public struct SettingsScreen: View {
     @State private var appearanceSaveError: String?
     private let storeKind: AnchorStore.StoreKind
     private let onShowOnboarding: (() -> Void)?
+    #if os(macOS) || os(iOS)
+    private let remindersCoordinator: RemindersSyncCoordinator
+    #endif
 
     public init(
         storeKind: AnchorStore.StoreKind = .persistent,
-        onShowOnboarding: (() -> Void)? = nil
+        onShowOnboarding: (() -> Void)? = nil,
+        remindersCoordinator: RemindersSyncCoordinator = RemindersSyncCoordinator()
     ) {
         self.storeKind = storeKind
         self.onShowOnboarding = onShowOnboarding
+        #if os(macOS) || os(iOS)
+        self.remindersCoordinator = remindersCoordinator
+        #endif
     }
 
     public var body: some View {
@@ -81,6 +88,7 @@ public struct SettingsScreen: View {
             hubPreferences
             privacyPreferences
             dataPreferences
+            RemindersSettings(coordinator: remindersCoordinator)
         }
         .frame(maxWidth: .infinity, alignment: .top)
     }
