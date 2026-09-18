@@ -108,6 +108,7 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         ITSAppUsesNonExemptEncryption: false
         NSHumanReadableCopyright: ""
+        NSRemindersFullAccessUsageDescription: "Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings."
         # Not an agent app: Anchor has a real window as well as the menu bar.
         LSUIElement: false
 
@@ -157,6 +158,7 @@ targets:
               - $(GOOGLE_OAUTH_URL_SCHEME)
         GoogleOAuthClientID: $(GOOGLE_OAUTH_CLIENT_ID)
         ITSAppUsesNonExemptEncryption: false
+        NSRemindersFullAccessUsageDescription: "Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings."
         NSSupportsLiveActivities: true
         UILaunchScreen:
           UIColorName: ""

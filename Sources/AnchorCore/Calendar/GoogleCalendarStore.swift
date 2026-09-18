@@ -101,16 +101,41 @@ public struct URLSessionGoogleCalendarStore: GoogleCalendarStoreProtocol {
     }
 
     public func calendars(accessToken: String) async throws -> [GoogleCalendarInfo] {
-        let url = apiBaseURL.appending(path: "users/me/calendarList")
-        let (data, _) = try await get(url, accessToken: accessToken)
-        let list = try JSONDecoder().decode(CalendarListBody.self, from: data)
-        return list.items.map {
-            GoogleCalendarInfo(
-                id: $0.id,
-                title: $0.summaryOverride ?? $0.summary,
-                isPrimary: $0.primary ?? false
-            )
+        let baseURL = apiBaseURL.appending(path: "users/me/calendarList")
+        var pageToken: String?
+        var calendars: [GoogleCalendarInfo] = []
+
+        repeat {
+            let url = try Self.url(baseURL, queryItems: [], pageToken: pageToken)
+            let (data, _) = try await get(url, accessToken: accessToken)
+            let list = try JSONDecoder().decode(CalendarListBody.self, from: data)
+            calendars += list.items.map {
+                GoogleCalendarInfo(
+                    id: $0.id,
+                    title: $0.summaryOverride ?? $0.summary,
+                    isPrimary: $0.primary ?? false
+                )
+            }
+            pageToken = list.nextPageToken
+        } while pageToken != nil
+
+        return calendars
+    }
+
+    private static func url(
+        _ baseURL: URL,
+        queryItems: [URLQueryItem],
+        pageToken: String?
+    ) throws -> URL {
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            throw GoogleCalendarError.invalidResponse
         }
+        components.queryItems = queryItems
+        if let pageToken {
+            components.queryItems?.append(URLQueryItem(name: "pageToken", value: pageToken))
+        }
+        guard let url = components.url else { throw GoogleCalendarError.invalidResponse }
+        return url
     }
 
     public func events(
@@ -119,15 +144,12 @@ public struct URLSessionGoogleCalendarStore: GoogleCalendarStoreProtocol {
         calendarID: String,
         window: DateInterval
     ) async throws -> [GoogleCalendarEvent] {
-        var components = URLComponents(
-            url: apiBaseURL
-                .appending(path: "calendars")
-                .appending(path: calendarID)
-                .appending(path: "events"),
-            resolvingAgainstBaseURL: false
-        )
+        let baseURL = apiBaseURL
+            .appending(path: "calendars")
+            .appending(path: calendarID)
+            .appending(path: "events")
         let formatter = ISO8601DateFormatter()
-        components?.queryItems = [
+        let queryItems = [
             URLQueryItem(name: "timeMin", value: formatter.string(from: window.start)),
             URLQueryItem(name: "timeMax", value: formatter.string(from: window.end)),
             URLQueryItem(name: "singleEvents", value: "true"),
@@ -137,24 +159,32 @@ public struct URLSessionGoogleCalendarStore: GoogleCalendarStoreProtocol {
             URLQueryItem(name: "showDeleted", value: "true"),
             URLQueryItem(name: "maxResults", value: "250"),
         ]
-        guard let url = components?.url else { throw GoogleCalendarError.invalidResponse }
-        let (data, _) = try await get(url, accessToken: accessToken)
-        let list = try JSONDecoder().decode(EventListBody.self, from: data)
-        return list.items.compactMap { item in
-            let cancelled = item.status == "cancelled"
-            let timed = Self.parseInterval(item)
-            if !cancelled && timed == nil { return nil }
-            return GoogleCalendarEvent(
-                accountID: accountID,
-                calendarID: calendarID,
-                eventID: item.id,
-                title: item.summary ?? "",
-                start: timed?.start ?? window.start,
-                end: timed?.end ?? window.start,
-                isAllDay: timed == nil,
-                isCancelled: cancelled
-            )
-        }
+        var pageToken: String?
+        var events: [GoogleCalendarEvent] = []
+
+        repeat {
+            let url = try Self.url(baseURL, queryItems: queryItems, pageToken: pageToken)
+            let (data, _) = try await get(url, accessToken: accessToken)
+            let list = try JSONDecoder().decode(EventListBody.self, from: data)
+            events += list.items.compactMap { item in
+                let cancelled = item.status == "cancelled"
+                let timed = Self.parseInterval(item)
+                if !cancelled && timed == nil { return nil }
+                return GoogleCalendarEvent(
+                    accountID: accountID,
+                    calendarID: calendarID,
+                    eventID: item.id,
+                    title: item.summary ?? "",
+                    start: timed?.start ?? window.start,
+                    end: timed?.end ?? window.start,
+                    isAllDay: timed == nil,
+                    isCancelled: cancelled
+                )
+            }
+            pageToken = list.nextPageToken
+        } while pageToken != nil
+
+        return events
     }
 
     /// Returns the event's real interval for timed events, `nil` for all-day
@@ -203,10 +233,12 @@ public struct URLSessionGoogleCalendarStore: GoogleCalendarStoreProtocol {
             let primary: Bool?
         }
         let items: [Entry]
+        let nextPageToken: String?
     }
 
     private struct EventListBody: Decodable {
         let items: [EventItem]
+        let nextPageToken: String?
     }
 
     struct EventItem: Decodable {

@@ -268,6 +268,50 @@ struct CalendarSyncTests {
         }
     }
 
+    @Test("Calendar list pagination keeps calendars from later pages")
+    func calendarListPagination() async throws {
+        let http = StubGoogleHTTP()
+        http.responsesByPageToken[""] = #"{"items":[{"id":"primary","summary":"Personal","primary":true}],"nextPageToken":"calendar-page-2"}"#
+        http.responsesByPageToken["calendar-page-2"] = #"{"items":[{"id":"team","summary":"Team","primary":false}]}"#
+
+        let store = URLSessionGoogleCalendarStore(
+            http: http,
+            apiBaseURL: URL(string: "https://calendar.test/calendar/v3")!,
+            userInfoURL: URL(string: "https://calendar.test/userinfo")!
+        )
+        let calendars = try await store.calendars(accessToken: "token")
+
+        #expect(calendars.map(\.id) == ["primary", "team"])
+        #expect(http.requests.count == 2)
+        #expect(http.pageToken(for: http.requests[1]) == "calendar-page-2")
+    }
+
+    @Test("Event pagination keeps timed events from later pages")
+    func eventPagination() async throws {
+        let http = StubGoogleHTTP()
+        http.responsesByPageToken[""] = #"{"items":[{"id":"event-1","status":"confirmed","summary":"First","start":{"dateTime":"2026-01-01T10:00:00Z"},"end":{"dateTime":"2026-01-01T11:00:00Z"}}],"nextPageToken":"event-page-2"}"#
+        http.responsesByPageToken["event-page-2"] = #"{"items":[{"id":"event-2","status":"confirmed","summary":"Second","start":{"dateTime":"2026-01-02T10:00:00Z"},"end":{"dateTime":"2026-01-02T11:00:00Z"}}]}"#
+
+        let store = URLSessionGoogleCalendarStore(
+            http: http,
+            apiBaseURL: URL(string: "https://calendar.test/calendar/v3")!,
+            userInfoURL: URL(string: "https://calendar.test/userinfo")!
+        )
+        let events = try await store.events(
+            accessToken: "token",
+            accountID: "account",
+            calendarID: "primary",
+            window: DateInterval(
+                start: Date(timeIntervalSince1970: 1_767_225_600),
+                duration: 86_400 * 3
+            )
+        )
+
+        #expect(events.map(\.eventID) == ["event-1", "event-2"])
+        #expect(http.requests.count == 2)
+        #expect(http.pageToken(for: http.requests[1]) == "event-page-2")
+    }
+
     @Test("ID token identity decodes sub, email, and name")
     func idTokenIdentity() {
         // {"sub":"108","email":"me@example.com","name":"Me"} base64url
@@ -318,15 +362,27 @@ private final class StubGoogleHTTP: GoogleHTTPClient, @unchecked Sendable {
     var statusCode = 200
     var body = "{}"
     var lastRequest: URLRequest?
+    var requests: [URLRequest] = []
+    var responsesByPageToken: [String: String] = [:]
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         lastRequest = request
+        requests.append(request)
+        let pageToken = pageToken(for: request) ?? ""
+        let responseBody = responsesByPageToken[pageToken] ?? body
         let response = HTTPURLResponse(
             url: request.url!,
             statusCode: statusCode,
             httpVersion: nil,
             headerFields: nil
         )!
-        return (Data(body.utf8), response)
+        return (Data(responseBody.utf8), response)
+    }
+
+    func pageToken(for request: URLRequest) -> String? {
+        URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first { $0.name == "pageToken" }?
+            .value
     }
 }
