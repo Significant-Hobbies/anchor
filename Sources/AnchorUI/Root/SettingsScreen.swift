@@ -27,17 +27,20 @@ public struct SettingsScreen: View {
     private let onShowOnboarding: (() -> Void)?
     #if os(macOS) || os(iOS)
     private let remindersCoordinator: RemindersSyncCoordinator
+    private let calendarCoordinator: CalendarSyncCoordinator
     #endif
 
     public init(
         storeKind: AnchorStore.StoreKind = .persistent,
         onShowOnboarding: (() -> Void)? = nil,
-        remindersCoordinator: RemindersSyncCoordinator = RemindersSyncCoordinator()
+        remindersCoordinator: RemindersSyncCoordinator = RemindersSyncCoordinator(),
+        calendarCoordinator: CalendarSyncCoordinator = CalendarSyncCoordinator()
     ) {
         self.storeKind = storeKind
         self.onShowOnboarding = onShowOnboarding
         #if os(macOS) || os(iOS)
         self.remindersCoordinator = remindersCoordinator
+        self.calendarCoordinator = calendarCoordinator
         #endif
     }
 
@@ -89,6 +92,7 @@ public struct SettingsScreen: View {
             privacyPreferences
             dataPreferences
             RemindersSettings(coordinator: remindersCoordinator)
+            CalendarSettings(coordinator: calendarCoordinator)
         }
         .frame(maxWidth: .infinity, alignment: .top)
     }

@@ -357,6 +357,9 @@ public final class PlanBlock {
     /// `nil` means the block has never been exported.
     public var reminderExternalIdentifier: String?
     public var reminderLastSyncedAt: Date?
+    /// Google Calendar import linkage (`GoogleCalendarEvent.linkKey`). `nil`
+    /// means the block was authored locally, not imported.
+    public var externalEventKey: String?
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
 

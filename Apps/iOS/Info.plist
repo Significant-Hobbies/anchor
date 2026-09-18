@@ -26,13 +26,14 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>anchor</string>
+				<string>$(GOOGLE_OAUTH_URL_SCHEME)</string>
 			</array>
-			<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings.</string>
-</dict>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>GoogleOAuthClientID</key>
+	<string>$(GOOGLE_OAUTH_CLIENT_ID)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSSupportsLiveActivities</key>
@@ -41,9 +42,7 @@
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<true/>
-		<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings.</string>
-</dict>
+	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
@@ -52,9 +51,7 @@
 	<dict>
 		<key>UIColorName</key>
 		<string></string>
-		<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings.</string>
-</dict>
+	</dict>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -68,7 +65,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>Anchor shows your planned blocks in Apple Reminders and marks them complete when you finish them in either place. Nothing is sent to Reminders until you turn sync on in Settings.</string>
 </dict>
 </plist>

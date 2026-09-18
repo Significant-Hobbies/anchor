@@ -132,6 +132,9 @@ public enum CloudKitSchemaSeed {
         block.behaviorPattern = .socialFeeds
         block.lifeDirection = .focus
         block.state = .completed
+        block.reminderExternalIdentifier = "schema-seed-reminder"
+        block.reminderLastSyncedAt = timestamp
+        block.externalEventKey = "schema-seed\u{1F}calendar\u{1F}event"
 
         let divergence = try firstOrInsert(DivergenceEvent.self, into: context) {
             DivergenceEvent(
