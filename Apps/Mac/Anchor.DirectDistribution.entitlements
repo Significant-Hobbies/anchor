@@ -30,5 +30,7 @@
 	<array>
 		<string>group.com.significanthobbies.anchor</string>
 	</array>
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 </dict>
 </plist>

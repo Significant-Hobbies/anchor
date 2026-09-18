@@ -353,6 +353,10 @@ public final class PlanBlock {
     public var flexibilityRaw: String = ScheduleFlexibility.flexible.rawValue
     public var behaviorPatternRaw: String?
     public var lifeDirectionRaw: String?
+    /// Apple Reminders linkage. Optional so the schema stays CloudKit-safe;
+    /// `nil` means the block has never been exported.
+    public var reminderExternalIdentifier: String?
+    public var reminderLastSyncedAt: Date?
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
 

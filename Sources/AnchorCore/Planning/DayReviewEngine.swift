@@ -7,6 +7,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public var templateOccurrenceDay: Date?
     public var sessionID: UUID?
     public var title: String
+    public var details: String = ""
     public var plannedStart: Date
     public var plannedSeconds: Int
     public var actualStartedAt: Date?
@@ -16,6 +17,8 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public var flexibility: ScheduleFlexibility
     public var behaviorPattern: BehaviorPattern?
     public var lifeDirection: LifeDirection?
+    public var reminderExternalIdentifier: String?
+    public var reminderLastSyncedAt: Date?
 
     public init(
         id: UUID,
@@ -23,6 +26,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
         templateOccurrenceDay: Date? = nil,
         sessionID: UUID? = nil,
         title: String,
+        details: String = "",
         plannedStart: Date,
         plannedSeconds: Int,
         actualStartedAt: Date? = nil,
@@ -31,13 +35,16 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
         kind: PlanBlockKind = .focus,
         flexibility: ScheduleFlexibility = .flexible,
         behaviorPattern: BehaviorPattern? = nil,
-        lifeDirection: LifeDirection? = nil
+        lifeDirection: LifeDirection? = nil,
+        reminderExternalIdentifier: String? = nil,
+        reminderLastSyncedAt: Date? = nil
     ) {
         self.id = id
         self.templateID = templateID
         self.templateOccurrenceDay = templateOccurrenceDay
         self.sessionID = sessionID
         self.title = title
+        self.details = details
         self.plannedStart = plannedStart
         self.plannedSeconds = plannedSeconds
         self.actualStartedAt = actualStartedAt
@@ -47,6 +54,8 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
         self.flexibility = flexibility
         self.behaviorPattern = behaviorPattern
         self.lifeDirection = lifeDirection
+        self.reminderExternalIdentifier = reminderExternalIdentifier
+        self.reminderLastSyncedAt = reminderLastSyncedAt
     }
 }
 
@@ -105,6 +114,7 @@ public extension PlanBlock {
             templateOccurrenceDay: templateOccurrenceDay,
             sessionID: sessionID,
             title: title,
+            details: details,
             plannedStart: plannedStart,
             plannedSeconds: plannedSeconds,
             actualStartedAt: actualStartedAt,
@@ -113,7 +123,9 @@ public extension PlanBlock {
             kind: kind,
             flexibility: flexibility,
             behaviorPattern: behaviorPattern,
-            lifeDirection: lifeDirection
+            lifeDirection: lifeDirection,
+            reminderExternalIdentifier: reminderExternalIdentifier,
+            reminderLastSyncedAt: reminderLastSyncedAt
         )
     }
 }
