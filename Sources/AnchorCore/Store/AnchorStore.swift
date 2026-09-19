@@ -67,6 +67,10 @@ public enum AnchorStore {
     /// Keep configuration construction inspectable so tests can prove that the
     /// production path targets Anchor's exact container instead of relying on
     /// entitlement-order discovery.
+    ///
+    /// The local store is always `.none`: CloudKit continuity runs through the
+    /// shared `CloudKitMirrorTransport` on `cloudKitIdentifier`, not Core Data
+    /// autosync, so the same canonical records reach Apple storage and the Hub.
     public static func configuration(
         kind: StoreKind,
         url: URL? = nil
@@ -74,17 +78,11 @@ public enum AnchorStore {
         switch kind {
         case .inMemory:
             ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        case .localOnly:
+        case .localOnly, .persistent:
             ModelConfiguration(
                 schema: schema,
                 url: url ?? storeURL(),
                 cloudKitDatabase: .none
-            )
-        case .persistent:
-            ModelConfiguration(
-                schema: schema,
-                url: url ?? storeURL(),
-                cloudKitDatabase: .private(cloudKitIdentifier)
             )
         }
     }
