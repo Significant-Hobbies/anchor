@@ -17,8 +17,10 @@ let package = Package(
         .executable(name: "anchor-mcp", targets: ["anchor-mcp"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/Significant-Hobbies/significanthobbies.git",
-                 revision: "07215ed888533931918ca9f095f2638126e2323a"),
+        .package(
+            url: "https://github.com/Significant-Hobbies/significanthobbies.git",
+            revision: "ebfc2387acf643bbb63e07c7a8e41fbc586cdca2"
+        ),
     ],
     targets: [
         .target(

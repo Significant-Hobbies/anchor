@@ -418,6 +418,19 @@ struct LegacySessionSummaryPayload: Codable {
 
 // MARK: - Snapshot + apply
 
+enum AnchorMirrorSyncError: Error, Equatable {
+    /// The user context holds unsaved edits or a local save landed after the
+    /// snapshot was staged — defer the pass rather than save or discard user
+    /// work. Both are retryable: the next pass snapshots fresh.
+    case pendingLocalEdits
+    /// A pull was handed to apply without a pinned verified account.
+    case unverifiedAccount
+    /// A record failed Hub validation: malformed payload, name/payload UUID
+    /// mismatch, forged foreign owner, foreign or orphan distraction parent,
+    /// or an attempted claim of an unowned local session.
+    case invalidRecord
+}
+
 @MainActor
 enum AnchorMirror {
     private static let encoder: JSONEncoder = {
@@ -443,18 +456,64 @@ enum AnchorMirror {
     /// Records arrive with `modifiedAt = now`; the runtime stamps each one with
     /// its first-seen write time, so unchanged entities keep their original
     /// emission time across restarts.
+    ///
+    /// `hubAccountID: nil` is the generic full-fidelity projection, retained
+    /// for a future explicitly-approved migration; production Hub passes must
+    /// never use it. With a verified account, the projection narrows to
+    /// finished sessions that account owns plus distraction metadata whose
+    /// parent is in that set — foreign, unowned, orphan, active and all other
+    /// model kinds stay native/iCloud-only, and omission never emits a
+    /// tombstone because a broad name ledger cannot prove an owned deletion.
     static func records(
         in context: ModelContext,
         tombstonesFor knownNames: Set<String>,
+        hubAccountID: String? = nil,
+        sessionWireName: (UUID) -> String? = { AnchorMirrorNaming.Kind.focusSession.name(for: $0) },
         now: Date = .now
     ) throws -> [MirrorRecord] {
+        if let account = hubAccountID {
+            var records: [MirrorRecord] = []
+            var eligibleSessionIDs = Set<UUID>()
+            for session in try context.fetch(FetchDescriptor<FocusSession>())
+            where session.hubAccountID == account && !session.isActive {
+                // Reuse the original wire alias so later edits and linked
+                // metadata remain syncable without creating a second record.
+                guard let name = sessionWireName(session.id) else { continue }
+                eligibleSessionIDs.insert(session.id)
+                // Hub ownership is local provenance established by the
+                // verified account, not user data to echo back to the server.
+                // Omitting it from the wire payload keeps a pulled record's
+                // fingerprint stable after the local owner is stamped on it.
+                var payload = FocusSessionPayload(session)
+                payload.hubAccountID = nil
+                records.append(MirrorRecord(
+                    name: name,
+                    modifiedAt: now,
+                    payload: try encoder.encode(payload),
+                    appendOnly: true
+                ))
+            }
+            for distraction in try context.fetch(FetchDescriptor<Distraction>()) {
+                guard let parent = distraction.session,
+                      eligibleSessionIDs.contains(parent.id) else { continue }
+                records.append(MirrorRecord(
+                    name: AnchorMirrorNaming.Kind.distraction.name(for: distraction.id),
+                    modifiedAt: now,
+                    payload: try encoder.encode(DistractionPayload(distraction))
+                ))
+            }
+            return records
+        }
+
         var live = Set<String>()
         var records: [MirrorRecord] = []
         func emit<Payload: Encodable>(
-            _ payload: Payload, name: String
+            _ payload: Payload, name: String, appendOnly: Bool = false
         ) throws {
             live.insert(name)
-            records.append(try record(name, payload, now: now))
+            var emitted = try record(name, payload, now: now)
+            emitted.appendOnly = appendOnly
+            records.append(emitted)
         }
 
         for goal in try context.fetch(FetchDescriptor<Goal>()) {
@@ -467,7 +526,11 @@ enum AnchorMirror {
             try emit(SavedTagPayload(tag), name: AnchorMirrorNaming.Kind.savedTag.name(for: tag.id))
         }
         for session in try context.fetch(FetchDescriptor<FocusSession>()) {
-            try emit(FocusSessionPayload(session), name: AnchorMirrorNaming.Kind.focusSession.name(for: session.id))
+            try emit(
+                FocusSessionPayload(session),
+                name: AnchorMirrorNaming.Kind.focusSession.name(for: session.id),
+                appendOnly: true
+            )
         }
         for distraction in try context.fetch(FetchDescriptor<Distraction>()) {
             try emit(DistractionPayload(distraction), name: AnchorMirrorNaming.Kind.distraction.name(for: distraction.id))
@@ -506,45 +569,71 @@ enum AnchorMirror {
     /// Apply pulled winners into the local store. Scalar state lands first;
     /// session/distraction relationships resolve in a second pass so ordering
     /// inside the batch never matters. Returns whether the store changed.
-    static func apply(_ records: [MirrorRecord], in context: ModelContext) throws -> Bool {
+    ///
+    /// With a `trustedAccountID` (the verified Hub account, never the payload)
+    /// the entire batch is decoded and validated before anything mutates: name
+    /// and payload UUIDs must agree, a supplied `hubAccountID` may not belong
+    /// to another account, a nil-owned local session cannot be claimed by a
+    /// download, and distraction parents must resolve to an account-owned
+    /// session. `account: nil` keeps the generic full-fidelity path for the
+    /// future explicit migration — production Hub pulls must not use it.
+    ///
+    /// `save` is injectable so callers can prove a failed commit cannot leave
+    /// an unsaved mutation that a retry mistakes for durable application.
+    static func apply(
+        _ records: [MirrorRecord],
+        in context: ModelContext,
+        account trustedAccountID: String? = nil,
+        save: (ModelContext) throws -> Void = { try $0.save() }
+    ) throws -> Bool {
         var index = try Index(context: context)
         var deletedDistractionIDs: [UUID] = []
         var changed = false
 
-        for record in records {
-            guard let kind = AnchorMirrorNaming.kind(of: record.name) else { continue }
-            if let payload = record.payload {
-                changed = try upsert(kind: kind, name: record.name, payload: payload, index: &index, context: context) || changed
-            } else {
-                changed = try tombstone(
-                    kind: kind, name: record.name, index: &index,
-                    context: context, deletedDistractions: &deletedDistractionIDs
-                ) || changed
+        if let trustedAccountID {
+            let batch = try prepareHubBatch(records, index: index, account: trustedAccountID)
+            changed = try applyHubBatch(
+                batch, index: &index, context: context,
+                deletedDistractions: &deletedDistractionIDs, account: trustedAccountID
+            )
+        } else {
+            for record in records {
+                guard let kind = AnchorMirrorNaming.kind(of: record.name) else { continue }
+                if let payload = record.payload {
+                    changed = try upsert(kind: kind, name: record.name, payload: payload, index: &index, context: context) || changed
+                } else {
+                    changed = try tombstone(
+                        kind: kind, name: record.name, index: &index,
+                        context: context, deletedDistractions: &deletedDistractionIDs
+                    ) || changed
+                }
             }
         }
 
-        // Relationships resolve last: a pulled session can precede its goal in
-        // the same batch, and a pulled distraction can precede its session.
-        for record in records where record.payload != nil {
-            switch AnchorMirrorNaming.kind(of: record.name) {
-            case .focusSession:
-                let session = try sessionFromPayload(record.payload!, name: record.name, index: &index, context: context).session
-                guard let payload = try? decode(FocusSessionPayload.self, from: record.payload!) else { continue }
-                session.goal = payload.goalID.flatMap(UUID.init(uuidString:)).flatMap { index.goals[$0.uuidString] }
-                session.project = payload.projectID.flatMap(UUID.init(uuidString:)).flatMap { index.projects[$0.uuidString] }
-            case .distraction:
-                guard let payload = try? decode(DistractionPayload.self, from: record.payload!),
-                      let id = UUID(uuidString: payload.id),
-                      let distraction = index.distractions[id.uuidString]
-                else { continue }
-                distraction.session = payload.sessionID.flatMap(UUID.init(uuidString:)).flatMap { index.sessions[$0.uuidString] }
-            default:
-                continue
+        if trustedAccountID == nil {
+            // Relationships resolve last: a pulled session can precede its goal
+            // in the same batch, and a pulled distraction can precede its session.
+            for record in records where record.payload != nil {
+                switch AnchorMirrorNaming.kind(of: record.name) {
+                case .focusSession:
+                    let session = try sessionFromPayload(record.payload!, name: record.name, index: &index, context: context).session
+                    guard let payload = try? decode(FocusSessionPayload.self, from: record.payload!) else { continue }
+                    session.goal = payload.goalID.flatMap(UUID.init(uuidString:)).flatMap { index.goals[$0.uuidString] }
+                    session.project = payload.projectID.flatMap(UUID.init(uuidString:)).flatMap { index.projects[$0.uuidString] }
+                case .distraction:
+                    guard let payload = try? decode(DistractionPayload.self, from: record.payload!),
+                          let id = UUID(uuidString: payload.id),
+                          let distraction = index.distractions[id.uuidString]
+                    else { continue }
+                    distraction.session = payload.sessionID.flatMap(UUID.init(uuidString:)).flatMap { index.sessions[$0.uuidString] }
+                default:
+                    continue
+                }
             }
         }
 
         guard changed else { return false }
-        try context.save()
+        try save(context)
         // Notes vault entries for tombstoned distractions (including ones lost
         // to a session cascade) are local files — remove them with the row.
         for id in deletedDistractionIDs {
@@ -778,6 +867,230 @@ enum AnchorMirror {
             return (session, true)
         }
         throw CocoaError(.coderReadCorrupt)
+    }
+
+    // MARK: Hub batch validation
+
+    /// One decoded, ownership-checked change. The Hub projection covers only
+    /// sessions and distraction metadata; every other record kind is
+    /// deliberately outside it and is skipped, never mutated or deleted.
+    private enum HubChange {
+        case session(id: UUID, canonical: FocusSessionPayload?, legacy: LegacySessionSummaryPayload?)
+        case distraction(id: UUID, payload: DistractionPayload)
+        case distractionTombstone(id: UUID)
+    }
+
+    /// Decodes and validates the whole batch before any mutation. Owners come
+    /// from the verified account, not the payload; a parent may arrive later
+    /// in the same batch, so distraction links check after all sessions decode.
+    private static func prepareHubBatch(
+        _ records: [MirrorRecord],
+        index: Index,
+        account: String
+    ) throws -> [HubChange] {
+        var changes: [HubChange] = []
+        var batchSessions = Set<UUID>()
+
+        for record in records {
+            guard let payload = record.payload else {
+                // Sessions are append-only history: Hub tombstones for them are
+                // never applied. Distraction tombstones delete only when the
+                // local row's parent is already owned by this account.
+                if AnchorMirrorNaming.kind(of: record.name) == .distraction,
+                   let id = AnchorMirrorNaming.entityID(of: record.name, kind: .distraction) {
+                    changes.append(.distractionTombstone(id: id))
+                }
+                continue
+            }
+
+            if let kind = AnchorMirrorNaming.kind(of: record.name) {
+                switch kind {
+                case .focusSession:
+                    let change = try prepareSession(
+                        payload: payload, expectedID: AnchorMirrorNaming.entityID(of: record.name, kind: kind),
+                        fallbackName: String(record.name.dropFirst(kind.prefix.count)),
+                        index: index, account: account
+                    )
+                    if case let .session(id, _, _) = change { batchSessions.insert(id) }
+                    changes.append(change)
+                case .distraction:
+                    let value = try decode(DistractionPayload.self, from: payload)
+                    guard value.recordType == "distraction",
+                          let id = UUID(uuidString: value.id),
+                          AnchorMirrorNaming.entityID(of: record.name, kind: kind) == id
+                    else { throw AnchorMirrorSyncError.invalidRecord }
+                    changes.append(.distraction(id: id, payload: value))
+                default:
+                    // The other eleven model kinds have no per-record Hub
+                    // ownership contract yet: outside this projection, never
+                    // mutated and never tombstoned.
+                    continue
+                }
+            } else if let id = UUID(uuidString: record.name) {
+                // Pre-mirror Hub records used the session's bare UUID as the
+                // record id. It maps to the same local session as the
+                // canonical `session-<uuid>` name, so replays deduplicate.
+                let change = try prepareSession(
+                    payload: payload, expectedID: id,
+                    fallbackName: nil, index: index, account: account
+                )
+                if case let .session(sessionID, _, _) = change { batchSessions.insert(sessionID) }
+                changes.append(change)
+            }
+            // Any other name is foreign to Anchor and ignored.
+        }
+
+        // Distraction parents resolve against local account-owned sessions or
+        // eligible sessions arriving in this same batch; foreign and orphan
+        // parents are refused.
+        for change in changes {
+            guard case let .distraction(id, value) = change else { continue }
+            if let existing = index.distractions[id.uuidString], existing.session?.hubAccountID != account {
+                throw AnchorMirrorSyncError.invalidRecord
+            }
+            guard let reference = value.sessionID, let parentID = UUID(uuidString: reference),
+                  batchSessions.contains(parentID)
+                    || index.sessions[parentID.uuidString]?.hubAccountID == account
+            else { throw AnchorMirrorSyncError.invalidRecord }
+        }
+        return changes
+    }
+
+    private static func prepareSession(
+        payload: Data,
+        expectedID: UUID?,
+        fallbackName: String?,
+        index: Index,
+        account: String
+    ) throws -> HubChange {
+        struct TypeProbe: Decodable { var recordType: String? }
+        let probe = try? decode(TypeProbe.self, from: payload)
+        if let recordType = probe?.recordType {
+            // A canonical-typed payload that fails full decoding is malformed,
+            // never a legacy summary — it must not silently fall back.
+            guard recordType == "focusSession" else { throw AnchorMirrorSyncError.invalidRecord }
+            var value = try decode(FocusSessionPayload.self, from: payload)
+            guard let id = UUID(uuidString: value.id), id == expectedID else {
+                throw AnchorMirrorSyncError.invalidRecord
+            }
+            // A supplied owner is untrusted: foreign is forged, nil is stamped
+            // with the verified account.
+            if let owner = value.hubAccountID, owner != account {
+                throw AnchorMirrorSyncError.invalidRecord
+            }
+            if let existing = index.sessions[id.uuidString] {
+                if let owner = existing.hubAccountID {
+                    guard owner == account else { throw AnchorMirrorSyncError.invalidRecord }
+                } else {
+                    // Claiming an unowned local session from a download needs
+                    // the explicit history-approval path, not silent adoption.
+                    throw AnchorMirrorSyncError.invalidRecord
+                }
+            }
+            value.hubAccountID = value.hubAccountID ?? account
+            return .session(id: id, canonical: value, legacy: nil)
+        }
+        // No record type: only the exact legacy Hub summary shape is eligible.
+        let summary = try decode(LegacySessionSummaryPayload.self, from: payload)
+        let id = expectedID ?? AnchorPlatformRecord.stableUUID(fallbackName ?? "")
+        if let existing = index.sessions[id.uuidString], existing.hubAccountID != account {
+            throw AnchorMirrorSyncError.invalidRecord
+        }
+        return .session(id: id, canonical: nil, legacy: summary)
+    }
+
+    private static func applyHubBatch(
+        _ batch: [HubChange],
+        index: inout Index,
+        context: ModelContext,
+        deletedDistractions: inout [UUID],
+        account: String
+    ) throws -> Bool {
+        var changed = false
+        for change in batch {
+            switch change {
+            case let .session(id, canonical, legacy):
+                if let summary = legacy, index.sessions[id.uuidString] == nil {
+                    let session = FocusSession(
+                        id: id, goal: nil, intent: summary.title,
+                        plannedSeconds: summary.durationSeconds, startedAt: summary.startedAt
+                    )
+                    session.endedAt = summary.endedAt
+                    session.bankedSeconds = Double(summary.durationSeconds)
+                    session.runningSince = nil
+                    session.state = .finished
+                    session.endReason = SessionEndReason(rawValue: summary.outcome ?? "completed") ?? .completed
+                    session.hubAccountID = account
+                    context.insert(session)
+                    index.sessions[id.uuidString] = session
+                    changed = true
+                }
+                guard let value = canonical else { continue }
+                if let existing = index.sessions[id.uuidString] {
+                    guard FocusSessionPayload(existing) != value else { continue }
+                    assign(value, to: existing)
+                    changed = true
+                } else {
+                    let session = FocusSession(id: id, goal: nil, plannedSeconds: value.plannedSeconds)
+                    assign(value, to: session)
+                    context.insert(session)
+                    index.sessions[id.uuidString] = session
+                    changed = true
+                }
+            case let .distraction(id, value):
+                if let existing = index.distractions[id.uuidString] {
+                    // A distraction already attached to a foreign-owned session
+                    // is not this account's record to rewrite.
+                    if let owner = existing.session?.hubAccountID, owner != account {
+                        throw AnchorMirrorSyncError.invalidRecord
+                    }
+                    guard DistractionPayload(existing) != value else { continue }
+                    assign(value, to: existing)
+                    changed = true
+                } else {
+                    let distraction = Distraction(id: id, note: "")
+                    assign(value, to: distraction)
+                    context.insert(distraction)
+                    index.distractions[id.uuidString] = distraction
+                    changed = true
+                }
+            case let .distractionTombstone(id):
+                guard let entity = index.distractions[id.uuidString],
+                      entity.session?.hubAccountID == account else { continue }
+                index.distractions.removeValue(forKey: id.uuidString)
+                deletedDistractions.append(entity.id)
+                context.delete(entity)
+                changed = true
+            }
+        }
+
+        // Relationships resolve last, so parents arriving later in the batch
+        // still link. Goals and projects are not Hub-synced: references only
+        // resolve against entities that already exist locally, and an
+        // unresolvable remote reference never clears a local relationship.
+        for change in batch {
+            switch change {
+            case let .session(id, canonical, _):
+                guard let value = canonical,
+                      let session = index.sessions[id.uuidString] else { continue }
+                if let reference = value.goalID.flatMap(UUID.init(uuidString:)),
+                   let goal = index.goals[reference.uuidString] {
+                    session.goal = goal
+                }
+                if let reference = value.projectID.flatMap(UUID.init(uuidString:)),
+                   let project = index.projects[reference.uuidString] {
+                    session.project = project
+                }
+            case let .distraction(id, value):
+                guard let distraction = index.distractions[id.uuidString] else { continue }
+                distraction.session = value.sessionID
+                    .flatMap(UUID.init(uuidString:))
+                    .flatMap { index.sessions[$0.uuidString] }
+            case .distractionTombstone:
+                continue
+            }
+        }
+        return changed
     }
 
     // MARK: Field assignment

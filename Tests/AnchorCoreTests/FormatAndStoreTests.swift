@@ -77,13 +77,18 @@ struct FormatTests {
         #expect(AnchorStore.cloudKitIdentifier == "iCloud.com.significanthobbies.anchor")
     }
 
-    @Test("Persistent storage stays local while the mirror transport owns CloudKit")
+    @Test("Persistent storage retains its private CloudKit database until the approved migration")
     func persistentConfiguration() {
-        // The explicit CloudKitMirrorTransport syncs through the app's
-        // container; SwiftData itself never autosyncs, so every store
-        // configuration leaves cloudKitDatabase unset.
-        let configuration = AnchorStore.configuration(kind: .persistent)
-        #expect(configuration.cloudKitContainerIdentifier == nil)
+        // Until the shared mirror transport is the approved CloudKit path, the
+        // persistent store must keep syncing through the app's native private
+        // database on every platform. Only explicitly local or in-memory
+        // stores opt out.
+        #expect(
+            AnchorStore.configuration(kind: .persistent).cloudKitContainerIdentifier
+                == AnchorStore.cloudKitIdentifier
+        )
+        #expect(AnchorStore.configuration(kind: .localOnly).cloudKitContainerIdentifier == nil)
+        #expect(AnchorStore.configuration(kind: .inMemory).cloudKitContainerIdentifier == nil)
         #expect(AnchorStore.StoreKind.persistent.storageDescription == "On this device, with iCloud continuity")
         #expect(AnchorStore.StoreKind.localOnly.storageDescription == "Stored only on this device")
     }

@@ -132,13 +132,31 @@ struct AnchorAccountSyncTests {
         #expect(imported.hubAccountID == "stable-B")
         let reopened = fixture.makeSync()
         await reopened.restoreAndSynchronize()
-        let pushed = Set(await fixture.server.pushes.flatMap(\.mutations).map(\.id))
-        // The mirror syncs every entity under its canonical name — both
-        // sessions and their distraction metadata travel under A's account.
+        let mutations = await fixture.server.pushes.flatMap(\.mutations)
+        let pushed = Set(mutations.map(\.id))
+        // A's Hub may only ever receive A-owned history. The session already
+        // owned by stable-B must stay off A's account — and so must the
+        // distraction metadata bound to it, whose payload carries its owner's
+        // sessionID. A's own session and distraction still upload.
         #expect(pushed.contains("session-\(local.id.uuidString.lowercased())"))
-        #expect(pushed.contains("session-\(imported.id.uuidString.lowercased())"))
+        for distraction in try #require(local.distractions, "fixture session has a distraction") {
+            #expect(pushed.contains("distraction-\(distraction.id.uuidString.lowercased())"))
+        }
+        #expect(!pushed.contains("session-\(imported.id.uuidString.lowercased())"))
+        for distraction in try #require(imported.distractions, "fixture session has a distraction") {
+            #expect(!pushed.contains("distraction-\(distraction.id.uuidString.lowercased())"))
+        }
+        let leaksImportedSession = mutations.contains { mutation in
+            guard case let .object(fields) = mutation.record,
+                  case let .string(sessionID) = fields["sessionID"] else { return false }
+            return sessionID == imported.id.uuidString
+        }
+        #expect(!leaksImportedSession)
         #expect(pushed.allSatisfy { $0.hasPrefix("session-") || $0.hasPrefix("distraction-") })
         #expect(try HubHistoryOwnershipStore(directory: fixture.directory).owner() == "stable-A")
+        // The reopened sync must leave both provenances exactly as they were.
+        #expect(local.hubAccountID == "stable-A")
+        #expect(imported.hubAccountID == "stable-B")
         await fixture.sync.disconnect()
         await fixture.signIn("B")
         #expect(!(await fixture.sync.approveHubHistory()))
@@ -228,6 +246,7 @@ struct AnchorAccountSyncTests {
         #expect(await fixture.server.pulls.last?.cursor == 11)
         // Editing A's local summary uses A's server version, not B's version.
         local.intent = "Synthetic amended summary"
+        try fixture.context.save()
         await fixture.sync.synchronize()
         let amended = await fixture.server.pushes.last?.mutations.first {
             $0.id == "session-\(local.id.uuidString.lowercased())"
@@ -482,6 +501,269 @@ struct AnchorAccountSyncTests {
         #expect(sessions.first?.state == .finished)
         #expect(sessions.first?.focusedSeconds() == 3_600)
     }
+
+    @Test("A legacy Hub summary filed under a bare UUID still imports exactly once")
+    func remoteBareUUIDLegacySummaryImports() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        // Pre-mirror uploads used the session's own UUID as the Hub record id —
+        // no kind prefix — with the summary fields AnchorPlatformRecord wrote.
+        let legacyID = UUID()
+        try await fixture.server.enqueueRemote("""
+        {"cursor":2,"changeId":"legacy-bare","domain":"anchor","id":"\(legacyID.uuidString.lowercased())","operation":"upsert","version":4,"occurredAt":"2026-08-01T10:00:00Z","recordedAt":"2026-08-01T10:00:01Z","originDeviceId":"old-device","record":{"title":"Pre-mirror bare session","startedAt":"2026-08-01T09:00:00Z","endedAt":"2026-08-01T10:00:00Z","durationSeconds":3600,"outcome":"completed","interruptionCount":1}}
+        """)
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        let sessions = try fixture.context.fetch(FetchDescriptor<FocusSession>())
+        #expect(sessions.count == 1)
+        #expect(sessions.first?.id == legacyID)
+        #expect(sessions.first?.intent == "Pre-mirror bare session")
+        #expect(sessions.first?.state == .finished)
+        #expect(sessions.first?.endReason == .completed)
+        #expect(sessions.first?.focusedSeconds() == 3_600)
+        // The pull cursor is only durable because apply committed, so the next
+        // pass resumes past it — and replaying the same change must never
+        // duplicate the imported session under a canonical wire name.
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.pulls.map(\.cursor) == [0, 11])
+        #expect(try fixture.context.fetchCount(FetchDescriptor<FocusSession>()) == 1)
+        let pushedIDs = await fixture.server.pushes.flatMap(\.mutations).map(\.id)
+        #expect(pushedIDs.allSatisfy { $0 != "session-" + legacyID.uuidString.lowercased() })
+    }
+
+    @Test("Missing progressed versions block before a new pull can hide lost aliases")
+    func missingVersionsBlockBeforeNonemptyDelta() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Previously synchronized")
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
+        let pullsBefore = await fixture.server.pulls.count
+        let pushesBefore = await fixture.server.pushes.count
+        let versionURL = fixture.directory.appending(path: "anchor-hub-versions.json")
+        try FileManager.default.moveItem(at: versionURL, to: fixture.directory.appending(path: "versions-backup.json"))
+        try await fixture.server.enqueueRemote("""
+        {"cursor":12,"changeId":"new-delta","domain":"anchor","id":"\(UUID().uuidString.lowercased())","operation":"upsert","version":1,"occurredAt":"2026-08-01T10:00:00Z","recordedAt":"2026-08-01T10:00:01Z","originDeviceId":"old-device","record":{"title":"New remote summary","startedAt":"2026-08-01T09:00:00Z","endedAt":"2026-08-01T10:00:00Z","durationSeconds":3600,"outcome":"completed","interruptionCount":1}}
+        """)
+        fixture.sync = fixture.makeSync()
+        await fixture.signIn("A")
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.failure != nil)
+        #expect(await fixture.server.pulls.count == pullsBefore)
+        #expect(await fixture.server.pushes.count == pushesBefore)
+        #expect(!FileManager.default.fileExists(atPath: versionURL.path))
+        #expect(try fixture.context.fetch(FetchDescriptor<FocusSession>()).map(\.id) == [local.id])
+    }
+
+    @Test("A malformed record in a pulled batch rolls back the earlier apply work")
+    func malformedPullBatchLeavesNoPartialState() async throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appending(path: "anchor-malformed-batch-\(UUID())")
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+        let storeURL = storeDirectory.appending(path: "anchor.store")
+        let fixture = try SyncFixture(storeURL: storeURL)
+        defer { fixture.cleanUp() }
+        // The pull applies in name order: the valid record lands first, the
+        // corrupt one last, so the batch fails after the first session was
+        // already inserted into the shared context.
+        let goodID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let badID = UUID(uuidString: "ffffffff-ffff-ffff-ffff-ffffffffffff")!
+        try await fixture.server.enqueueRemote("""
+        {"cursor":2,"changeId":"batch-good","domain":"anchor","id":"session-\(goodID.uuidString.lowercased())","operation":"upsert","version":3,"occurredAt":"2026-09-02T09:00:00Z","recordedAt":"2026-09-02T09:00:01Z","originDeviceId":"other-device","record":{"recordType":"focusSession","id":"\(goodID.uuidString)","startedAt":"2026-09-02T08:00:00Z","endedAt":"2026-09-02T09:00:00Z","plannedSeconds":3600,"bankedSeconds":3600,"stateRaw":"finished","endReasonRaw":"completed","intent":"Remote good batch session","notes":"","tagIDStrings":[],"hourlyRate":0,"currencyCode":"USD","computerActiveSeconds":0,"computerAwaySeconds":0}}
+        """)
+        try await fixture.server.enqueueRemote("""
+        {"cursor":3,"changeId":"batch-bad","domain":"anchor","id":"session-\(badID.uuidString.lowercased())","operation":"upsert","version":3,"occurredAt":"2026-09-02T09:05:00Z","recordedAt":"2026-09-02T09:05:01Z","originDeviceId":"other-device","record":{"recordType":"focusSession","id":"\(badID.uuidString)"}}
+        """)
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.failure != nil)
+        // Nothing the failed batch touched may remain: not visible in the
+        // shared context, not staged as a local record for the next push, and
+        // not committed to the store file.
+        #expect(try fixture.context.fetch(FetchDescriptor<FocusSession>()).isEmpty)
+        #expect(try AnchorMirror.records(in: fixture.context, tombstonesFor: []).isEmpty)
+        let committed = ModelContext(fixture.container)
+        #expect(try committed.fetch(FetchDescriptor<FocusSession>()).isEmpty)
+        // Retrying without the corrupt change restarts the pull — the cursor
+        // was never acknowledged — and the surviving record imports exactly
+        // once and durably, instead of the memory-only copy winning the merge
+        // and being pushed back up as this device's own work.
+        await fixture.server.removeRemote(id: "session-\(badID.uuidString.lowercased())")
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.pulls.map(\.cursor) == [0, 0])
+        #expect(try fixture.context.fetchCount(FetchDescriptor<FocusSession>()) == 1)
+        let persisted = try ModelContext(fixture.container).fetch(FetchDescriptor<FocusSession>())
+        #expect(persisted.count == 1)
+        #expect(persisted.first?.id == goodID)
+        let pushedIDs = await fixture.server.pushes.flatMap(\.mutations).map(\.id)
+        #expect(pushedIDs.allSatisfy { $0 != "session-\(goodID.uuidString.lowercased())" })
+    }
+
+    @Test("A remote session carrying a foreign owner is refused, not claimed")
+    func foreignInboundSessionIsRejected() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let remoteID = UUID()
+        try await fixture.server.enqueueRemote("""
+        {"cursor":2,"changeId":"forged-owner","domain":"anchor","id":"session-\(remoteID.uuidString.lowercased())","operation":"upsert","version":3,"occurredAt":"2026-09-02T09:00:00Z","recordedAt":"2026-09-02T09:00:01Z","originDeviceId":"other-device","record":{"recordType":"focusSession","id":"\(remoteID.uuidString)","hubAccountID":"stable-B","startedAt":"2026-09-02T08:00:00Z","endedAt":"2026-09-02T09:00:00Z","plannedSeconds":3600,"bankedSeconds":3600,"stateRaw":"finished","endReasonRaw":"completed","intent":"Forged owner session","notes":"","tagIDStrings":[],"hourlyRate":0,"currencyCode":"USD","computerActiveSeconds":0,"computerAwaySeconds":0}}
+        """)
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        // The payload's owner is untrusted: stable-B ≠ the verified account, so
+        // the batch fails closed and nothing is claimed or committed.
+        #expect(fixture.sync.receipt.failure != nil)
+        #expect(try fixture.context.fetch(FetchDescriptor<FocusSession>()).isEmpty)
+        #expect(try ModelContext(fixture.container).fetch(FetchDescriptor<FocusSession>()).isEmpty)
+    }
+
+    @Test("A record whose payload UUID disagrees with its name is refused")
+    func nameMismatchedSessionIsRejected() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let nameID = UUID()
+        let payloadID = UUID()
+        try await fixture.server.enqueueRemote("""
+        {"cursor":2,"changeId":"uuid-mismatch","domain":"anchor","id":"session-\(nameID.uuidString.lowercased())","operation":"upsert","version":3,"occurredAt":"2026-09-02T09:00:00Z","recordedAt":"2026-09-02T09:00:01Z","originDeviceId":"other-device","record":{"recordType":"focusSession","id":"\(payloadID.uuidString)","startedAt":"2026-09-02T08:00:00Z","endedAt":"2026-09-02T09:00:00Z","plannedSeconds":3600,"bankedSeconds":3600,"stateRaw":"finished","endReasonRaw":"completed","intent":"Mismatched session","notes":"","tagIDStrings":[],"hourlyRate":0,"currencyCode":"USD","computerActiveSeconds":0,"computerAwaySeconds":0}}
+        """)
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.failure != nil)
+        #expect(try fixture.context.fetch(FetchDescriptor<FocusSession>()).isEmpty)
+    }
+
+    @Test("A remote distraction bound to a foreign or missing session is refused")
+    func foreignParentDistractionIsRejected() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        // The parent exists locally but belongs to a different account: the
+        // metadata payload must never attach to it.
+        let foreign = fixture.addSession("Synthetic stable-B history")
+        foreign.hubAccountID = "stable-B"
+        try fixture.context.save()
+        let distractionID = UUID()
+        try await fixture.server.enqueueRemote("""
+        {"cursor":2,"changeId":"foreign-parent","domain":"anchor","id":"distraction-\(distractionID.uuidString.lowercased())","operation":"upsert","version":3,"occurredAt":"2026-09-02T09:00:00Z","recordedAt":"2026-09-02T09:00:01Z","originDeviceId":"other-device","record":{"recordType":"distraction","id":"\(distractionID.uuidString)","capturedAt":"2026-09-02T08:30:00Z","kindConfidence":0,"kindIsUserSet":false,"offsetSeconds":120,"didReturnToFocus":true,"sessionID":"\(foreign.id.uuidString)","tagIDStrings":[]}}
+        """)
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.failure != nil)
+        // Only the fixture's own distraction exists — the remote row was refused.
+        #expect(try fixture.context.fetch(FetchDescriptor<Distraction>()).count == 1)
+        // An orphan parent is refused the same way.
+        let orphanID = UUID()
+        try await fixture.server.enqueueRemote("""
+        {"cursor":3,"changeId":"orphan-parent","domain":"anchor","id":"distraction-\(orphanID.uuidString.lowercased())","operation":"upsert","version":3,"occurredAt":"2026-09-02T09:05:00Z","recordedAt":"2026-09-02T09:05:01Z","originDeviceId":"other-device","record":{"recordType":"distraction","id":"\(orphanID.uuidString)","capturedAt":"2026-09-02T08:35:00Z","kindConfidence":0,"kindIsUserSet":false,"offsetSeconds":60,"didReturnToFocus":true,"sessionID":"\(UUID().uuidString)","tagIDStrings":[]}}
+        """)
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.failure != nil)
+        #expect(try fixture.context.fetchCount(FetchDescriptor<Distraction>()) == 1)
+    }
+
+    @Test("A failed durable commit is not acknowledged and retries to a reopened store")
+    func isolatedSaveFailureRetriesAndReopens() async throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appending(path: "anchor-save-failure-\(UUID())")
+        try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+        let storeURL = storeDirectory.appending(path: "anchor.store")
+        let fixture = try SyncFixture(storeURL: storeURL)
+        defer { fixture.cleanUp() }
+        let sessionID = UUID()
+        let payload = Data("""
+        {"recordType":"focusSession","id":"\(sessionID.uuidString)","startedAt":"2026-09-02T08:00:00Z","endedAt":"2026-09-02T09:00:00Z","plannedSeconds":3600,"bankedSeconds":3600,"stateRaw":"finished","endReasonRaw":"completed","intent":"Durable remote session","notes":"","tagIDStrings":[],"hourlyRate":0,"currencyCode":"USD","computerActiveSeconds":0,"computerAwaySeconds":0}
+        """.utf8)
+        let record = MirrorRecord(
+            name: "session-\(sessionID.uuidString.lowercased())",
+            modifiedAt: Date(), payload: payload, appendOnly: true
+        )
+        // An injected save failure must propagate: the mutation is abandoned
+        // with the context, and a retry on a fresh context applies cleanly.
+        struct SaveFailed: Error {}
+        let failed = ModelContext(fixture.container)
+        failed.autosaveEnabled = false
+        #expect(throws: SaveFailed.self) {
+            try AnchorMirror.apply([record], in: failed, account: "stable-A") { _ in throw SaveFailed() }
+        }
+        #expect(try ModelContext(fixture.container).fetch(FetchDescriptor<FocusSession>()).isEmpty)
+        // A read-only SwiftData configuration exercises the default save
+        // failure without relying on permissions of already-open SQLite FDs.
+        let readOnly = ModelConfiguration(schema: AnchorStore.schema, url: storeURL,
+                                          allowsSave: false, cloudKitDatabase: .none)
+        let blockedContainer = try ModelContainer(for: AnchorStore.schema, configurations: [readOnly])
+        let blocked = ModelContext(blockedContainer)
+        blocked.autosaveEnabled = false
+        #expect(throws: (any Error).self) {
+            try AnchorMirror.apply([record], in: blocked, account: "stable-A")
+        }
+        #expect(try ModelContext(fixture.container).fetch(FetchDescriptor<FocusSession>()).isEmpty)
+        // The retry runs on a fresh isolated context: the earlier failed
+        // attempt is discarded, not mistaken for durable work.
+        let retry = ModelContext(fixture.container)
+        retry.autosaveEnabled = false
+        #expect(try AnchorMirror.apply([record], in: retry, account: "stable-A"))
+        #expect(try ModelContext(fixture.container).fetch(FetchDescriptor<FocusSession>()).count == 1)
+        // And it survives reopening the real store.
+        let reopened = try AnchorStore.makeContainer(kind: .localOnly, url: storeURL)
+        let persisted = try ModelContext(reopened).fetch(FetchDescriptor<FocusSession>())
+        #expect(persisted.count == 1)
+        #expect(persisted.first?.id == sessionID)
+        #expect(persisted.first?.hubAccountID == "stable-A")
+    }
+
+    @Test("Unsaved local edits are preserved and defer the pass instead of being committed")
+    func unsavedLocalEditsArePreserved() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        // A draft the user has not saved must not be saved, rolled back or
+        // acknowledged by the pass — it stays pending in the user context.
+        let draft = FocusSession(goal: nil, intent: "Unsaved draft", plannedSeconds: 60)
+        fixture.context.insert(draft)
+        #expect(fixture.context.hasChanges)
+        await fixture.sync.synchronize()
+        // The pass failed rather than silently acknowledging unsaved work, and
+        // the draft is untouched: still pending, still unclaimed.
+        #expect(fixture.sync.receipt.failure != nil)
+        #expect(fixture.context.hasChanges)
+        #expect(draft.hubAccountID == nil)
+        #expect(await fixture.server.pushes.isEmpty)
+        // Once the user commits the draft themselves, the next pass applies.
+        try fixture.context.save()
+        await fixture.sync.synchronize()
+        #expect(!fixture.context.hasChanges)
+        #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
+        // Unapproved drafts stay local-only — never adopted by a sync pass.
+        #expect(draft.hubAccountID == nil)
+        #expect(await fixture.server.pushes.isEmpty)
+    }
+
+    @Test("A remote update refreshes the held main-context model after commit")
+    func remoteUpdateRefreshesHeldModel() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let local = fixture.addSession("Before remote edit")
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        // A newer remote write for the same session must land durably and be
+        // visible through the already-held model — an isolated save alone
+        // leaves it stale until the main context refetches.
+        try await fixture.server.enqueueRemote("""
+        {"cursor":2,"changeId":"remote-edit","domain":"anchor","id":"session-\(local.id.uuidString.lowercased())","operation":"upsert","version":4,"occurredAt":"2027-01-01T09:00:00Z","recordedAt":"2027-01-01T09:00:01Z","originDeviceId":"other-device","record":{"recordType":"focusSession","id":"\(local.id.uuidString)","startedAt":"2027-01-01T08:00:00Z","endedAt":"2027-01-01T09:00:00Z","plannedSeconds":3600,"bankedSeconds":3600,"stateRaw":"finished","endReasonRaw":"completed","intent":"Remote updated intent","notes":"","tagIDStrings":[],"hourlyRate":0,"currencyCode":"USD","computerActiveSeconds":0,"computerAwaySeconds":0}}
+        """)
+        await fixture.sync.synchronize()
+        #expect(local.intent == "Remote updated intent")
+        #expect(local.hubAccountID == "stable-A")
+    }
 }
 
 @MainActor
@@ -490,6 +772,7 @@ private final class SyncFixture {
     let suite = "anchor-account-sync-\(UUID())"
     let tokens = FixtureTokens()
     let server = FixtureHub()
+    let container: ModelContainer
     let context: ModelContext
     let origin: URL
     let transport: URLSession
@@ -498,8 +781,13 @@ private final class SyncFixture {
     let receipts: HubSyncReceiptStore
     lazy var sync = makeSync()
 
-    init() throws {
-        context = ModelContext(try AnchorStore.makeContainer(kind: .inMemory))
+    init(storeURL: URL? = nil) throws {
+        if let storeURL {
+            container = try AnchorStore.makeContainer(kind: .localOnly, url: storeURL)
+        } else {
+            container = try AnchorStore.makeContainer(kind: .inMemory)
+        }
+        context = ModelContext(container)
         origin = URL(string: "https://\(UUID().uuidString.lowercased()).invalid")!
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [FixtureProtocol.self]
@@ -572,6 +860,7 @@ private actor FixtureHub {
         guard let change = change as? [String: Any] else { throw URLError(.cannotParseResponse) }
         remoteChanges.append(change)
     }
+    func removeRemote(id: String) { remoteChanges.removeAll { $0["id"] as? String == id } }
     private var failures: Set<String> = []
     private var holds: Set<String> = []
     private var held: [String: CheckedContinuation<Int, Never>] = [:]

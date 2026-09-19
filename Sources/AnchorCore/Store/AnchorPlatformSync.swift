@@ -4,6 +4,7 @@ import Foundation
 import Observation
 import PersonalSyncKit
 import SwiftData
+import Synchronization
 
 @MainActor
 @Observable
@@ -17,7 +18,7 @@ public final class AnchorPlatformSync {
     /// Completed sessions are append-only mirror records: a tombstone must
     /// never erase history that actually happened.
     nonisolated static func isAppendOnlyRecord(_ name: String) -> Bool {
-        name.hasPrefix(AnchorMirrorNaming.Kind.focusSession.prefix)
+        name.hasPrefix(AnchorMirrorNaming.Kind.focusSession.prefix) || UUID(uuidString: name) != nil
     }
 
     private let context: ModelContext
@@ -37,6 +38,18 @@ public final class AnchorPlatformSync {
     private var isDisconnecting = false
     private var saveObserver: NSObjectProtocol?
     private var saveDebounce: Task<Void, Never>?
+    /// The same `SyncVersionStore` instance the Hub transport uses, so wire
+    /// names pulled under a legacy bare-UUID alias keep that identity.
+    private let hubVersions: SyncVersionStore?
+    /// Count of `didSave` notifications observed for `context`. Captured with
+    /// each records snapshot; a mismatch at apply time means a local save
+    /// landed mid-pass and the merge must retry rather than commit stale.
+    /// Posted synchronously inside `save()`, so the counter is locked rather
+    /// than deferred to a later actor hop.
+    private let saveGeneration = Mutex(0)
+    /// One pinned synchronize pass: the freshly verified account plus the
+    /// local-save generation captured by the records snapshot.
+    private var syncPass: (account: PersonalSyncAccount?, saveGeneration: Int, attempt: UUID)?
     public let account: PersonalAccountModel?
     public private(set) var isSyncing = false
     public private(set) var pendingCount = 0
@@ -45,10 +58,16 @@ public final class AnchorPlatformSync {
 
     public convenience init(
         context: ModelContext,
+        storeKind: AnchorStore.StoreKind = .persistent,
         enabled: Bool = true,
         sessionSynchronizationEnabled: Bool = AnchorExternalSyncPolicy.allowsSessionSynchronization(),
         receiptStore: HubSyncReceiptStore = HubSyncReceiptStore()
     ) {
+        // Only a persistent store may start external sync. A local-only,
+        // in-memory or failed-preflight fallback must not inspect Keychain
+        // tokens or open an account runtime; CloudKit continuity itself is
+        // native and needs no replacement transport here.
+        let enabled = enabled && storeKind == .persistent && !CloudKitSchemaSeed.isRequested
         let defaults = UserDefaults.standard
         let deviceKey = "personal-platform-device-id"
         let deviceId = defaults.string(forKey: deviceKey) ?? UUID().uuidString.lowercased()
@@ -63,12 +82,8 @@ public final class AnchorPlatformSync {
             ) : nil,
             supportDirectory: AnchorStore.storeURL().deletingLastPathComponent(),
             deviceId: deviceId,
-            sessionSynchronizationEnabled: sessionSynchronizationEnabled,
-            receiptStore: receiptStore,
-            cloudKit: enabled ? CloudKitMirrorTransport(
-                containerIdentifier: AnchorStore.cloudKitIdentifier,
-                appendOnly: Self.isAppendOnlyRecord
-            ) : nil
+            sessionSynchronizationEnabled: sessionSynchronizationEnabled && enabled,
+            receiptStore: receiptStore
         )
     }
 
@@ -100,10 +115,12 @@ public final class AnchorPlatformSync {
         }
 
         var transports: [any MirrorTransport] = []
+        var hubVersions: SyncVersionStore?
         if let identity,
            let versions = try? SyncVersionStore(
                fileURL: supportDirectory.appending(path: "anchor-hub-versions.json")
            ) {
+            hubVersions = versions
             transports.append(
                 HubMirrorTransport(
                     domain: .anchor,
@@ -123,6 +140,7 @@ public final class AnchorPlatformSync {
             )
         }
         if let cloudKit { transports.append(cloudKit) }
+        self.hubVersions = hubVersions
         runtime = transports.isEmpty ? nil : MirrorRuntime(
             transports: transports,
             store: MirrorBookkeepingStore(
@@ -130,18 +148,20 @@ public final class AnchorPlatformSync {
             )
         )
 
-        // Every local save schedules a debounced mirror pass — the old outbox
+        // Every local save bumps the snapshot generation; with observation
+        // enabled it also schedules a debounced mirror pass — the old outbox
         // had to be fed explicitly; the mirror diffs the document itself.
-        if observeLocalSaves {
-            let contextID = ObjectIdentifier(context)
-            saveObserver = NotificationCenter.default.addObserver(
-                forName: ModelContext.didSave,
-                object: nil,
-                queue: nil
-            ) { [weak self] notification in
-                guard (notification.object as? ModelContext).map(ObjectIdentifier.init) == contextID else { return }
-                Task { @MainActor [weak self] in self?.scheduleSynchronizeAfterLocalSave() }
-            }
+        let contextID = ObjectIdentifier(context)
+        saveObserver = NotificationCenter.default.addObserver(
+            forName: ModelContext.didSave,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            guard (notification.object as? ModelContext).map(ObjectIdentifier.init) == contextID else { return }
+            guard let self else { return }
+            self.saveGeneration.withLock { $0 += 1 }
+            guard observeLocalSaves else { return }
+            Task { @MainActor [weak self] in self?.scheduleSynchronizeAfterLocalSave() }
         }
     }
 
@@ -277,17 +297,34 @@ public final class AnchorPlatformSync {
         let attempt = generation
         isSyncing = true
         defer {
+            syncPass = nil
             if isCurrent(attempt) { isSyncing = false }
         }
         do {
-            let outcome = try await runtime.synchronize {
+            // Pin one verified account for the whole pass. The transport
+            // re-verifies on its own requests, so a resolution failure here is
+            // not fatal — it just leaves the pass unauthenticated, which the
+            // Hub leg reports as its usual "not signed in" outcome.
+            let pinned = try? await identity?.verifiedSyncAccount()
+            guard isCurrent(attempt) else { return }
+            syncPass = (account: pinned ?? nil, saveGeneration: saveGeneration.withLock { $0 }, attempt: attempt)
+            // Check continuity before a pull can recreate a missing version map.
+            try await validateVersionContinuity()
+            let outcome = try await runtime.synchronize(records: {
                 try await self.mirrorRecords()
-            } apply: { records in
+            }, validateLocalSnapshot: { _ in
+                try await self.validateSyncPass()
+            }) { records in
                 try await self.commitMirrorRecords(records)
             }
             guard isCurrent(attempt) else { return }
+            // The durable owner file must still equal the pinned account before
+            // any receipt is published — a pass that started as A can never
+            // report success to a store that has become someone else's.
+            if outcome.isComplete, let pinned, (try? historyOwnership.owner()) != pinned.userID { return }
             await refreshPendingCount()
             guard isCurrent(attempt) else { return }
+            if outcome.isComplete { try await validateSyncPass() }
             await recordOutcome(outcome)
         } catch {
             guard isCurrent(attempt) else { return }
@@ -300,17 +337,106 @@ public final class AnchorPlatformSync {
         }
     }
 
-    /// Every syncable entity plus tombstones for names the ledger still knows.
+    /// The account-scoped Hub projection: only finished sessions the pinned
+    /// verified account owns, plus distraction metadata bound to those
+    /// sessions. Anything else is native/iCloud-only and never staged.
     func mirrorRecords() async throws -> [MirrorRecord] {
-        var known: Set<String> = []
-        if let runtime, let names = try? await runtime.knownRecordNames() {
-            known = names
+        guard !context.hasChanges, let pass = syncPass, isCurrent(pass.attempt) else {
+            throw AnchorMirrorSyncError.pendingLocalEdits
         }
-        return try AnchorMirror.records(in: context, tombstonesFor: known)
+        syncPass?.saveGeneration = saveGeneration.withLock { $0 }
+        guard let account = syncPass?.account,
+              (try? historyOwnership.owner()) == account.userID else { return [] }
+        return try await hubRecords(for: account.userID)
     }
 
-    func commitMirrorRecords(_ records: [MirrorRecord]) throws {
-        _ = try AnchorMirror.apply(records, in: context)
+    /// The identical projection used for pending counts: what the durable
+    /// owner is still owed, independent of who happens to be signed in.
+    private func hubRecords(for owner: String) async throws -> [MirrorRecord] {
+        let snapshotGeneration = saveGeneration.withLock { $0 }
+        guard !context.hasChanges else { throw AnchorMirrorSyncError.pendingLocalEdits }
+        try await validateVersionContinuity()
+        var aliases: [UUID: String] = [:]
+        if let hubVersions {
+            for session in try context.fetch(FetchDescriptor<FocusSession>())
+            where session.hubAccountID == owner && !session.isActive {
+                // The same version store the Hub transport writes on pull: a
+                // positive version under a bare UUID is evidence that session
+                // already has a remote wire name. Lowercase wins over
+                // uppercase; version values are per-alias, not comparable.
+                let lower = session.id.uuidString.lowercased()
+                let upper = session.id.uuidString
+                if await hubVersions.version(for: lower, in: .anchor) > 0 {
+                    aliases[session.id] = lower
+                } else if await hubVersions.version(for: upper, in: .anchor) > 0 {
+                    aliases[session.id] = upper
+                }
+            }
+        }
+        guard !context.hasChanges, saveGeneration.withLock({ $0 }) == snapshotGeneration else {
+            throw AnchorMirrorSyncError.pendingLocalEdits
+        }
+        return try AnchorMirror.records(in: context, tombstonesFor: [], hubAccountID: owner) { id in
+            aliases[id] ?? AnchorMirrorNaming.Kind.focusSession.name(for: id)
+        }
+    }
+
+    private func validateVersionContinuity() async throws {
+        let versionsURL = supportDirectory.appending(path: "anchor-hub-versions.json")
+        if FileManager.default.fileExists(atPath: versionsURL.path) {
+            // Validate retained disk evidence too; the actor's cached map must
+            // not conceal an unreadable file that a relaunch cannot recover.
+            _ = try JSONDecoder().decode([PersonalDomain: [String: Int]].self,
+                                         from: Data(contentsOf: versionsURL))
+        } else {
+            let bookkeeping = try await MirrorBookkeepingStore(
+                fileURL: supportDirectory.appending(path: "anchor-mirror-bookkeeping.json")
+            ).load()
+            let progressed = !bookkeeping.ledger.stamps.isEmpty
+                || bookkeeping.pushedFingerprints.values.contains { !$0.isEmpty }
+                || bookkeeping.pullTokens.values.contains { (Int(String(decoding: $0, as: UTF8.self)) ?? 1) > 0 }
+            guard !progressed else { throw AnchorMirrorSyncError.invalidRecord }
+        }
+    }
+
+    /// Apply pulled records into an isolated context off the same container and
+    /// commit exactly once. On any failure the isolated context is discarded —
+    /// the user context keeps its pending edits and no half-applied batch is
+    /// mistaken for durable on retry.
+    func commitMirrorRecords(_ records: [MirrorRecord]) async throws {
+        try await validateSyncPass()
+        guard let pass = syncPass, let account = pass.account else {
+            throw AnchorMirrorSyncError.unverifiedAccount
+        }
+        guard !context.hasChanges, saveGeneration.withLock({ $0 }) == pass.saveGeneration else {
+            throw AnchorMirrorSyncError.pendingLocalEdits
+        }
+        guard (try? historyOwnership.owner()) == account.userID else {
+            throw HubHistoryOwnershipError.differentAccount
+        }
+        let isolated = ModelContext(context.container)
+        isolated.autosaveEnabled = false
+        let changed = try AnchorMirror.apply(records, in: isolated, account: account.userID)
+        guard changed else { return }
+        // A held main-context model does not see the isolated commit; a fresh
+        // fetch refreshes it in place without resetting user edits.
+        _ = try? context.fetch(FetchDescriptor<FocusSession>())
+        _ = try? context.fetch(FetchDescriptor<Distraction>())
+    }
+
+    private func validateSyncPass() async throws {
+        guard let pass = syncPass, let verified = pass.account, let identity,
+              isCurrent(verified.userID, attempt: pass.attempt) else {
+            throw AnchorMirrorSyncError.unverifiedAccount
+        }
+        try await identity.requireCurrentAccount(verified)
+        guard isCurrent(verified.userID, attempt: pass.attempt),
+              !context.hasChanges, saveGeneration.withLock({ $0 }) == pass.saveGeneration else {
+            throw AnchorMirrorSyncError.pendingLocalEdits
+        }
+        guard try historyOwnership.owner() == verified.userID else {
+            throw HubHistoryOwnershipError.differentAccount
+        }
     }
 
     /// Only the Hub leg owns the receipt: CloudKit mirroring runs whenever the
@@ -367,7 +493,14 @@ public final class AnchorPlatformSync {
         selectAccount()
         guard let runtime else { return }
         let attempt = generation
-        let records = (try? AnchorMirror.records(in: context, tombstonesFor: [])) ?? []
+        // The pending queue belongs to the durable bound owner, not whoever is
+        // signed in — the same account projection that gates transport
+        // eligibility decides what is still owed.
+        var records: [MirrorRecord] = []
+        if let owner = try? historyOwnership.owner() {
+            guard let snapshot = try? await hubRecords(for: owner) else { return }
+            records = snapshot
+        }
         // Unreadable bookkeeping cannot prove anything was accepted, so the
         // honest answer is that every staged record is still owed.
         let pending = (try? await runtime.unpushedCount(transportID: "hub", records: records))
