@@ -1,14 +1,27 @@
 #if !os(watchOS)
-import AnchorCore
+@testable import AnchorCore
 import Foundation
 import PersonalSyncKit
 import Testing
 
 @Suite("Personal Platform session contract")
 struct AnchorPlatformRecordTests {
-    @Test("Remote Hub history does not enter Anchor's planner")
-    func hubIsOutboundOnly() {
-        #expect(!AnchorPlatformSync.importsRemoteSessions)
+    @Test("Distraction mirror payloads never carry note text or keywords")
+    func distractionPayloadExcludesPrivateContent() throws {
+        let distraction = Distraction(
+            note: "PRIVATE NOTE MUST NOT LEAVE",
+            session: nil,
+            tagIDStrings: ["tag-1"]
+        )
+        distraction.keywords = ["PRIVATE", "KEYWORD"]
+        distraction.kind = .message
+        let payload = DistractionPayload(distraction)
+        let data = try JSONEncoder().encode(payload)
+        let json = String(decoding: data, as: UTF8.self)
+        #expect(!json.contains("PRIVATE"))
+        #expect(!json.contains("\"note\""))
+        #expect(!json.contains("keywords"))
+        #expect(json.contains("\"recordType\":\"distraction\""))
     }
 
     @Test("Account deletion uses the authenticated Better Auth endpoint")
