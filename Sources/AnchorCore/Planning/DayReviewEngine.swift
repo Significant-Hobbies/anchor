@@ -19,11 +19,15 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public var lifeDirection: LifeDirection?
     public var reminderExternalIdentifier: String?
     public var reminderLastSyncedAt: Date?
+    public var externalEventKey: String?
+    /// True once the owner has personalized a sync- or template-managed block.
+    public var isTemplateOverride: Bool
 
     public init(
         id: UUID,
         templateID: UUID? = nil,
         templateOccurrenceDay: Date? = nil,
+        isTemplateOverride: Bool = false,
         sessionID: UUID? = nil,
         title: String,
         details: String = "",
@@ -37,11 +41,13 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
         behaviorPattern: BehaviorPattern? = nil,
         lifeDirection: LifeDirection? = nil,
         reminderExternalIdentifier: String? = nil,
-        reminderLastSyncedAt: Date? = nil
+        reminderLastSyncedAt: Date? = nil,
+        externalEventKey: String? = nil
     ) {
         self.id = id
         self.templateID = templateID
         self.templateOccurrenceDay = templateOccurrenceDay
+        self.isTemplateOverride = isTemplateOverride
         self.sessionID = sessionID
         self.title = title
         self.details = details
@@ -56,6 +62,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
         self.lifeDirection = lifeDirection
         self.reminderExternalIdentifier = reminderExternalIdentifier
         self.reminderLastSyncedAt = reminderLastSyncedAt
+        self.externalEventKey = externalEventKey
     }
 }
 
@@ -112,6 +119,7 @@ public extension PlanBlock {
             id: id,
             templateID: templateID,
             templateOccurrenceDay: templateOccurrenceDay,
+            isTemplateOverride: isTemplateOverride,
             sessionID: sessionID,
             title: title,
             details: details,
@@ -125,7 +133,8 @@ public extension PlanBlock {
             behaviorPattern: behaviorPattern,
             lifeDirection: lifeDirection,
             reminderExternalIdentifier: reminderExternalIdentifier,
-            reminderLastSyncedAt: reminderLastSyncedAt
+            reminderLastSyncedAt: reminderLastSyncedAt,
+            externalEventKey: externalEventKey
         )
     }
 }
