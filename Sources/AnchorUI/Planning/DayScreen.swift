@@ -856,6 +856,13 @@ struct PlanBlockEditor: View {
                         .padding(Space.sm)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
+                } else if block?.externalEventKey != nil {
+                    Label("Imported from Google Calendar. Editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(theme.textSecondary)
+                        .padding(Space.sm)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
                 }
                 if let saveError {
                     Label(saveError, systemImage: "exclamationmark.triangle.fill")
@@ -1021,7 +1028,7 @@ struct PlanBlockEditor: View {
                 block.flexibility = flexibility
                 block.lifeDirection = direction
                 block.behaviorPattern = behaviorPattern
-                if block.templateID != nil && occurrenceChanged {
+                if (block.templateID != nil || block.externalEventKey != nil) && occurrenceChanged {
                     block.isTemplateOverride = true
                 }
                 block.updatedAt = Date()
