@@ -67,6 +67,11 @@ public enum AnchorStore {
     /// Keep configuration construction inspectable so tests can prove that the
     /// production path targets Anchor's exact container instead of relying on
     /// entitlement-order discovery.
+    ///
+    /// Persistent stores sync natively through the app's private CloudKit
+    /// database on every platform — the Hub is an additional owner-scoped leg,
+    /// not a replacement for iCloud continuity. `.localOnly` and `.inMemory`
+    /// stores never touch the cloud.
     public static func configuration(
         kind: StoreKind,
         url: URL? = nil

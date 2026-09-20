@@ -27,6 +27,7 @@ public struct HabitsScreen: View {
     @Query(sort: \HabitCompletion.updatedAt, order: .reverse) private var habitCompletions: [HabitCompletion]
     @State private var showsProfile = false
     @State private var showsNewHabit = false
+    @State private var showsArchived = false
     @State private var editingTemplate: ScheduleTemplate?
     @State private var schedulingTemplate: ScheduleTemplate?
     @State private var progressionError: String?
@@ -37,7 +38,7 @@ public struct HabitsScreen: View {
         templates.filter(\.isActiveBehaviorHabit)
     }
 
-    private var pausedTemplates: [ScheduleTemplate] {
+    private var archivedTemplates: [ScheduleTemplate] {
         templates.filter { $0.isBehaviorHabit && $0.archivedAt != nil && $0.graduatedAt == nil }
     }
 
@@ -113,22 +114,60 @@ public struct HabitsScreen: View {
                 .buttonStyle(PrimaryButtonStyle())
                 .accessibilityIdentifier("anchor.habits.add")
 
-                if !pausedTemplates.isEmpty {
+                if !archivedTemplates.isEmpty {
                     VStack(alignment: .leading, spacing: Space.sm) {
-                        SectionHeader("Paused", subtitle: "Kept for later without crowding this week")
-                        ForEach(pausedTemplates) { template in
+                        Button {
+                            withAnimation(Motion.snappy) { showsArchived.toggle() }
+                        } label: {
                             HStack(spacing: Space.sm) {
-                                Image(systemName: "pause.circle")
+                                Image(systemName: "archivebox")
                                     .foregroundStyle(theme.textTertiary)
-                                Text(template.title)
+                                Text("Archived")
+                                    .font(.headline)
                                     .foregroundStyle(theme.textPrimary)
-                                Spacer()
-                                Button("Resume") { resume(template) }
-                                    .buttonStyle(QuietButtonStyle(expands: false))
+                                Text("\(archivedTemplates.count)")
+                                    .font(.caption.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(theme.textTertiary)
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(theme.textTertiary)
+                                    .rotationEffect(.degrees(showsArchived ? 90 : 0))
                             }
-                            .padding(Space.md)
-                            .background(theme.surface, in: .rect(cornerRadius: Radius.md))
-                            .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
+                            .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("anchor.habits.archived-toggle")
+                        .accessibilityValue(showsArchived ? "expanded" : "collapsed")
+
+                        if showsArchived {
+                            ForEach(archivedTemplates) { template in
+                                HStack(spacing: Space.sm) {
+                                    Button { editingTemplate = template } label: {
+                                        HStack(spacing: Space.sm) {
+                                            Image(systemName: "archivebox")
+                                                .foregroundStyle(theme.textTertiary)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(template.title)
+                                                    .foregroundStyle(theme.textPrimary)
+                                                Text("\(habitTiming(template)) · \(template.weekdays.sorted { $0.rawValue < $1.rawValue }.map(\.compactLabel).joined(separator: ", "))")
+                                                    .font(.caption)
+                                                    .foregroundStyle(theme.textSecondary)
+                                            }
+                                            Spacer(minLength: 0)
+                                        }
+                                        .contentShape(.rect)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Inspect \(template.title)")
+                                    .accessibilityIdentifier("anchor.habits.archived.\(template.id.uuidString)")
+                                    Button("Restore") { restore(template) }
+                                        .buttonStyle(QuietButtonStyle(expands: false))
+                                }
+                                .padding(Space.md)
+                                .background(theme.surface, in: .rect(cornerRadius: Radius.md))
+                                .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
+                            }
                         }
                     }
                 }
@@ -199,7 +238,7 @@ public struct HabitsScreen: View {
                 }
                 Spacer(minLength: Space.sm)
                 Menu {
-                    Button("Pause habit", systemImage: "pause") { pause(template) }
+                    Button("Archive habit", systemImage: "archivebox") { archive(template) }
                     Button("Edit habit", systemImage: "pencil") { editingTemplate = template }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -275,15 +314,16 @@ public struct HabitsScreen: View {
         }
     }
 
-    private func pause(_ template: ScheduleTemplate) {
+    private func archive(_ template: ScheduleTemplate) {
         template.archivedAt = Date()
-        persistScheduleChange(template, failure: "Anchor could not pause that habit.")
+        persistScheduleChange(template, failure: "Anchor could not archive that habit.")
+        if progressionError == nil { showsArchived = true }
     }
 
-    private func resume(_ template: ScheduleTemplate) {
+    private func restore(_ template: ScheduleTemplate) {
         template.archivedAt = nil
         template.habitLevelStartedAt = Date()
-        persistScheduleChange(template, failure: "Anchor could not resume that habit.")
+        persistScheduleChange(template, failure: "Anchor could not restore that habit.")
     }
 
     private func persistScheduleChange(_ template: ScheduleTemplate, failure: String) {

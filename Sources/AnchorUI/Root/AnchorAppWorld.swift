@@ -74,7 +74,12 @@ public final class AnchorAppWorld {
         #endif
         controller = focusController
 
-        platform = AnchorPlatformSync(context: result.container.mainContext)
+        // The actual store kind gates external sync: a local-only or failed
+        // preflight fallback must never start the Hub account runtime.
+        platform = AnchorPlatformSync(
+            context: result.container.mainContext,
+            storeKind: result.kind
+        )
 
         #if os(macOS)
         machineActivityMonitor = MachineActivityMonitor(
