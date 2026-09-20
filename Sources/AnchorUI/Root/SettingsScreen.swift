@@ -247,7 +247,7 @@ public struct SettingsScreen: View {
 
     @ViewBuilder
     private var hubPreferences: some View {
-        if let platform, platform.account != nil {
+        if let platform {
             PreferenceGroup(
                 "Significant Hobbies Hub",
                 subtitle: "One optional account across the family"

@@ -105,8 +105,14 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Save habits and continue"].tap()
 
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 5))
+        #if ANCHOR_LOCAL_ONLY
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-apple"].exists)
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-google"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
+        #else
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-google"].exists)
+        #endif
         app.buttons["anchor.onboarding.hub-continue-locally"].tap()
 
         XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 5))
@@ -315,8 +321,14 @@ final class AnchorIOSUITests: XCTestCase {
         settingsButton.tap()
 
         XCTAssertTrue(app.staticTexts["Significant Hobbies Hub"].waitForExistence(timeout: 4))
+        #if ANCHOR_LOCAL_ONLY
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-apple"].exists)
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-google"].exists)
+        #else
         XCTAssertTrue(app.staticTexts["Bring Anchor into your Hub"].exists)
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
+        #endif
         let appearance = app.segmentedControls["anchor.settings.appearance"]
         XCTAssertTrue(appearance.exists)
         appearance.buttons["Dark"].tap()

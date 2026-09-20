@@ -509,11 +509,12 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 4))
         #if ANCHOR_LOCAL_ONLY
         XCTAssertFalse(app.buttons["anchor.hub.sign-in-apple"].exists)
-        XCTAssertTrue(app.staticTexts["Connect your Hub account"].exists)
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-google"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
         #else
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
-        #endif
         XCTAssertTrue(app.buttons["anchor.hub.sign-in-google"].exists)
+        #endif
         app.buttons["anchor.onboarding.hub-continue-locally"].click()
 
         XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 4))
@@ -559,6 +560,13 @@ final class AnchorMacUITests: XCTestCase {
                 .path
         app.launch()
 
+        #if ANCHOR_LOCAL_ONLY
+        XCTAssertTrue(
+            app.descendants(matching: .any)["anchor.hub.unavailable"]
+                .waitForExistence(timeout: 5)
+        )
+        return
+        #else
         let google = app.buttons["anchor.hub.sign-in-google"]
         XCTAssertTrue(google.waitForExistence(timeout: 5))
         google.click()
@@ -579,6 +587,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(google.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].exists)
         XCTAssertEqual(app.state, .runningForeground)
+        #endif
     }
 
     @MainActor
@@ -594,7 +603,13 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Settings"].click()
 
         XCTAssertTrue(app.staticTexts["Significant Hobbies Hub"].waitForExistence(timeout: 4))
+        #if ANCHOR_LOCAL_ONLY
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-apple"].exists)
+        XCTAssertFalse(app.buttons["anchor.hub.sign-in-google"].exists)
+        #else
         XCTAssertTrue(app.staticTexts["Bring Anchor into your Hub"].exists)
+        #endif
         XCTAssertTrue(app.radioButtons["System"].exists)
         XCTAssertTrue(app.radioButtons["Light"].exists)
         XCTAssertTrue(app.radioButtons["Dark"].exists)
