@@ -34,6 +34,20 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-26** — Qualification pass on build 25 (commit `62d3b3a`). Added the
+  missing provenance test — remote Hub history provably cannot enter the
+  planner before the owner approves history binding — and re-issued the design
+  receipt for build 25 with fresh catalog renders. Hosted `Anchor native
+  review` [36241896707](https://github.com/Significant-Hobbies/anchor/actions/runs/36241896707)
+  passed all gates on the exact commit: shared tests, on-device tagging,
+  catalog, full macOS and iPhone UI suites, watch build. The signed
+  ReleaseDirect archive and `dist/Anchor-1.0-25.dmg` carry Developer ID,
+  hardened runtime, Production CloudKit and no debug entitlement; the DMG is
+  not notarized. The development-signed build 25 is installed on the paired
+  iPhone; launch proof is pending because the phone is locked. Readiness audit
+  stands at 3 owner gates: physical-iPhone launch, fresh authenticated account,
+  and Production CloudKit observation on the current schema.
+
 - **2026-09-11** — Prepared the signed build 25 Mac distribution export and DMG; verified Production CloudKit and no debugger entitlement. Hosted source review passed 219 shared, 14 Mac UI and 8 simulator iPhone tests. Strengthened the release checks against real ordinary-build/export artifacts. Mac installation remains build 21; notarization and real account continuity remain open. A brief exported-app launch succeeded, but the tool did not forward isolation settings, so no isolated acceptance or owner-store outcome is claimed. See [the exact receipt and limits](docs/qualification/mac-release-2026-09-11.md).
 
 - **2026-09-09** — Prepared source-only daily-flow persistence repairs: failed resume/start/extension retain truthful state and drafts; planned starts commit new session, plan link and deliberate replan together, with exact-request retry reuse. Full 219 package tests pass, including synthetic disk/reopen and real caller handlers. No installed app or release changed; hosted billing, native/device and historical CloudKit gates remain. See [scheduled-start evidence](docs/qualification/scheduled-start-2026-09-09/README.md) and [resume/start evidence](docs/qualification/resume-2026-09-09/README.md).
