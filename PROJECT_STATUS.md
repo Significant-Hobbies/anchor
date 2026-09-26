@@ -34,6 +34,18 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-26** — Hosted review
+  [36256423165](https://github.com/Significant-Hobbies/anchor/actions/runs/36256423165)
+  was down to exactly two failures; both are test-journey issues, not product
+  defects. Mac: the Log time sheet's "Still happening" checkbox reported a
+  frame while clipped below the scroll fold, so the synthesized click missed
+  and the retro entry saved in-progress ("1 finished" instead of "2
+  finished") — the journey now scrolls the sheet first and asserts the
+  "Ended" picker appears. iOS: a tap on "Shape these habits" landed while the
+  step transition was still settling and was swallowed — the journey retries
+  once. Pushed as `ee00ba4`; follow-up hosted run is
+  [36260820047](https://github.com/Significant-Hobbies/anchor/actions/runs/36260820047).
+
 - **2026-09-26** — Idle-CPU runaway root-caused and fixed (issue 73): it was
   app code, not CloudKit. `FocusController`'s remote-change handler ran
   `migratePrivateNotes` on every `NSPersistentStoreRemoteChange`; the
