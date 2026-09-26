@@ -240,11 +240,20 @@ final class AnchorIOSUITests: XCTestCase {
         let title = app.textFields["What will you do?"]
         title.tap()
         title.typeText("Two-day reset")
+        // The keyboard stays up after typing and can cover the weekday
+        // chips — scroll the sheet until a chip is clear of it, and verify
+        // the tap actually toggled before saving.
         let secondDay = app.buttons.matching(
             NSPredicate(format: "label ENDSWITH %@", "not selected")
         ).firstMatch
-        XCTAssertTrue(secondDay.exists)
+        XCTAssertTrue(secondDay.waitForExistence(timeout: 3))
+        let hittableDeadline = Date().addingTimeInterval(4)
+        while !secondDay.isHittable && Date() < hittableDeadline {
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        let secondDayName = secondDay.label.replacingOccurrences(of: " not selected", with: "")
         secondDay.tap()
+        XCTAssertTrue(app.buttons["\(secondDayName) selected"].waitForExistence(timeout: 3))
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["Two-day reset"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["0 of 2 this week"].exists)

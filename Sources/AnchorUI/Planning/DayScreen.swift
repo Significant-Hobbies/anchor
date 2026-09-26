@@ -133,6 +133,15 @@ struct PlanScreen: View {
         .onChange(of: blocks.isEmpty) { _, isEmpty in
             if !isEmpty { scrollToNow(proxy) }
         }
+        // A save can land while a sheet is mid-dismissal; re-anchor once it
+        // has fully closed so the new or edited card isn't left below the fold.
+        .onChange(of: editorSeed != nil || editingBlock != nil || loggingBlock != nil || explainingBlock != nil) { _, anyOpen in
+            if !anyOpen {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
+                }
+            }
+        }
         .onChange(of: today) { _, _ in scrolledDay = nil }
         }
         .background(theme.canvas)
@@ -310,6 +319,12 @@ struct PlanScreen: View {
         scrolledDay = today
         DispatchQueue.main.async {
             proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
+            // A block landing while the editor sheet is still dismissing can
+            // have its scroll swallowed by the layout pass — retry once after
+            // the transition settles. Idempotent if the first scroll took.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
+            }
         }
     }
 
