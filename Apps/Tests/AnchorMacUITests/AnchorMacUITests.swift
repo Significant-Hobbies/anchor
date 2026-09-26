@@ -693,9 +693,19 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(retroTitle.waitForExistence(timeout: 3))
         retroTitle.click()
         retroTitle.typeText("Logged earlier")
-        let ongoingToggle = app.descendants(matching: .any)["anchor.log.still-happening"]
+        // The timing section sits at the bottom of the sheet's scroll view —
+        // the checkbox reports a frame there while still clipped, and a plain
+        // click lands on dead space. Scroll the sheet down first.
+        let ongoingToggle = app.checkBoxes["anchor.log.still-happening"]
         XCTAssertTrue(ongoingToggle.waitForExistence(timeout: 2))
+        let sheetScroll = app.scrollViews
+            .containing(.checkBox, identifier: "anchor.log.still-happening")
+            .firstMatch
+        for _ in 0..<4 { sheetScroll.swipeUp() }
         ongoingToggle.click()
+        // The "Ended" picker only exists once "Still happening" is off — a
+        // missed click would silently save the entry as still in progress.
+        XCTAssertTrue(app.datePickers["anchor.log.end"].waitForExistence(timeout: 3))
         app.buttons["anchor.log.save"].click()
         XCTAssertTrue(app.staticTexts["Logged earlier"].waitForExistence(timeout: 4))
         XCTAssertTrue(

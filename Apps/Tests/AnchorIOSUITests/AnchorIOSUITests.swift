@@ -100,8 +100,18 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Show me how Anchor protects it"].tap()
 
         XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
-        app.buttons["Shape these habits"].tap()
-        XCTAssertTrue(app.staticTexts["Choose when each habit is available."].waitForExistence(timeout: 4))
+        let shape = app.buttons["Shape these habits"]
+        shape.tap()
+        // A tap that lands while the step transition is still settling can miss
+        // the button entirely — retry rather than failing on a swallowed tap.
+        let scheduleTitle = app.staticTexts["Choose when each habit is available."]
+        if !scheduleTitle.waitForExistence(timeout: 4) {
+            let retry = app.buttons.matching(NSPredicate(
+                format: "label == %@ OR label == %@", "Shape these habits", "Continue without habits"
+            )).firstMatch
+            retry.tap()
+        }
+        XCTAssertTrue(scheduleTitle.waitForExistence(timeout: 4))
         app.buttons["Save habits and continue"].tap()
 
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 5))
