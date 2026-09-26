@@ -2,6 +2,7 @@
 @testable import AnchorCore
 import Foundation
 import PersonalSyncKit
+import SwiftData
 import Testing
 
 @Suite("Personal Platform session contract")
@@ -105,6 +106,32 @@ struct AnchorPlatformRecordTests {
         #expect(first.state == .finished)
         #expect(first.endReason == .endedEarly)
         #expect(first.focusedSeconds() == 1_800)
+    }
+
+    @Test("Remote Hub history does not enter Anchor's planner")
+    @MainActor
+    func remoteHubHistoryStaysRemoteUntilApproved() async throws {
+        let fixture = try SyncFixture()
+        defer { fixture.cleanUp() }
+        let remoteID = UUID()
+        try await fixture.server.enqueueRemote("""
+        {"cursor":2,"changeId":"unapproved-remote","domain":"anchor","id":"session-\(remoteID.uuidString.lowercased())","operation":"upsert","version":3,"occurredAt":"2026-09-02T09:00:00Z","recordedAt":"2026-09-02T09:00:01Z","originDeviceId":"other-device","record":{"recordType":"focusSession","id":"\(remoteID.uuidString)","startedAt":"2026-09-02T08:00:00Z","endedAt":"2026-09-02T09:00:00Z","plannedSeconds":3600,"bankedSeconds":3600,"stateRaw":"finished","endReasonRaw":"completed","intent":"Unapproved remote history","notes":"","tagIDStrings":[],"hourlyRate":0,"currencyCode":"USD","computerActiveSeconds":0,"computerAwaySeconds":0}}
+        """)
+        await fixture.signIn("A")
+        await fixture.sync.synchronize()
+        // Sign-in alone is not consent to import. Until the owner approves
+        // this device's history binding the Hub leg stays gated — no remote
+        // row reaches the planner and not even a pull leaves the device.
+        #expect(fixture.sync.needsHistoryApproval)
+        #expect(fixture.sync.ownershipNotice != nil)
+        #expect(try fixture.context.fetch(FetchDescriptor<FocusSession>()).isEmpty)
+        #expect(await fixture.server.pulls.isEmpty)
+        #expect(await fixture.server.pushes.isEmpty)
+        // The approval gate, not a broken transport, held the record back:
+        // the same change imports once the owner explicitly approves.
+        #expect(await fixture.sync.approveHubHistory())
+        await fixture.sync.synchronize()
+        #expect(try fixture.context.fetch(FetchDescriptor<FocusSession>()).map(\.id) == [remoteID])
     }
 }
 #endif
