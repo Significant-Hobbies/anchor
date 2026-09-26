@@ -17,10 +17,9 @@ let package = Package(
         .executable(name: "anchor-mcp", targets: ["anchor-mcp"]),
     ],
     dependencies: [
-        .package(
-            url: "https://github.com/Significant-Hobbies/significanthobbies.git",
-            revision: "118fc5552b08078ac06e3339c0c65a304e103e7d"
-        ),
+        // Local checkout while the shared mirror runtime lands; repin to the
+        // pushed kit revision when the PersonalSyncKit commit ships.
+        .package(path: "../significanthobbies"),
     ],
     targets: [
         .target(
