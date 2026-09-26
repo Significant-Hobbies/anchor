@@ -34,6 +34,25 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-26** — Idle-CPU runaway root-caused and fixed (issue 73): it was
+  app code, not CloudKit. `FocusController`'s remote-change handler ran
+  `migratePrivateNotes` on every `NSPersistentStoreRemoteChange`; the
+  migration dirtied every `Distraction` row (`note = ""` / `keywords = []`
+  unconditionally) and saved a transaction even when nothing changed, and each
+  mirrored save arrived back as another remote change — save → notify → save
+  forever, ~200+ CloudKit scheduler submissions/sec, ~110% CPU. Fix:
+  `persistPrivateContent` only clears fields when they differ, and
+  `migratePrivateNotes`/`AnchorStore.save` skip `context.save()` when
+  `!context.hasChanges`. A regression test fails on the old code
+  (`hasChanges` stays true). While diagnosing, hosted review also surfaced two
+  real timetable defects now fixed: cards that collide at the minimum
+  rendered height now lane-pack (`minSpan` on `TimetableLayout.place`), and
+  the full-grid tap-to-add overlay is no longer an accessibility element (it
+  swallowed hit-tests for the block-action buttons). `scrollToNow` also
+  retries once when `@Query` lands instead of racing it. Verified live:
+  installed build 27 idles at 0% CPU, ~2 scheduler submissions/min, all data
+  intact after a store reset + re-import (row counts identical).
+
 - **2026-09-26** — Owner scoped the surfaces sharper: **Today answers only "what
   does this day ask of me"** (header, day picker, summary line, timetable, Add /
   Log time / Customize). The habit checklist left Today entirely — unscheduled
