@@ -467,6 +467,7 @@ struct TimetableOptionsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .accessibilityIdentifier("anchor.timetable.options-done")
                 }
             }
         }
@@ -994,6 +995,7 @@ struct RoutineManager: View {
                     Spacer()
                     Button("Done") { dismiss() }
                         .buttonStyle(QuietButtonStyle(expands: false))
+                        .accessibilityIdentifier("anchor.routines.done")
                 }
                 .padding(.horizontal, Space.md)
                 .padding(.vertical, Space.xs)

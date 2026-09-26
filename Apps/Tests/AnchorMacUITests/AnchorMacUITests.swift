@@ -82,6 +82,13 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Mac schedule acceptance"].waitForExistence(timeout: 4))
         let actions = app.descendants(matching: .any)["anchor.today.block-actions"].firstMatch
         XCTAssertTrue(actions.waitForExistence(timeout: 3))
+        // scroll-to-now can still be animating when the card first appears —
+        // wait until the action control is actually hittable before clicking.
+        let hittableDeadline = Date().addingTimeInterval(4)
+        while !actions.isHittable && Date() < hittableDeadline {
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        XCTAssertTrue(actions.isHittable)
         actions.click()
         XCTAssertTrue(app.buttons["Start now"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["Edit or move"].exists)
@@ -237,7 +244,10 @@ final class AnchorMacUITests: XCTestCase {
 
         app.buttons["Today"].click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 4))
-        XCTAssertTrue(element(containing: "Two-day reset edited", in: app).waitForExistence(timeout: 4))
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Two-day reset edited"))
+                .firstMatch.waitForExistence(timeout: 4)
+        )
 
         keepScreenshot(app, named: "anchor-build19-mac-scheduled-habit-today")
     }
@@ -294,7 +304,8 @@ final class AnchorMacUITests: XCTestCase {
         initialTitle.typeText("Initial weekly entry")
         app.checkBoxes["Repeat weekly"].click()
         app.buttons["Save"].click()
-        let usualWeek = app.buttons["Your usual week · 1 item, Manage"]
+        app.buttons["anchor.today.customize"].click()
+        let usualWeek = app.buttons["anchor.timetable.routines"]
         XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))
         usualWeek.click()
         XCTAssertTrue(app.radioButtons["Monday"].waitForExistence(timeout: 4))
@@ -652,8 +663,8 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.lived-trace"].exists)
         app.buttons["anchor.timetable.routines"].click()
         XCTAssertTrue(app.staticTexts["Your usual week"].waitForExistence(timeout: 3))
-        app.buttons["Done"].click()
-        app.buttons["Done"].click()
+        app.buttons["anchor.routines.done"].click()
+        app.buttons["anchor.timetable.options-done"].click()
 
         // Quick log — "still happening" captures an open entry without a timer.
         app.buttons["anchor.today.log-time"].click()
