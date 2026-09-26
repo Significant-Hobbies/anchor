@@ -82,15 +82,10 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Mac schedule acceptance"].waitForExistence(timeout: 4))
         let actions = app.descendants(matching: .any)["anchor.today.block-actions"].firstMatch
         XCTAssertTrue(actions.waitForExistence(timeout: 3))
-        // scroll-to-now can still be animating when the card first appears —
-        // wait until the action control is actually hittable before clicking.
-        let hittableDeadline = Date().addingTimeInterval(4)
-        while !actions.isHittable && Date() < hittableDeadline {
-            Thread.sleep(forTimeInterval: 0.2)
-        }
-        XCTAssertTrue(actions.isHittable)
+        // Don't gate on isHittable — a fresh card can sit at the scroll fold
+        // while scroll-to-now settles; click() scrolls it into view itself.
         actions.click()
-        XCTAssertTrue(app.buttons["Start now"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Start now"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.buttons["Edit or move"].exists)
         XCTAssertTrue(app.buttons["Explain a change"].exists)
         let finish = app.buttons["Finished without timing"]
