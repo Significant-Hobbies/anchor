@@ -402,7 +402,10 @@ private struct TimetableBlockCard: View {
     @ViewBuilder
     private var actionsButton: some View {
         #if os(macOS)
-        Button { showsActions.toggle() } label: {
+        // Set rather than toggle — the card's own tap gesture also sets
+        // showsActions, and a toggle can race it and close the popover
+        // immediately after it opens.
+        Button { showsActions = true } label: {
             Label(actionLabel, systemImage: stateSymbol)
                 .labelStyle(.iconOnly)
                 .font(.body)
