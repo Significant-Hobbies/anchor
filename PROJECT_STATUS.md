@@ -43,8 +43,16 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
   finished") — the journey now scrolls the sheet first and asserts the
   "Ended" picker appears. iOS: a tap on "Shape these habits" landed while the
   step transition was still settling and was swallowed — the journey retries
-  once. Pushed as `ee00ba4`; follow-up hosted run is
-  [36260820047](https://github.com/Significant-Hobbies/anchor/actions/runs/36260820047).
+  once. Pushed as `ee00ba4`; follow-up run
+  [36260820047](https://github.com/Significant-Hobbies/anchor/actions/runs/36260820047)
+  then passed the full iPhone suite, watchOS build and the Mac timetable
+  logging journey — leaving exactly one Mac failure: the card action popover
+  never showed "Start now". Root cause was a real race, not a test issue —
+  the card's `.onTapGesture` sets `showsActions` while the actions button
+  toggled it, so the popover could open then immediately close depending on
+  event order. The button now sets the flag unconditionally (`655d955`);
+  verification run
+  [36262692191](https://github.com/Significant-Hobbies/anchor/actions/runs/36262692191).
 
 - **2026-09-26** — Idle-CPU runaway root-caused and fixed (issue 73): it was
   app code, not CloudKit. `FocusController`'s remote-change handler ran
