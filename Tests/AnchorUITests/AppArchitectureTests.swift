@@ -134,13 +134,19 @@ struct AppArchitectureTests {
             contentsOf: repository.appending(path: "Sources/AnchorUI/Planning/DayScreen.swift"),
             encoding: .utf8
         )
+        let habits = try String(
+            contentsOf: repository.appending(path: "Sources/AnchorUI/Planning/FourSurfaceScreens.swift"),
+            encoding: .utf8
+        )
 
         #expect(model.contains("public var habitUsesSuggestedTime: Bool = true"))
         #expect(model.contains("public final class HabitCompletion"))
         #expect(model.contains("!template.isBehaviorHabit && template.applies"))
         #expect(lifecycle.contains("public struct HabitDayService"))
-        #expect(today.contains("anchor.today.habits"))
-        #expect(today.contains("anchor.today.habit.place"))
+        // Habits live on the Habits surface — Today is the timetable only.
+        #expect(!today.contains("anchor.today.habits"))
+        #expect(habits.contains("anchor.habits.complete"))
+        #expect(habits.contains("placingHabit"))
         #expect(today.contains("A suggestion, never a reservation"))
         #expect(today.contains("available all day"))
         #expect(model.contains("case .saturday: \"Sat\""))

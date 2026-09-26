@@ -49,35 +49,8 @@ public struct HabitsScreen: View {
                     "HabitsDoodle",
                     eyebrow: "Habits",
                     title: "Habits",
-                    message: "Tick it off or add it to your day. A time is optional."
+                    message: "Every habit you keep, and the time it belongs at."
                 )
-
-                Button { showsProfile = true } label: {
-                    HStack(spacing: Space.sm) {
-                        Image(systemName: "arrow.triangle.branch")
-                            .foregroundStyle(theme.accent)
-                            .frame(width: 28, height: 28)
-                            .background(theme.accent.opacity(0.12), in: .circle)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Patterns and replacements")
-                                .font(.headline)
-                                .foregroundStyle(theme.textPrimary)
-                            Text(profileSummary)
-                                .font(.subheadline)
-                                .foregroundStyle(theme.textSecondary)
-                                .multilineTextAlignment(.leading)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(theme.textTertiary)
-                    }
-                    .padding(Space.md)
-                    .background(theme.surface, in: .rect(cornerRadius: Radius.md))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("anchor.habits.behavior-profile")
-                .accessibilityValue(profileSummary)
 
                 if let progressionError {
                     Label(progressionError, systemImage: "exclamationmark.triangle.fill")
@@ -87,7 +60,7 @@ public struct HabitsScreen: View {
 
                 VStack(alignment: .leading, spacing: Space.sm) {
                     HStack(alignment: .firstTextBaseline) {
-                        SectionHeader("Your habits", subtitle: "Track them here. Schedule only what needs a time.")
+                        SectionHeader("Your habits", subtitle: "All of them — check one off or give it a time.")
                         Spacer(minLength: Space.sm)
                         Text("\(activeTemplates.count) active")
                             .font(.caption.weight(.bold).monospacedDigit())
@@ -108,11 +81,22 @@ public struct HabitsScreen: View {
                     }
                 }
 
-                Button("Add a habit", systemImage: "plus") {
-                    showsNewHabit = true
+                HStack(spacing: Space.xs) {
+                    Button("Add a habit", systemImage: "plus") {
+                        showsNewHabit = true
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .accessibilityIdentifier("anchor.habits.add")
+
+                    Spacer(minLength: 0)
+
+                    Button { showsProfile = true } label: {
+                        Label("Patterns and replacements", systemImage: "arrow.triangle.branch")
+                    }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .accessibilityIdentifier("anchor.habits.behavior-profile")
+                    .accessibilityValue(profileSummary)
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .accessibilityIdentifier("anchor.habits.add")
 
                 if !archivedTemplates.isEmpty {
                     VStack(alignment: .leading, spacing: Space.sm) {

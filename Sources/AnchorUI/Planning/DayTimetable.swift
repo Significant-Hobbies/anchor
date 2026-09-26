@@ -47,17 +47,19 @@ enum TimetableLayout {
     }
 
     /// The hour window the grid draws. Defaults to a working day
-    /// (7:00–22:00) and expands to cover every block plus the current hour
-    /// when the day being viewed is today.
+    /// (7:00–22:00, owner-adjustable) and expands to cover every block plus
+    /// the current hour when the day being viewed is today.
     static func displayRange(
         for day: Date,
         intervals: [(TimeInterval, TimeInterval)],
         now: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        windowStartHour: Int = 7,
+        windowEndHour: Int = 22
     ) -> DateInterval {
         let startOfDay = calendar.startOfDay(for: day)
-        var startHour = 7.0
-        var endHour = 22.0
+        var startHour = Double(max(0, min(windowStartHour, 23)))
+        var endHour = Double(max(Int(startHour) + 1, min(windowEndHour, 24)))
         for (start, end) in intervals {
             startHour = min(startHour, floor(start / 3600))
             endHour = max(endHour, ceil(end / 3600))
@@ -96,6 +98,10 @@ struct DayTimetable: View {
     let day: Date
     let entries: [Entry]
     var hourHeight: CGFloat = 56
+    var windowStartHour: Int = 7
+    var windowEndHour: Int = 22
+    var showsLivedTrace: Bool = true
+    var dimsFinished: Bool = true
     var onStart: (PlanBlock) -> Void = { _ in }
     var onOpenFocus: () -> Void = {}
     var onComplete: (PlanBlock) -> Void = { _ in }
@@ -107,7 +113,7 @@ struct DayTimetable: View {
     static let nowAnchorID = "anchor.timetable.now"
 
     private let railWidth: CGFloat = 50
-    private let traceWidth: CGFloat = 12
+    private var traceWidth: CGFloat { showsLivedTrace ? 12 : 0 }
 
     private var range: DateInterval {
         TimetableLayout.displayRange(
@@ -116,7 +122,9 @@ struct DayTimetable: View {
                 let start = entry.block.plannedStart.timeIntervalSince(Calendar.current.startOfDay(for: day))
                 return (start, start + Double(entry.block.plannedSeconds))
             },
-            now: Date()
+            now: Date(),
+            windowStartHour: windowStartHour,
+            windowEndHour: windowEndHour
         )
     }
 
@@ -159,7 +167,9 @@ struct DayTimetable: View {
                     .accessibilityLabel("Add an entry at this time")
                     .accessibilityIdentifier("anchor.today.timetable-add")
 
-                livedTraces
+                if showsLivedTrace {
+                    livedTraces
+                }
 
                 ForEach(entries) { entry in
                     let placement = placements[entry.id] ?? TimetableLayout.Placement(lane: 0, laneCount: 1)
@@ -168,6 +178,7 @@ struct DayTimetable: View {
                     TimetableBlockCard(
                         entry: entry,
                         height: cardHeight(for: entry),
+                        dimsFinished: dimsFinished,
                         onStart: { onStart(entry.block) },
                         onOpenFocus: onOpenFocus,
                         onComplete: { onComplete(entry.block) },
@@ -294,6 +305,7 @@ private struct TimetableBlockCard: View {
 
     let entry: DayTimetable.Entry
     let height: CGFloat
+    var dimsFinished: Bool = true
     let onStart: () -> Void
     let onOpenFocus: () -> Void
     let onComplete: () -> Void
@@ -478,7 +490,8 @@ private struct TimetableBlockCard: View {
     }
 
     private var cardOpacity: Double {
-        switch block.state {
+        guard dimsFinished else { return 1 }
+        return switch block.state {
         case .completed: 0.62
         case .skipped, .moved: 0.45
         default: 1

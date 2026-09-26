@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Today becomes a real timetable — hour-grid plan with a drawn lived trace, plus a time logger (still-happening and retroactive entries)",
+  "target": "Today answers only 'what does this day ask of me' — hour-grid timetable + logger + owner customization; habits live entirely on Habits (list, check-off, schedule-at-time)",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
@@ -32,13 +32,13 @@
       "purposeSource": "PRODUCT.md; owner stated on 26 September 2026 that the product they wanted was 'a well sorted timetable and logger'",
       "canonicalPurpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
       "purposeAlignment": "match",
-      "driftNote": "Owner scoped the change through structured options: hour-grid timetable, retroactive + in-the-moment logging, Today-only scope. History stays as-is.",
+      "driftNote": "Owner then scoped the surfaces sharper on 26 September 2026: Today shows only the day's asks (timetable + logging + customize), and Habits owns the habit list plus scheduling a habit at a particular time. History stays as-is.",
       "audience": "The owner using an iPhone and Mac throughout an ordinary day.",
-      "job": "See the day on a true time axis, place or move entries by tapping open time, and record what actually happened — running or finished.",
+      "job": "See the day on a true time axis with nothing else competing, place or move entries by tapping open time, record what actually happened, and adjust how the grid draws itself.",
       "thesis": "The plan is a straight, quiet hour grid; the day that was actually lived is drawn beside it in the hand-wiggled trace material the rest of the app uses.",
       "system": "Existing paper/charcoal, native SF type, Anchor spacing, hairline hour marks, card surfaces and state tints — no new tokens.",
       "signature": "Two traces on one timetable: planned blocks on the grid, and a thin drawn wiggle in the gutter marking when work really happened.",
-      "risk": "A full-day grid reads denser than the old compact list; mitigated by faint hairlines, a working-day default window, and scroll-to-now on open."
+      "risk": "A full-day grid reads denser than the old compact list; mitigated by faint hairlines, an owner-adjustable day window (7–22 default), optional lived-trace, finished-entry dimming, and scroll-to-now on open."
     }
   },
   "evidence": {
@@ -71,7 +71,7 @@
     "critique": {
       "score": 33,
       "maximum": 40,
-      "note": "Fresh review of the new grid and log sheet renders: consistent tokens, honest states, lived trace reads as intended. Not carried forward — the surface changed."
+      "note": "Fresh review of the new grid and log sheet renders: consistent tokens, honest states, lived trace reads as intended. Surface re-scoping keeps the same materials — the change removes surface competition rather than adding visual novelty. Re-render pending for the scoped surfaces."
     },
     "audit": {
       "score": 17,
@@ -115,6 +115,6 @@
   },
   "ownerFeedback": {
     "decision": "approved",
-    "note": "Owner selected the hour-grid timetable, both logging modes (retroactive + quick), and Today-only scope via structured scoping options on 26 September 2026."
+    "note": "Owner selected the hour-grid timetable, both logging modes (retroactive + quick), and Today-only scope via structured scoping options, then directed: Today = only what the day asks (customizable), Habits = the habit list + schedule-at-a-time."
   }
 }

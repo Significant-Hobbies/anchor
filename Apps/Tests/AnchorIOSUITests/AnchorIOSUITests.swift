@@ -251,17 +251,20 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.buttons["anchor.habits.complete"].exists)
 
 
+        // Habits live on the Habits tab; Today only gains one when it's
+        // scheduled at a time, which places it on the timetable.
         app.tabBars.buttons["Today"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 4))
-        app.buttons["anchor.today.habit.done"].tap()
-        XCTAssertTrue(app.staticTexts["Completed today"].waitForExistence(timeout: 3))
-        app.buttons["anchor.today.habit.undo"].tap()
-        app.buttons["anchor.today.habit.place"].tap()
+        XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
+
+        app.tabBars.buttons["Habits"].tap()
+        app.buttons["Schedule"].tap()
         XCTAssertTrue(app.navigationBars["Place habit"].waitForExistence(timeout: 3))
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Placed at")).firstMatch.waitForExistence(timeout: 3))
 
-        keepScreenshot(app, named: "anchor-build19-ios-flexible-habits-today")
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["Two-day reset"].waitForExistence(timeout: 4))
+
+        keepScreenshot(app, named: "anchor-build19-ios-scheduled-habit-today")
 
     }
 

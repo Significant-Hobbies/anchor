@@ -9,8 +9,8 @@ struct PlanScreen: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
-    @Query(sort: \HabitCompletion.updatedAt, order: .reverse) private var habitCompletions: [HabitCompletion]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \AnchorPreferences.updatedAt, order: .reverse) private var preferences: [AnchorPreferences]
     @Query private var projects: [Project]
     private let controller: FocusController
     private let onOpenFocus: () -> Void
@@ -18,9 +18,8 @@ struct PlanScreen: View {
     @State private var lastCalendarDay = Date()
     @State private var showsCopyDay = false
     @State private var editorSeed: EditorSeed?
-    @State private var showsRoutines = false
+    @State private var showsCustomize = false
     @State private var editingBlock: PlanBlock?
-    @State private var placingHabit: ScheduleTemplate?
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
@@ -59,10 +58,6 @@ struct PlanScreen: View {
                 dayHeader
 
                 dayControls
-
-                if !todayHabits.isEmpty {
-                    todayHabitsSection
-                }
 
                 if !blocks.isEmpty {
                     daySummary
@@ -103,6 +98,10 @@ struct PlanScreen: View {
                     DayTimetable(
                         day: today,
                         entries: timetableEntries,
+                        windowStartHour: timetablePrefs.startHour,
+                        windowEndHour: timetablePrefs.endHour,
+                        showsLivedTrace: timetablePrefs.showsLivedTrace,
+                        dimsFinished: timetablePrefs.dimsFinished,
                         onStart: start,
                         onOpenFocus: onOpenFocus,
                         onComplete: complete,
@@ -113,21 +112,6 @@ struct PlanScreen: View {
                     )
                 }
 
-                if !activeTemplates.isEmpty {
-                    Button { showsRoutines = true } label: {
-                        HStack {
-                            Label("Your usual week · \(activeTemplates.count) item\(activeTemplates.count == 1 ? "" : "s")", systemImage: "calendar.badge.clock")
-                            Spacer()
-                            Text("Manage")
-                            Image(systemName: "chevron.right")
-                        }
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(theme.textSecondary)
-                        .padding(Space.md)
-                        .background(theme.surface, in: .rect(cornerRadius: Radius.md))
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             .padding(Space.lg)
             .frame(maxWidth: workspaceMaxWidth)
@@ -164,20 +148,12 @@ struct PlanScreen: View {
             PlanBlockEditor(initialDay: today, suggestedStart: seed.start) { refresh() }
                 .anchorTheme()
         }
-        .sheet(isPresented: $showsRoutines) {
-            RoutineManager(onChange: refresh)
-                .anchorTheme()
-        }
         .sheet(item: $editingBlock) { block in
             PlanBlockEditor(initialDay: today, block: block) { refresh() }
                 .anchorTheme()
         }
-        .sheet(item: $placingHabit) { habit in
-            PlanBlockEditor(
-                initialDay: today,
-                suggestedStart: habit.habitSuggestedStart(on: today) ?? suggestedStart,
-                placingHabit: habit
-            ) { refresh() }
+        .sheet(isPresented: $showsCustomize) {
+            TimetableOptionsSheet(routineCount: activeTemplates.count, onChange: refresh)
                 .anchorTheme()
         }
         .sheet(item: $explainingBlock) { block in
@@ -234,7 +210,7 @@ struct PlanScreen: View {
             "TodayDoodle",
             eyebrow: today.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
             title: "Draw the day",
-            message: "Check habits, plan entries, then play your day.",
+            message: "Everything this day asks of you, laid out on the clock.",
             compact: true
         )
     }
@@ -255,6 +231,9 @@ struct PlanScreen: View {
                 Button("Log time", systemImage: "clock.arrow.circlepath") { showsLogSheet = true }
                     .buttonStyle(QuietButtonStyle(expands: false))
                     .accessibilityIdentifier("anchor.today.log-time")
+                Button("Customize", systemImage: "slider.horizontal.3") { showsCustomize = true }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .accessibilityIdentifier("anchor.today.customize")
             }
         }
     }
@@ -263,136 +242,14 @@ struct PlanScreen: View {
         templates.filter { !$0.isArchived && !$0.isBehaviorHabit }
     }
 
-    private var todayHabits: [ScheduleTemplate] {
-        templates
-            .filter { $0.isActiveBehaviorHabit && $0.applies(to: today) }
-            .sorted { $0.createdAt < $1.createdAt }
-    }
-
-    private var todayHabitsSection: some View {
-        VStack(alignment: .leading, spacing: Space.sm) {
-            SectionHeader(
-                Calendar.current.isDateInToday(today) ? "Today’s habits" : "Habits for this day",
-                subtitle: "Check it off or schedule a time."
-            )
-            VStack(spacing: Space.xs) {
-                ForEach(todayHabits) { habit in
-                    todayHabitRow(habit)
-                }
-            }
-        }
-        .accessibilityIdentifier("anchor.today.habits")
-    }
-
-    private func todayHabitRow(_ habit: ScheduleTemplate) -> some View {
-        let placed = placedBlock(for: habit)
-        let direct = directCompletion(for: habit)
-        let isDone = placed?.state == .completed || direct?.isCompleted == true
-
-        return ViewThatFits(in: .horizontal) {
-            HStack(spacing: Space.sm) {
-                habitIdentity(habit, placed: placed, isDone: isDone)
-                Spacer(minLength: Space.sm)
-                habitActions(habit, placed: placed, direct: direct, isDone: isDone)
-            }
-            VStack(alignment: .leading, spacing: Space.sm) {
-                habitIdentity(habit, placed: placed, isDone: isDone)
-                habitActions(habit, placed: placed, direct: direct, isDone: isDone)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Space.md)
-        .background(theme.surface, in: .rect(cornerRadius: Radius.md))
-        .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("anchor.today.habit.\(habit.id.uuidString)")
-    }
-
-    private func habitIdentity(_ habit: ScheduleTemplate, placed: PlanBlock?, isDone: Bool) -> some View {
-        HStack(spacing: Space.sm) {
-            Image(systemName: isDone ? "checkmark" : (habit.lifeDirection?.symbolName ?? "leaf"))
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(isDone ? theme.positive : theme.accent)
-                .frame(width: 34, height: 34)
-                .background((isDone ? theme.positive : theme.accent).opacity(0.11), in: .circle)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(habit.title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-                Text(habitStatusCopy(habit, placed: placed, isDone: isDone))
-                    .font(.caption)
-                    .foregroundStyle(theme.textSecondary)
-                    .accessibilityIdentifier("anchor.today.habit.status")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func habitActions(
-        _ habit: ScheduleTemplate,
-        placed: PlanBlock?,
-        direct: HabitCompletion?,
-        isDone: Bool
-    ) -> some View {
-        if isDone {
-            HStack(spacing: Space.xs) {
-                Label("Done", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(theme.positive)
-                if placed == nil && direct?.isCompleted == true {
-                    Button("Undo") { setHabitCompleted(false, habit: habit) }
-                        .buttonStyle(QuietButtonStyle(expands: false))
-                        .accessibilityIdentifier("anchor.today.habit.undo")
-                }
-            }
-        } else if let placed {
-            Button("Done", systemImage: "checkmark") { complete(placed) }
-                .buttonStyle(QuietButtonStyle(expands: false))
-                .accessibilityIdentifier("anchor.today.habit.done")
-        } else {
-            HStack(spacing: Space.xs) {
-                Button("Done", systemImage: "checkmark") { setHabitCompleted(true, habit: habit) }
-                    .buttonStyle(QuietButtonStyle(expands: false))
-                    .accessibilityIdentifier("anchor.today.habit.done")
-                Button("Schedule", systemImage: "calendar.badge.plus") { placingHabit = habit }
-                    .buttonStyle(PrimaryButtonStyle(expands: false))
-                    .accessibilityIdentifier("anchor.today.habit.place")
-            }
-        }
-    }
-
-    private func habitStatusCopy(_ habit: ScheduleTemplate, placed: PlanBlock?, isDone: Bool) -> String {
-        if isDone { return Calendar.current.isDateInToday(today) ? "Completed today" : "Completed on this day" }
-        if let placed {
-            return "Placed at \(placed.plannedStart.formatted(date: .omitted, time: .shortened))"
-        }
-        if let suggested = habit.habitSuggestedStart(on: today) {
-            return "Suggested around \(suggested.formatted(date: .omitted, time: .shortened)) · available all day"
-        }
-        return Calendar.current.isDateInToday(today) ? "Any time today" : "Any time on this day"
-    }
-
-    private func placedBlock(for habit: ScheduleTemplate) -> PlanBlock? {
-        allBlocks
-            .filter { $0.templateID == habit.id }
-            .filter { Calendar.current.isDate($0.templateOccurrenceDay ?? $0.plannedStart, inSameDayAs: today) }
-            .max { $0.updatedAt < $1.updatedAt }
-    }
-
-    private func directCompletion(for habit: ScheduleTemplate) -> HabitCompletion? {
-        habitCompletions
-            .filter { $0.habitID == habit.id && Calendar.current.isDate($0.day, inSameDayAs: today) }
-            .max { $0.updatedAt < $1.updatedAt }
-    }
-
-    private func setHabitCompleted(_ completed: Bool, habit: ScheduleTemplate) {
-        do {
-            try HabitDayService(context: context).setCompleted(completed, habitID: habit.id, on: today)
-            loadError = nil
-        } catch {
-            context.rollback()
-            loadError = "Anchor could not save that habit. Nothing else changed."
-        }
+    private var timetablePrefs: (startHour: Int, endHour: Int, showsLivedTrace: Bool, dimsFinished: Bool) {
+        let prefs = AnchorPreferencesPolicy.latest(in: preferences)
+        return (
+            prefs?.timetableStartHour ?? 7,
+            prefs?.timetableEndHour ?? 22,
+            prefs?.timetableShowsLivedTrace ?? true,
+            prefs?.timetableDimsFinished ?? true
+        )
     }
 
     private var emptyDayCopy: some View {
@@ -510,6 +367,185 @@ struct PlanScreen: View {
 private struct EditorSeed: Identifiable {
     let id = UUID()
     let start: Date
+}
+
+/// How Today draws its timetable. The choices live on `AnchorPreferences`, so
+/// they travel with the rest of the owner's private Anchor data, and they only
+/// shape the display — entries outside the chosen hours still expand the grid
+/// rather than disappear.
+struct TimetableOptionsSheet: View {
+    @Environment(\.anchorTheme) private var theme
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \AnchorPreferences.updatedAt, order: .reverse) private var preferences: [AnchorPreferences]
+    @State private var showsRoutines = false
+    @State private var saveError: String?
+
+    let routineCount: Int
+    let onChange: () -> Void
+
+    private var prefs: AnchorPreferences? {
+        AnchorPreferencesPolicy.latest(in: preferences)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.lg) {
+                    Text("The timetable only ever answers one question: what does this day ask of you. These choices shape how it draws that answer.")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.textSecondary)
+
+                    if let saveError {
+                        Label(saveError, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(theme.negative)
+                    }
+
+                    Card(padding: Space.lg) {
+                        VStack(alignment: .leading, spacing: Space.md) {
+                            Stepper(value: startHourBinding, in: 0...23) {
+                                HStack {
+                                    Text("Day starts")
+                                        .foregroundStyle(theme.textPrimary)
+                                    Spacer()
+                                    Text(hourLabel(prefs?.timetableStartHour ?? 7))
+                                        .font(.subheadline.monospacedDigit())
+                                        .foregroundStyle(theme.textSecondary)
+                                }
+                            }
+                            .accessibilityIdentifier("anchor.timetable.start-hour")
+                            Stepper(value: endHourBinding, in: 1...24) {
+                                HStack {
+                                    Text("Day ends")
+                                        .foregroundStyle(theme.textPrimary)
+                                    Spacer()
+                                    Text(hourLabel(prefs?.timetableEndHour ?? 22))
+                                        .font(.subheadline.monospacedDigit())
+                                        .foregroundStyle(theme.textSecondary)
+                                }
+                            }
+                            .accessibilityIdentifier("anchor.timetable.end-hour")
+                            Text("Entries outside these hours still appear — the grid grows to include them.")
+                                .font(.caption)
+                                .foregroundStyle(theme.textTertiary)
+                        }
+                    }
+
+                    Card(padding: Space.lg) {
+                        VStack(alignment: .leading, spacing: Space.md) {
+                            Toggle("Show the lived trace", isOn: livedTraceBinding)
+                                .tint(theme.accent)
+                                .accessibilityIdentifier("anchor.timetable.lived-trace")
+                            Toggle("Dim finished entries", isOn: dimsFinishedBinding)
+                                .tint(theme.accent)
+                                .accessibilityIdentifier("anchor.timetable.dims-finished")
+                        }
+                    }
+
+                    Button { showsRoutines = true } label: {
+                        HStack {
+                            Label("Your usual week · \(routineCount) item\(routineCount == 1 ? "" : "s")", systemImage: "calendar.badge.clock")
+                            Spacer()
+                            Text("Manage")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(theme.textSecondary)
+                        .padding(Space.md)
+                        .background(theme.surface, in: .rect(cornerRadius: Radius.md))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("anchor.timetable.routines")
+                }
+                .padding(Space.lg)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
+            }
+            .background(theme.canvas)
+            .navigationTitle("Customize Today")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .sheet(isPresented: $showsRoutines) {
+            RoutineManager(onChange: onChange)
+                .anchorTheme()
+        }
+        #if os(macOS)
+        .frame(minWidth: 480, idealWidth: 560, minHeight: 360, idealHeight: 460)
+        #endif
+    }
+
+    private var startHourBinding: Binding<Int> {
+        Binding(
+            get: { prefs?.timetableStartHour ?? 7 },
+            set: { newValue in
+                update { prefs in
+                    prefs.timetableStartHour = newValue
+                    if prefs.timetableEndHour <= newValue {
+                        prefs.timetableEndHour = min(24, newValue + 1)
+                    }
+                }
+            }
+        )
+    }
+
+    private var endHourBinding: Binding<Int> {
+        Binding(
+            get: { prefs?.timetableEndHour ?? 22 },
+            set: { newValue in
+                update { prefs in
+                    prefs.timetableEndHour = newValue
+                    if prefs.timetableStartHour >= newValue {
+                        prefs.timetableStartHour = max(0, newValue - 1)
+                    }
+                }
+            }
+        )
+    }
+
+    private var livedTraceBinding: Binding<Bool> {
+        Binding(
+            get: { prefs?.timetableShowsLivedTrace ?? true },
+            set: { newValue in update { $0.timetableShowsLivedTrace = newValue } }
+        )
+    }
+
+    private var dimsFinishedBinding: Binding<Bool> {
+        Binding(
+            get: { prefs?.timetableDimsFinished ?? true },
+            set: { newValue in update { $0.timetableDimsFinished = newValue } }
+        )
+    }
+
+    private func hourLabel(_ hour: Int) -> String {
+        let calendar = Calendar.current
+        let base = calendar.startOfDay(for: Date())
+        let date = calendar.date(byAdding: .hour, value: hour, to: base) ?? base
+        return date.formatted(.dateTime.hour())
+    }
+
+    private func update(_ mutate: (AnchorPreferences) -> Void) {
+        let record: AnchorPreferences
+        if let existing = prefs {
+            record = existing
+        } else {
+            record = AnchorPreferences()
+            context.insert(record)
+        }
+        mutate(record)
+        record.updatedAt = Date()
+        do {
+            try context.save()
+            saveError = nil
+        } catch {
+            context.rollback()
+            saveError = "Anchor could not save that choice. Try again."
+        }
+    }
 }
 
 struct PlanBlockEditor: View {

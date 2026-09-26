@@ -146,8 +146,9 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(element(containing: "Mac reset walk", in: app).waitForExistence(timeout: 4))
         app.buttons["Today"].click()
         XCTAssertTrue(app.staticTexts["Mac weekly planning"].waitForExistence(timeout: 4))
-        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Mac reset walk"].waitForExistence(timeout: 4))
+        // Unscheduled habits stay on Habits — Today is the timetable only.
+        XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
+        XCTAssertFalse(app.staticTexts["Mac reset walk"].exists)
     }
 
     @MainActor
@@ -220,22 +221,25 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Save"].click()
         XCTAssertTrue(element(containing: "Two-day reset edited", in: app).waitForExistence(timeout: 4))
 
+        // Habits live on the Habits tab; Today stays free of them until one is
+        // scheduled at a time, which places it on the timetable.
         app.buttons["Today"].click()
-        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 4))
-        app.buttons["anchor.today.habit.done"].click()
-        let completedHabit = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "Completed today", "Completed today")
-        ).firstMatch
-        XCTAssertTrue(completedHabit.waitForExistence(timeout: 3))
-        app.buttons["anchor.today.habit.undo"].click()
-        app.buttons["anchor.today.habit.place"].click()
+        XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
+
+        app.buttons["Habits"].click()
+        let schedule = app.buttons["Schedule"]
+        XCTAssertTrue(schedule.waitForExistence(timeout: 4))
+        schedule.click()
         let placeHabitTitle = app.staticTexts["Place habit"]
         XCTAssertTrue(placeHabitTitle.waitForExistence(timeout: 3))
         app.buttons["Save"].click()
         XCTAssertTrue(placeHabitTitle.waitForNonExistence(timeout: 4))
-        XCTAssertTrue(app.buttons["anchor.today.habit.place"].waitForNonExistence(timeout: 4))
 
-        keepScreenshot(app, named: "anchor-build19-mac-flexible-habits-today")
+        app.buttons["Today"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 4))
+        XCTAssertTrue(element(containing: "Two-day reset edited", in: app).waitForExistence(timeout: 4))
+
+        keepScreenshot(app, named: "anchor-build19-mac-scheduled-habit-today")
     }
 
     @MainActor
@@ -641,6 +645,15 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Timetable acceptance"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-timetable-grid")
+
+        // Customize — the timetable's own options plus the door to usual week.
+        app.buttons["anchor.today.customize"].click()
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.start-hour"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.lived-trace"].exists)
+        app.buttons["anchor.timetable.routines"].click()
+        XCTAssertTrue(app.staticTexts["Your usual week"].waitForExistence(timeout: 3))
+        app.buttons["Done"].click()
+        app.buttons["Done"].click()
 
         // Quick log — "still happening" captures an open entry without a timer.
         app.buttons["anchor.today.log-time"].click()

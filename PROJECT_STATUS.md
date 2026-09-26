@@ -34,6 +34,29 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-26** — Owner scoped the surfaces sharper: **Today answers only "what
+  does this day ask of me"** (header, day picker, summary line, timetable, Add /
+  Log time / Customize). The habit checklist left Today entirely — unscheduled
+  habits were already excluded from `materialize`, so the grid now carries only
+  real commitments; a habit appears only once it's scheduled at a time from
+  **Habits**, which is now the single home for the habit list (add, check off,
+  schedule-at-time, archive) with the behaviour-profile editor demoted to a
+  quiet secondary button. **Customize Today** is a new sheet holding the
+  timetable's owner options — day start/end hours (the grid still grows to
+  cover outlying entries), lived-trace visibility, finished-entry dimming —
+  persisted on `AnchorPreferences` so the choices travel over private CloudKit;
+  "Your usual week" management moved inside it. Hosted UI evidence pending.
+
+- **2026-09-26** — Found a Mac battery-drain defect while verifying usability:
+  the installed build idles at ~110% CPU because CoreData's CloudKit export
+  activity resubmits its background-task request ~300×/sec forever
+  (`updateTaskRequest: No change in task request for
+  com.apple.coredata.cloudkit.activity.export…`). Same binary on a local-only
+  store idles at 0% — the loop is inside `NSPersistentCloudKitContainer`'s
+  mirroring layer, not app code. Tracked as [issue
+  73](https://github.com/Significant-Hobbies/anchor/issues/73); likely a stuck
+  export record or a macOS 27.2 beta regression.
+
 - **2026-09-26** — Today becomes a real timetable: an hour grid renders blocks
   at their clock position sized by duration (overlaps share equal lanes), a thin
   hand-drawn trace beside the rail marks when time actually passed, the view
@@ -395,9 +418,14 @@ CloudKit container and app group.
 
 ## Features (current source)
 
-- Local day planning on an hour-grid timetable: one-off blocks and recurring
-  weekly routines sit at their clock position, overlaps share lanes, open space
-  is one tap away from a new entry, and a drawn lived trace shows the real day
+- Today answers only "what does this day ask of me" — an hour-grid timetable
+  where one-off blocks, scheduled habits and recurring routines sit at their
+  clock position, overlaps share lanes, open space is one tap away from a new
+  entry, and a drawn lived trace shows the real day; **Customize Today** holds
+  the owner-set day window, lived-trace and finished-entry dimming options plus
+  the door to usual-week management
+- Habits is the single home for habits: the full list with check-off, weekly
+  progress, archive/restore, and schedule-at-time placement onto Today's grid
 - Time logging that needs no timer: "still happening" opens an entry you finish
   later, and past spans can be recorded after the fact — both count as observed
   lived time in the day review

@@ -52,5 +52,33 @@ struct TimetableLayoutTests {
         #expect(range.start == day.addingTimeInterval(7 * 3_600))
         #expect(range.end == day.addingTimeInterval(22 * 3_600))
     }
+
+    @Test("The owner's window replaces the default and still grows for outlying entries")
+    func displayRangeHonoursOwnerWindow() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let day = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
+        let custom = TimetableLayout.displayRange(
+            for: day,
+            intervals: [],
+            now: Date(),
+            calendar: calendar,
+            windowStartHour: 9,
+            windowEndHour: 18
+        )
+        #expect(custom.start == day.addingTimeInterval(9 * 3_600))
+        #expect(custom.end == day.addingTimeInterval(18 * 3_600))
+
+        let expanded = TimetableLayout.displayRange(
+            for: day,
+            intervals: [(23 * 3_600, 24 * 3_600)],
+            now: Date(),
+            calendar: calendar,
+            windowStartHour: 9,
+            windowEndHour: 18
+        )
+        #expect(expanded.start == day.addingTimeInterval(9 * 3_600))
+        #expect(expanded.end == day.addingTimeInterval(24 * 3_600))
+    }
 }
 #endif
