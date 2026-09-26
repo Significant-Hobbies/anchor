@@ -50,9 +50,17 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
   never showed "Start now". Root cause was a real race, not a test issue —
   the card's `.onTapGesture` sets `showsActions` while the actions button
   toggled it, so the popover could open then immediately close depending on
-  event order. The button now sets the flag unconditionally (`655d955`);
-  verification run
-  [36262692191](https://github.com/Significant-Hobbies/anchor/actions/runs/36262692191).
+  event order. The button now sets the flag unconditionally (`655d955`).
+  Verification run
+  [36262692191](https://github.com/Significant-Hobbies/anchor/actions/runs/36262692191)
+  surfaced two more swallowed-interaction failures: `scrollToNow` fired while
+  the editor sheet was still dismissing and got dropped, leaving the new card
+  at the bottom fold with its action button unhittable — the screen now
+  re-anchors after any block sheet closes (plus a delayed retry inside
+  `scrollToNow`); and the iOS habit journey tapped a weekday chip while the
+  keyboard covered it — the journey now scrolls the chip clear and asserts it
+  flipped to selected before saving (`d52e25b`). Verification run
+  [36265610087](https://github.com/Significant-Hobbies/anchor/actions/runs/36265610087).
 
 - **2026-09-26** — Idle-CPU runaway root-caused and fixed (issue 73): it was
   app code, not CloudKit. `FocusController`'s remote-change handler ran
