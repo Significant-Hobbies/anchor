@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Build 25 design verification — private-notes and daily-flow repairs touched no visual surface",
+  "target": "Today becomes a real timetable — hour-grid plan with a drawn lived trace, plus a time logger (still-happening and retroactive entries)",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
@@ -13,8 +13,8 @@
   "direction": {
     "references": [],
     "probes": [],
-    "selected": "existing-design",
-    "approval": "not-required",
+    "selected": "owner-picked-hour-grid-timetable",
+    "approval": "approved",
     "before": "artifacts/design/build25-verification-20260926/today-mac.png",
     "library": {
       "strategy": "upstream-first",
@@ -24,71 +24,59 @@
       "customReplacement": {
         "used": false,
         "authorization": "not-required",
-        "reason": ""
+        "reason": "SwiftUI-only surface composed entirely from AnchorTheme tokens, Card, Chip and the existing drawn-day materials."
       }
     },
     "contract": {
-      "purpose": "Replace unwanted habits, track good ones, plan a day and run its entries with honest interruption logging.",
-      "purposeSource": "Owner direction on 7 September 2026 and PRODUCT.md; builds 23-25 carried reliability work only",
+      "purpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
+      "purposeSource": "PRODUCT.md; owner stated on 26 September 2026 that the product they wanted was 'a well sorted timetable and logger'",
       "canonicalPurpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
-      "purposeAlignment": "repository-override",
-      "driftNote": "Builds 23-25 changed sync plumbing, private-note persistence and failure safety. No visual surface, layout, or token changed; this receipt re-verifies the drawn-day surfaces on the current build rather than claiming a new review of unchanged pixels.",
+      "purposeAlignment": "match",
+      "driftNote": "Owner scoped the change through structured options: hour-grid timetable, retroactive + in-the-moment logging, Today-only scope. History stays as-is.",
       "audience": "The owner using an iPhone and Mac throughout an ordinary day.",
-      "job": "Check off a habit or schedule and play an entry without configuring a behavior programme.",
-      "thesis": "Preserve The Drawn Day but give the actual daily actions the prominent controls.",
-      "system": "Existing paper/charcoal, native SF type, Anchor spacing, restrained ink actions and original doodles.",
-      "signature": "A drawn day with directly playable entries and habits that can be checked off without a time.",
-      "risk": "None new — no design change shipped since the simple-day review."
+      "job": "See the day on a true time axis, place or move entries by tapping open time, and record what actually happened — running or finished.",
+      "thesis": "The plan is a straight, quiet hour grid; the day that was actually lived is drawn beside it in the hand-wiggled trace material the rest of the app uses.",
+      "system": "Existing paper/charcoal, native SF type, Anchor spacing, hairline hour marks, card surfaces and state tints — no new tokens.",
+      "signature": "Two traces on one timetable: planned blocks on the grid, and a thin drawn wiggle in the gutter marking when work really happened.",
+      "risk": "A full-day grid reads denser than the old compact list; mitigated by faint hairlines, a working-day default window, and scroll-to-now on open."
     }
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/build25-verification-20260926/today-390.png"
+        "path": "artifacts/design/timetable-logger-20260926/today-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/build25-verification-20260926/today-768.png"
+        "path": "artifacts/design/timetable-logger-20260926/today-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/build25-verification-20260926/today-1440.png"
+        "path": "artifacts/design/timetable-logger-20260926/today-1440.png"
       },
       {
         "width": 1200,
-        "path": "artifacts/design/build25-verification-20260926/focus-mac.png"
+        "path": "artifacts/design/timetable-logger-20260926/today-mac.png"
       },
       {
-        "width": 402,
-        "path": "artifacts/design/build25-verification-20260926/focus-phone.png"
-      },
-      {
-        "width": 1200,
-        "path": "artifacts/design/build25-verification-20260926/habits-mac.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/build25-verification-20260926/onboarding-phone.png"
-      },
-      {
-        "width": 402,
-        "path": "artifacts/design/build25-verification-20260926/history-trends-phone.png"
+        "width": 720,
+        "path": "artifacts/design/timetable-logger-20260926/log-time-mac.png"
       }
     ],
     "projectCheck": {
-      "command": "node .agents/skills/anchor-review-readiness/scripts/review-readiness.mjs --full --policy-checked 2026-09-26 (visual catalog rendered offscreen from current build-25 source, 28 pages)",
+      "command": "swift build && swift test (234 core + 36 UI package tests pass, including TimetableLayout lane packing and logged-entry review evidence); DebugLocal macOS and iOS app builds succeed",
       "status": "pass"
     },
     "critique": {
-      "score": 34,
+      "score": 33,
       "maximum": 40,
-      "note": "Carried forward from the 2026-09-07 simple-day review; builds 23-25 shipped no visual change. Fresh renders were inspected for regressions, not re-scored."
+      "note": "Fresh review of the new grid and log sheet renders: consistent tokens, honest states, lived trace reads as intended. Not carried forward — the surface changed."
     },
     "audit": {
       "score": 17,
       "maximum": 20,
-      "note": "Carried forward from the 2026-09-07 review for the same reason."
+      "note": "Checked against the drawn-day contract: hairlines stay quiet, accent marks only now/active work, completed and skipped states dim rather than disappear."
     },
     "unresolved": {
       "p0": 0,
@@ -97,9 +85,9 @@
     "detector": {
       "posture": "advisory",
       "findings": [
-        "Native SwiftUI review, not a browser rendering. Phone-width catalog images use macOS controls; actual iOS journeys are recorded separately.",
-        "Full Mac UI and physical-device journeys remain release gates; visual scores do not qualify them.",
-        "Build 25 renders were verified surface-by-surface against the drawn-day contract; scores are carried forward, not re-derived."
+        "Native SwiftUI review, not a browser rendering; phone-width catalog images use macOS controls.",
+        "Local Mac UI automation is environment-blocked on this machine (runner SIGKILL before bootstrap); the new grid+logging journey runs in the hosted native-review workflow.",
+        "Overlapping blocks share equal-width lanes within a cluster — deliberate, matching calendar conventions."
       ]
     },
     "comprehension": {
@@ -126,7 +114,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "delegated",
-    "note": "Verification receipt only: builds 23-25 contained no visual change, so the carried-forward scores plus fresh catalog renders are the honest evidence."
+    "decision": "approved",
+    "note": "Owner selected the hour-grid timetable, both logging modes (retroactive + quick), and Today-only scope via structured scoping options on 26 September 2026."
   }
 }

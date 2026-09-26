@@ -623,6 +623,78 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Local library"].exists)
     }
 
+    @MainActor
+    func testTimetablePlacesBlocksOnAnHourGridAndLogsTime() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "timetable")
+        app.launch()
+
+        app.buttons["Today"].click()
+        app.buttons["Add the first entry"].click()
+        let title = app.textFields["What will you do?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        title.click()
+        title.typeText("Timetable acceptance")
+        app.buttons["Save"].click()
+
+        XCTAssertTrue(app.staticTexts["Timetable acceptance"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 3))
+        keepScreenshot(app, named: "anchor-timetable-grid")
+
+        // Quick log — "still happening" captures an open entry without a timer.
+        app.buttons["anchor.today.log-time"].click()
+        let logTitle = app.textFields["anchor.log.title"]
+        XCTAssertTrue(logTitle.waitForExistence(timeout: 3))
+        logTitle.click()
+        logTitle.typeText("In-flight entry")
+        app.buttons["anchor.log.save"].click()
+        XCTAssertTrue(app.staticTexts["In-flight entry"].waitForExistence(timeout: 4))
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "1 now"))
+                .firstMatch.waitForExistence(timeout: 3)
+        )
+
+        // Finishing the open entry records its real span.
+        let inFlightCard = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "anchor.today.block.")
+        ).allElementsBoundByIndex.first { $0.staticTexts["In-flight entry"].exists }
+        XCTAssertNotNil(inFlightCard)
+        inFlightCard?.click()
+        let finish = app.buttons["Finish now"]
+        XCTAssertTrue(finish.waitForExistence(timeout: 3))
+        finish.click()
+
+        // Retroactive log — toggling "Still happening" off records a past span.
+        app.buttons["anchor.today.log-time"].click()
+        let retroTitle = app.textFields["anchor.log.title"]
+        XCTAssertTrue(retroTitle.waitForExistence(timeout: 3))
+        retroTitle.click()
+        retroTitle.typeText("Logged earlier")
+        let ongoingToggle = app.descendants(matching: .any)["anchor.log.still-happening"]
+        XCTAssertTrue(ongoingToggle.waitForExistence(timeout: 2))
+        ongoingToggle.click()
+        app.buttons["anchor.log.save"].click()
+        XCTAssertTrue(app.staticTexts["Logged earlier"].waitForExistence(timeout: 4))
+        XCTAssertTrue(
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "2 finished"))
+                .firstMatch.waitForExistence(timeout: 3)
+        )
+        keepScreenshot(app, named: "anchor-timetable-logged")
+
+        // Logged entries count as observed time — no "untimed" in the review.
+        app.buttons["History"].click()
+        let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
+        XCTAssertTrue(comparison.waitForExistence(timeout: 3))
+        XCTAssertFalse(String(describing: comparison.value).contains("untimed"))
+
+        app.terminate()
+        app.launch()
+        app.buttons["Today"].click()
+        XCTAssertTrue(app.staticTexts["Logged earlier"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 3))
+    }
+
     private func isolatedDirectory(named name: String) throws -> URL {
         let directory = URL(fileURLWithPath: "/tmp", isDirectory: true)
             .appendingPathComponent("anchor-mac-\(name)-\(UUID().uuidString)", isDirectory: true)

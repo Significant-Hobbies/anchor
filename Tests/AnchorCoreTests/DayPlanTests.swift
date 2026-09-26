@@ -630,4 +630,27 @@ struct DayReviewTests {
         #expect(review.suggestions.first?.detail.contains("More creativity") == true)
         #expect(review.suggestions.first?.detail.contains("Short videos") == true)
     }
+
+    @Test("A logged entry is observed lived time, not an invented session")
+    func loggedEntryCountsAsObserved() {
+        let start = Fixture.day0.addingTimeInterval(5_400)
+        let block = PlanBlockRecord(
+            id: UUID(),
+            title: "Logged lunch walk",
+            plannedStart: start,
+            plannedSeconds: 1_800,
+            actualStartedAt: start.addingTimeInterval(300),
+            actualEndedAt: start.addingTimeInterval(2_700),
+            state: .completed,
+            kind: .enjoyment
+        )
+
+        let review = engine.review(day: Fixture.day0, blocks: [block], sessions: [], divergences: [])
+
+        #expect(review.actualSeconds == 2_400)
+        #expect(review.unobservedCompletedBlocks == 0)
+        #expect(review.gaps.first?.actualDurationKnown == true)
+        #expect(review.gaps.first?.varianceSeconds == 600)
+        #expect(review.gaps.first?.evidenceDescription.contains("duration was not observed") == false)
+    }
 }

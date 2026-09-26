@@ -14,12 +14,14 @@ struct DrawnDayLanguageTests {
         let focus = try source("Sources/AnchorUI/Root/RootView.swift", in: repository)
         let running = try source("Sources/AnchorUI/Focus/RunningSessionView.swift", in: repository)
         let day = try source("Sources/AnchorUI/Planning/DayScreen.swift", in: repository)
+        let timetable = try source("Sources/AnchorUI/Planning/DayTimetable.swift", in: repository)
 
         #expect(components.contains("public struct DrawnTrace"))
         #expect(components.contains("public struct InterruptionKnotMark"))
         #expect(focus.contains("FocusPreludeStage"))
         #expect(running.contains("InterruptionKnotMark"))
-        #expect(day.contains("DayRailSegment"))
+        #expect(day.contains("DayTimetable"))
+        #expect(timetable.contains("DayRailShape"))
         #expect(day.contains("DrawnTrace(fraction:"))
     }
 

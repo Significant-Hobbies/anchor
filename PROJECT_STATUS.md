@@ -34,6 +34,20 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-26** — Today becomes a real timetable: an hour grid renders blocks
+  at their clock position sized by duration (overlaps share equal lanes), a thin
+  hand-drawn trace beside the rail marks when time actually passed, the view
+  opens scrolled to now, and tapping open space offers a new entry at that
+  time. A new Log time sheet records what really happened — "still happening"
+  opens an entry you finish later, a finished entry stores its real span — and
+  the day review counts it as observed lived time rather than a fabricated
+  timed session. Owner selected the hour grid, both logging modes, and
+  Today-only scope. 234 core + 36 UI package tests pass, including new
+  lane-packing and logged-entry review coverage; DebugLocal macOS and iOS
+  builds succeed; evidence under
+  `artifacts/design/timetable-logger-20260926/`. Hosted UI evidence for the new
+  journey is pending on the branch run.
+
 - **2026-09-26** — Qualification pass on build 25 (commit `62d3b3a`). Added the
   missing provenance test — remote Hub history provably cannot enter the
   planner before the owner approves history binding — and re-issued the design
@@ -381,8 +395,12 @@ CloudKit container and app group.
 
 ## Features (current source)
 
-- Local day planning with one-off blocks and recurring weekly routines for work,
-  commitments, rest, and intentional enjoyment
+- Local day planning on an hour-grid timetable: one-off blocks and recurring
+  weekly routines sit at their clock position, overlaps share lanes, open space
+  is one tap away from a new entry, and a drawn lived trace shows the real day
+- Time logging that needs no timer: "still happening" opens an entry you finish
+  later, and past spans can be recorded after the fact — both count as observed
+  lived time in the day review
 - Evidence-first daily review of planned versus observed time, with deliberate
   replans, internal pulls, external interruptions, human needs, estimation
   errors, and Unknown kept distinct — never collapsed into an adherence score

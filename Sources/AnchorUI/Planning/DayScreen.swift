@@ -22,6 +22,8 @@ struct PlanScreen: View {
     @State private var editingBlock: PlanBlock?
     @State private var placingHabit: ScheduleTemplate?
     @State private var explainingBlock: PlanBlock?
+    @State private var showsLogSheet = false
+    @State private var loggingBlock: PlanBlock?
     @State private var loadError: String?
 
     init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
@@ -38,7 +40,20 @@ struct PlanScreen: View {
         allBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
     }
 
+    private var timetableEntries: [DayTimetable.Entry] {
+        blocks.sorted { $0.plannedStart < $1.plannedStart }.map { block in
+            DayTimetable.Entry(
+                block: block,
+                projectName: projects.first { $0.id == block.projectID }?.name,
+                linkedSession: block.sessionID.flatMap { id in sessions.first { $0.id == id } },
+                hasDifferentActiveSession: controller.hasSession && controller.session?.id != block.sessionID,
+                isCurrent: isCurrent(block)
+            )
+        }
+    }
+
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
                 dayHeader
@@ -85,29 +100,17 @@ struct PlanScreen: View {
                         #endif
                     }
                 } else {
-                    VStack(spacing: 0) {
-                        ForEach(timelineItems) { item in
-                            switch item {
-                            case let .block(block):
-                                PlanBlockRow(
-                                    block: block,
-                                    projectName: projects.first { $0.id == block.projectID }?.name,
-                                    linkedSession: block.sessionID.flatMap { id in sessions.first { $0.id == id } },
-                                    hasDifferentActiveSession: controller.hasSession && controller.session?.id != block.sessionID,
-                                    isCurrent: isCurrent(block),
-                                    onStart: { start(block) },
-                                    onOpenFocus: onOpenFocus,
-                                    onComplete: { complete(block) },
-                                    onEdit: { editingBlock = block },
-                                    onExplain: { explainingBlock = block }
-                                )
-                            case let .gap(gap):
-                                ScheduleGapRow(gap: gap) {
-                                    editorSeed = EditorSeed(start: gap.start)
-                                }
-                            }
-                        }
-                    }
+                    DayTimetable(
+                        day: today,
+                        entries: timetableEntries,
+                        onStart: start,
+                        onOpenFocus: onOpenFocus,
+                        onComplete: complete,
+                        onEdit: { editingBlock = $0 },
+                        onExplain: { explainingBlock = $0 },
+                        onLogActual: { loggingBlock = $0 },
+                        onAddAt: { editorSeed = EditorSeed(start: $0) }
+                    )
                 }
 
                 if !activeTemplates.isEmpty {
@@ -138,6 +141,8 @@ struct PlanScreen: View {
                     .padding(.vertical, Space.xs)
                     .background(.bar)
             }
+        }
+        .onAppear { scrollToNow(proxy) }
         }
         .background(theme.canvas)
         .sheet(isPresented: $showsCopyDay) {
@@ -197,6 +202,14 @@ struct PlanScreen: View {
             }
             .anchorTheme()
         }
+        .sheet(isPresented: $showsLogSheet) {
+            LogTimeSheet(day: today, onSave: refresh)
+                .anchorTheme()
+        }
+        .sheet(item: $loggingBlock) { block in
+            LogTimeSheet(day: today, block: block, onSave: refresh)
+                .anchorTheme()
+        }
         .task {
             refresh()
             while !Task.isCancelled {
@@ -234,10 +247,15 @@ struct PlanScreen: View {
                     .buttonStyle(.borderless)
                     .accessibilityLabel("Go to today")
             }
-            Button("Copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
-                .buttonStyle(QuietButtonStyle(expands: false))
-                .disabled(blocks.isEmpty)
-                .accessibilityIdentifier("anchor.today.copy-day")
+            HStack(spacing: Space.xs) {
+                Button("Copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .disabled(blocks.isEmpty)
+                    .accessibilityIdentifier("anchor.today.copy-day")
+                Button("Log time", systemImage: "clock.arrow.circlepath") { showsLogSheet = true }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .accessibilityIdentifier("anchor.today.log-time")
+            }
         }
     }
 
@@ -407,21 +425,6 @@ struct PlanScreen: View {
         .accessibilityIdentifier("anchor.today.completion")
     }
 
-    private var timelineItems: [PlanTimelineItem] {
-        var result: [PlanTimelineItem] = []
-        let sorted = blocks.sorted { $0.plannedStart < $1.plannedStart }
-        for (index, block) in sorted.enumerated() {
-            result.append(.block(block))
-            guard index + 1 < sorted.count else { continue }
-            let end = block.plannedStart.addingTimeInterval(Double(block.plannedSeconds))
-            let next = sorted[index + 1].plannedStart
-            if next.timeIntervalSince(end) >= 30 * 60 {
-                result.append(.gap(ScheduleGap(start: end, end: next)))
-            }
-        }
-        return result
-    }
-
     private var suggestedStart: Date {
         let calendar = Calendar.current
         let now = Date()
@@ -435,6 +438,13 @@ struct PlanScreen: View {
     private func isCurrent(_ block: PlanBlock) -> Bool {
         let now = Date()
         return block.state == .inProgress || (now >= block.plannedStart && now < block.plannedStart.addingTimeInterval(Double(block.plannedSeconds)))
+    }
+
+    private func scrollToNow(_ proxy: ScrollViewProxy) {
+        guard Calendar.current.isDateInToday(today), !blocks.isEmpty else { return }
+        DispatchQueue.main.async {
+            proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
+        }
     }
 
     private func refresh() {
@@ -496,281 +506,10 @@ struct PlanScreen: View {
     }
 }
 
-private struct PlanBlockRow: View {
-    @Environment(\.anchorTheme) private var theme
-    @State private var showsActions = false
-    let block: PlanBlock
-    let projectName: String?
-    let linkedSession: FocusSession?
-    let hasDifferentActiveSession: Bool
-    let isCurrent: Bool
-    let onStart: () -> Void
-    let onOpenFocus: () -> Void
-    let onComplete: () -> Void
-    let onEdit: () -> Void
-    let onExplain: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: Space.sm) {
-            VStack(spacing: 2) {
-                Text(block.plannedStart.formatted(date: .omitted, time: .shortened))
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(theme.textPrimary)
-                Text(Format.duration(Double(block.plannedSeconds)))
-                    .font(.caption2)
-                    .foregroundStyle(theme.textTertiary)
-            }
-            .frame(width: 58)
-
-            DayRailSegment(
-                isCurrent: isCurrent,
-                isCompleted: block.state == .completed
-            )
-            .frame(width: 20, height: 74)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(block.title)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-                    .lineLimit(2)
-                HStack(spacing: Space.xxs) {
-                    if let projectName {
-                        Text(projectName)
-                        Text("·")
-                    }
-                    Text(block.kind.label)
-                    Text("·")
-                    Text(block.flexibility.label)
-                    if block.templateID != nil {
-                        Text("·")
-                        Label("Recurring", systemImage: "repeat")
-                    }
-                    if let direction = block.lifeDirection {
-                        Text("·")
-                        Text(direction.label)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(theme.textTertiary)
-                .lineLimit(1)
-            }
-            Spacer(minLength: Space.xs)
-
-            #if os(macOS)
-            Button { showsActions.toggle() } label: {
-                actionIcon
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showsActions, arrowEdge: .trailing) {
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    actionChoices
-                }
-                .padding(Space.xs)
-                .frame(minWidth: 190)
-                .anchorTheme()
-            }
-            .accessibilityLabel(actionLabel)
-            .accessibilityIdentifier("anchor.today.block-actions")
-            #else
-            Menu {
-                actionChoices
-            } label: {
-                actionIcon
-            }
-            .accessibilityLabel(actionLabel)
-            .accessibilityIdentifier("anchor.today.block-actions")
-            #endif
-        }
-        .padding(.horizontal, Space.sm)
-        .padding(.vertical, Space.xs)
-        .background(
-            isCurrent ? theme.surfaceRaised : .clear,
-            in: .rect(cornerRadius: Radius.md)
-        )
-        .overlay {
-            if isCurrent {
-                RoundedRectangle(cornerRadius: Radius.md)
-                    .strokeBorder(theme.accent.opacity(0.22), lineWidth: 1)
-            }
-        }
-        .shadow(color: .black.opacity(isCurrent ? (theme.isDark ? 0.22 : 0.07) : 0), radius: 12, y: 5)
-        .padding(.vertical, 3)
-        .accessibilityElement(children: .contain)
-    }
-
-    private var actionIcon: some View {
-        Label(actionLabel, systemImage: stateSymbol)
-            .labelStyle(.iconOnly)
-            .font(.title3)
-            .foregroundStyle(stateTint)
-            .frame(width: 44, height: 44)
-            .contentShape(.rect)
-    }
-
-    @ViewBuilder
-    private var actionChoices: some View {
-        if linkedSession?.isActive == true {
-            Button("Open timer") { choose(onOpenFocus) }
-        } else if block.state == .planned {
-            if !hasDifferentActiveSession {
-                Button("Start now") { choose(onStart) }
-            }
-            Button("Edit or move") { choose(onEdit) }
-            Button("Finished without timing") { choose(onComplete) }
-        }
-        Button("Explain a change") { choose(onExplain) }
-    }
-
-    private func choose(_ action: () -> Void) {
-        showsActions = false
-        action()
-    }
-
-    private var stateSymbol: String {
-        if linkedSession?.isActive == true { return "timer" }
-        return switch block.state {
-        case .planned: "play.circle.fill"
-        case .inProgress: "timer"
-        case .completed: "checkmark.circle.fill"
-        case .skipped: "minus.circle"
-        case .moved: "arrow.right.circle"
-        }
-    }
-
-    private var stateTint: Color {
-        switch block.state {
-        case .completed: theme.positive
-        case .skipped, .moved: theme.textTertiary
-        default: theme.accent
-        }
-    }
-
-    private var actionLabel: String {
-        if hasDifferentActiveSession { return "Actions for \(block.title); another session is active" }
-        if linkedSession?.isActive == true { return "Open timer for \(block.title)" }
-        return "Actions for \(block.title)"
-    }
-}
-
-private struct ScheduleGap: Identifiable {
-    let start: Date
-    let end: Date
-    var id: Date { start }
-    var seconds: TimeInterval { end.timeIntervalSince(start) }
-}
-
-private enum PlanTimelineItem: Identifiable {
-    case block(PlanBlock)
-    case gap(ScheduleGap)
-
-    var id: String {
-        switch self {
-        case let .block(block): "block-\(block.id)"
-        case let .gap(gap): "gap-\(gap.start.timeIntervalSinceReferenceDate)"
-        }
-    }
-}
 
 private struct EditorSeed: Identifiable {
     let id = UUID()
     let start: Date
-}
-
-private struct ScheduleGapRow: View {
-    @Environment(\.anchorTheme) private var theme
-    let gap: ScheduleGap
-    let onUse: () -> Void
-
-    var body: some View {
-        Button(action: onUse) {
-            HStack(spacing: Space.sm) {
-                Text(gap.start.formatted(date: .omitted, time: .shortened))
-                    .font(.caption.monospacedDigit())
-                    .frame(width: 58)
-                DayGapMark()
-                    .frame(width: 20, height: 52)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Open space · \(Format.duration(gap.seconds))")
-                        .font(.subheadline.weight(.medium))
-                    Text("Use this time")
-                        .font(.caption)
-                        .foregroundStyle(theme.textTertiary)
-                }
-                Spacer()
-            }
-            .foregroundStyle(theme.textSecondary)
-            .padding(.horizontal, Space.sm)
-            .padding(.vertical, Space.xs)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Use open time at \(gap.start.formatted(date: .omitted, time: .shortened)) for \(Format.duration(gap.seconds))")
-    }
-}
-
-private struct DayRailSegment: View {
-    @Environment(\.anchorTheme) private var theme
-    let isCurrent: Bool
-    let isCompleted: Bool
-
-    var body: some View {
-        ZStack {
-            DayRailShape()
-                .stroke(theme.hairline, style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
-            if isCurrent {
-                DayRailShape()
-                    .stroke(theme.accent, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
-            }
-            Circle()
-                .fill(isCompleted ? theme.positive : (isCurrent ? theme.accent : theme.canvas))
-                .overlay(
-                    Circle().strokeBorder(
-                        isCompleted ? theme.positive : (isCurrent ? theme.accent : theme.textTertiary),
-                        lineWidth: isCurrent ? 2 : 1
-                    )
-                )
-                .frame(width: isCurrent ? 14 : 11, height: isCurrent ? 14 : 11)
-            if isCurrent {
-                Circle()
-                    .strokeBorder(theme.accent.opacity(0.18), lineWidth: 5)
-                    .frame(width: 22, height: 22)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-private struct DayGapMark: View {
-    @Environment(\.anchorTheme) private var theme
-
-    var body: some View {
-        ZStack {
-            DayRailShape()
-                .stroke(
-                    theme.hairline,
-                    style: StrokeStyle(lineWidth: 1.1, lineCap: .round, dash: [3, 5])
-                )
-            Image(systemName: "plus")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(theme.textSecondary)
-                .frame(width: 18, height: 18)
-                .background(theme.canvas, in: .circle)
-                .overlay(Circle().strokeBorder(theme.hairline))
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-private struct DayRailShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.midX + 0.5, y: rect.minY))
-        path.addCurve(
-            to: CGPoint(x: rect.midX - 0.5, y: rect.maxY),
-            control1: CGPoint(x: rect.midX - 1.4, y: rect.height * 0.28),
-            control2: CGPoint(x: rect.midX + 1.2, y: rect.height * 0.72)
-        )
-        return path
-    }
 }
 
 struct PlanBlockEditor: View {

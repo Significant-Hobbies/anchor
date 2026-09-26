@@ -206,6 +206,9 @@ private struct VisualCatalogRenderer {
             page("editor-metadata-mac-768", width: 768, height: 680) {
                 AnchorVisualCatalogSheet(.metadataLibrary)
             },
+            page("log-time-mac", width: 720, height: 680) {
+                AnchorVisualCatalogSheet(.logTime)
+            },
         ]
     }
 
@@ -297,6 +300,38 @@ private struct VisualCatalogRenderer {
             plannedSeconds: 3_600,
             kind: .focus,
             flexibility: .flexible
+        ))
+
+        // A completed block with real times shows the drawn "lived" trace beside
+        // the grid, and a second block overlapping the first exercises lanes.
+        let morning = PlanBlock(
+            title: "Write the morning notes",
+            details: "Logged after the fact.",
+            plannedStart: calendar.date(bySettingHour: 8, minute: 0, second: 0, of: today) ?? today,
+            plannedSeconds: 2_700,
+            kind: .focus,
+            flexibility: .flexible
+        )
+        morning.actualStartedAt = calendar.date(bySettingHour: 8, minute: 5, second: 0, of: today)
+        morning.actualEndedAt = calendar.date(bySettingHour: 8, minute: 50, second: 0, of: today)
+        morning.state = .completed
+        context.insert(morning)
+
+        context.insert(PlanBlock(
+            title: "Studio check-in",
+            details: "Overlaps the brief on purpose.",
+            plannedStart: calendar.date(bySettingHour: 10, minute: 50, second: 0, of: today) ?? today,
+            plannedSeconds: 1_800,
+            kind: .commitment,
+            flexibility: .fixed
+        ))
+        context.insert(PlanBlock(
+            title: "Read on the balcony",
+            details: "",
+            plannedStart: calendar.date(bySettingHour: 14, minute: 0, second: 0, of: today) ?? today,
+            plannedSeconds: 1_200,
+            kind: .enjoyment,
+            flexibility: .optional
         ))
         context.insert(BehaviorProfile(
             selectedPatterns: [.shortVideo, .socialFeeds],
