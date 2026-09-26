@@ -43,10 +43,12 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
   catalog, full macOS and iPhone UI suites, watch build. The signed
   ReleaseDirect archive and `dist/Anchor-1.0-25.dmg` carry Developer ID,
   hardened runtime, Production CloudKit and no debug entitlement; the DMG is
-  not notarized. The development-signed build 25 is installed on the paired
-  iPhone; launch proof is pending because the phone is locked. Readiness audit
-  stands at 3 owner gates: physical-iPhone launch, fresh authenticated account,
-  and Production CloudKit observation on the current schema.
+  not notarized. The signed export was observed importing and exporting
+  against the Production CloudKit container on this Mac with no CloudKit
+  errors. The development-signed build 25 is installed on the paired iPhone;
+  launch proof is pending because the phone is locked. Readiness audit stands
+  at 2 owner gates: physical-iPhone launch and a fresh authenticated-account
+  observation.
 
 - **2026-09-11** — Prepared the signed build 25 Mac distribution export and DMG; verified Production CloudKit and no debugger entitlement. Hosted source review passed 219 shared, 14 Mac UI and 8 simulator iPhone tests. Strengthened the release checks against real ordinary-build/export artifacts. Mac installation remains build 21; notarization and real account continuity remain open. A brief exported-app launch succeeded, but the tool did not forward isolation settings, so no isolated acceptance or owner-store outcome is claimed. See [the exact receipt and limits](docs/qualification/mac-release-2026-09-11.md).
 
