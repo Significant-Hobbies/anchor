@@ -245,7 +245,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons["Today"].click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Two-day reset edited"))
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "Two-day reset edited"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
 
@@ -680,11 +680,9 @@ final class AnchorMacUITests: XCTestCase {
         )
 
         // Finishing the open entry records its real span.
-        let inFlightCard = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "anchor.today.block.")
-        ).allElementsBoundByIndex.first { $0.staticTexts["In-flight entry"].exists }
-        XCTAssertNotNil(inFlightCard)
-        inFlightCard?.click()
+        let inFlightActions = app.buttons["Actions for In-flight entry"]
+        XCTAssertTrue(inFlightActions.waitForExistence(timeout: 3))
+        inFlightActions.click()
         let finish = app.buttons["Finish now"]
         XCTAssertTrue(finish.waitForExistence(timeout: 3))
         finish.click()

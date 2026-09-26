@@ -99,8 +99,10 @@ extension Distraction {
                 try vault.preserveLegacy(.init(note: note, keywords: keywords), id: id)
             }
         }
-        note = ""
-        keywords = []
+        if !note.isEmpty || !keywords.isEmpty {
+            note = ""
+            keywords = []
+        }
     }
 }
 
@@ -121,6 +123,10 @@ extension AnchorStore {
         for distraction in try context.fetch(FetchDescriptor<Distraction>()) {
             try distraction.persistPrivateContent(in: context)
         }
+        // An empty save still commits a transaction, which CloudKit mirroring
+        // reports back as a remote change — that would re-enter the migration
+        // from FocusController's remote-change observer forever.
+        guard context.hasChanges else { return }
         try context.save()
     }
 
@@ -128,6 +134,7 @@ extension AnchorStore {
         for distraction in try context.fetch(FetchDescriptor<Distraction>()) {
             try distraction.persistPrivateContent(in: context)
         }
+        guard context.hasChanges else { return }
         try context.save()
     }
 }

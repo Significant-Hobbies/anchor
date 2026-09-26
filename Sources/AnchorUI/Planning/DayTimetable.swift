@@ -14,7 +14,10 @@ enum TimetableLayout {
     /// Greedy lane packing inside each overlap cluster. A new cluster begins
     /// when an interval starts at or after the running latest end, so separate
     /// clusters never share lanes. Results are keyed by input index.
-    static func place(_ intervals: [(TimeInterval, TimeInterval)]) -> [Placement] {
+    /// `minSpan` stretches each interval's collision box to at least that
+    /// length so cards rendered with a minimum pixel height — which can
+    /// collide even when their clock times don't overlap — still get lanes.
+    static func place(_ intervals: [(TimeInterval, TimeInterval)], minSpan: TimeInterval = 0) -> [Placement] {
         var result = [Placement](repeating: Placement(lane: 0, laneCount: 1), count: intervals.count)
         var laneEnds: [TimeInterval] = []
         var cluster: [Int] = []
@@ -26,7 +29,8 @@ enum TimetableLayout {
         }
 
         for i in intervals.indices.sorted(by: { intervals[$0].0 < intervals[$1].0 }) {
-            let (start, end) = intervals[i]
+            let (start, rawEnd) = intervals[i]
+            let end = max(rawEnd, start + minSpan)
             if start >= clusterMaxEnd && !cluster.isEmpty {
                 finishCluster()
                 cluster.removeAll()
@@ -113,7 +117,14 @@ struct DayTimetable: View {
     static let nowAnchorID = "anchor.timetable.now"
 
     private let railWidth: CGFloat = 50
+    private let minCardHeight: CGFloat = 40
     private var traceWidth: CGFloat { showsLivedTrace ? 12 : 0 }
+
+    /// Seconds a card occupies for lane packing: its rendered height, which is
+    /// at least `minCardHeight` (+padding) regardless of the clock-time span.
+    private var minCollisionSpan: TimeInterval {
+        (minCardHeight + 4) / hourHeight * 3600
+    }
 
     private var range: DateInterval {
         TimetableLayout.displayRange(
@@ -141,7 +152,8 @@ struct DayTimetable: View {
             entries.map { entry in
                 let start = entry.block.plannedStart.timeIntervalSince(range.start)
                 return (start, start + Double(entry.block.plannedSeconds))
-            }
+            },
+            minSpan: minCollisionSpan
         )
         var result: [UUID: TimetableLayout.Placement] = [:]
         for (index, entry) in entries.enumerated() {
@@ -164,8 +176,11 @@ struct DayTimetable: View {
                     }
                     .frame(width: gridWidth, height: totalHeight)
                     .offset(x: gridX)
-                    .accessibilityLabel("Add an entry at this time")
-                    .accessibilityIdentifier("anchor.today.timetable-add")
+                    // Deliberately not an accessibility element: a full-grid
+                    // overlay swallows hit-tests for the block cards beneath
+                    // it. Tap-to-add stays mouse/trackpad-only; explicit Add
+                    // controls cover everyone else.
+                    .accessibilityHidden(true)
 
                 if showsLivedTrace {
                     livedTraces
@@ -223,7 +238,7 @@ struct DayTimetable: View {
 
     private func cardHeight(for entry: Entry) -> CGFloat {
         let span = Double(entry.block.plannedSeconds) / 3600 * hourHeight
-        return max(40, span - 4)
+        return max(minCardHeight, span - 4)
     }
 
     private func hourMarks(width: CGFloat) -> some View {

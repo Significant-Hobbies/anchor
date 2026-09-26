@@ -23,6 +23,7 @@ struct PlanScreen: View {
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
+    @State private var scrolledDay: Date?
     @State private var loadError: String?
 
     init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
@@ -127,6 +128,12 @@ struct PlanScreen: View {
             }
         }
         .onAppear { scrollToNow(proxy) }
+        // Blocks arrive through @Query after first layout — the onAppear pass
+        // can fire while the store is still empty, so retry once entries land.
+        .onChange(of: blocks.isEmpty) { _, isEmpty in
+            if !isEmpty { scrollToNow(proxy) }
+        }
+        .onChange(of: today) { _, _ in scrolledDay = nil }
         }
         .background(theme.canvas)
         .sheet(isPresented: $showsCopyDay) {
@@ -298,7 +305,9 @@ struct PlanScreen: View {
     }
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
-        guard Calendar.current.isDateInToday(today), !blocks.isEmpty else { return }
+        guard Calendar.current.isDateInToday(today), !blocks.isEmpty,
+              scrolledDay != today else { return }
+        scrolledDay = today
         DispatchQueue.main.async {
             proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
         }

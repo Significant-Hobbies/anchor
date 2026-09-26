@@ -28,6 +28,19 @@ struct TimetableLayoutTests {
         #expect(placements[4] == .init(lane: 2, laneCount: 3))
     }
 
+    @Test("Minimum rendered height is part of the collision box")
+    func minSpanLanesCloseButNonOverlappingBlocks() {
+        // Two 15-minute blocks 20 minutes apart don't overlap on the clock,
+        // but their cards (minimum rendered height) collide — without minSpan
+        // the second card would cover the first card's action control.
+        let without = TimetableLayout.place([(0, 900), (1_200, 2_100)])
+        #expect(without[0] == .init(lane: 0, laneCount: 1))
+        #expect(without[1] == .init(lane: 0, laneCount: 1))
+        let withMin = TimetableLayout.place([(0, 900), (1_200, 2_100)], minSpan: 2_571)
+        #expect(withMin[0] == .init(lane: 0, laneCount: 2))
+        #expect(withMin[1] == .init(lane: 1, laneCount: 2))
+    }
+
     @Test("The visible window covers early blocks and the current hour")
     func displayRangeCoversNowAndBlocks() {
         let calendar = Calendar.current

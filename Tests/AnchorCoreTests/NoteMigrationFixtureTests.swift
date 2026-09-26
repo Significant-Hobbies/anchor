@@ -121,6 +121,31 @@ import Testing
         #expect(record.legacyAlternates.contains { $0.note == "Late old-device version" })
     }
 
+    @Test func repeatedMigrationAndSaveAreNoOpsAndNeverDirtyTheContext() throws {
+        let url = try fixture()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let id = try seedLegacy(url)
+        let context = ModelContext(try AnchorStore.makeContainer(kind: .localOnly, url: url))
+        // First pass migrates the legacy fields into the vault.
+        _ = try context.fetch(FetchDescriptor<Distraction>())
+        #expect(try context.fetch(FetchDescriptor<Distraction>()).first?.id == id)
+        try AnchorStore.migratePrivateNotes(in: context)
+        // Every later pass — e.g. each remote-change notification a CloudKit
+        // store delivers — must write nothing. persistPrivateContent must not
+        // dirty an already-empty row: on the mirrored store each phantom write
+        // saves a transaction that arrives back as another remote change,
+        // spinning the sync loop (this was the idle-CPU runaway).
+        let d = try #require(context.fetch(FetchDescriptor<Distraction>()).first)
+        for _ in 0..<3 {
+            try d.persistPrivateContent(in: context)
+            #expect(!context.hasChanges)
+            try AnchorStore.migratePrivateNotes(in: context)
+            #expect(!context.hasChanges)
+        }
+        let record = try #require(try LocalDistractionNotes(storeURL: url).read(id))
+        #expect(record.current.note == "Synthetic private note")
+    }
+
     @Test func corruptVaultIsReportedRatherThanExportedAsAnEmptyNote() throws {
         let url = try fixture()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
