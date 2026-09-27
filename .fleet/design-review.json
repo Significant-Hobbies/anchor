@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Today answers only 'what does this day ask of me' — hour-grid timetable + logger + owner customization; habits live entirely on Habits (list, check-off, schedule-at-time)",
+  "target": "Build 29 release verification: Today answers only 'what does this day ask of me' \u2014 hour-grid timetable + logger + owner customization; habits live entirely on Habits (list, check-off, schedule-at-time)",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
@@ -36,47 +36,47 @@
       "audience": "The owner using an iPhone and Mac throughout an ordinary day.",
       "job": "See the day on a true time axis with nothing else competing, place or move entries by tapping open time, record what actually happened, and adjust how the grid draws itself.",
       "thesis": "The plan is a straight, quiet hour grid; the day that was actually lived is drawn beside it in the hand-wiggled trace material the rest of the app uses.",
-      "system": "Existing paper/charcoal, native SF type, Anchor spacing, hairline hour marks, card surfaces and state tints — no new tokens.",
+      "system": "Existing paper/charcoal, native SF type, Anchor spacing, hairline hour marks, card surfaces and state tints \u2014 no new tokens.",
       "signature": "Two traces on one timetable: planned blocks on the grid, and a thin drawn wiggle in the gutter marking when work really happened.",
-      "risk": "A full-day grid reads denser than the old compact list; mitigated by faint hairlines, an owner-adjustable day window (7–22 default), optional lived-trace, finished-entry dimming, and scroll-to-now on open."
+      "risk": "A full-day grid reads denser than the old compact list; mitigated by faint hairlines, an owner-adjustable day window (7\u201322 default), optional lived-trace, finished-entry dimming, and scroll-to-now on open."
     }
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/timetable-logger-20260926/today-390.png"
+        "path": "artifacts/design/build29-verification-20260927/today-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/timetable-logger-20260926/today-768.png"
+        "path": "artifacts/design/build29-verification-20260927/today-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/timetable-logger-20260926/today-1440.png"
+        "path": "artifacts/design/build29-verification-20260927/today-1440.png"
       },
       {
         "width": 1200,
-        "path": "artifacts/design/timetable-logger-20260926/today-mac.png"
+        "path": "artifacts/design/build29-verification-20260927/today-mac.png"
       },
       {
         "width": 720,
-        "path": "artifacts/design/timetable-logger-20260926/log-time-mac.png"
+        "path": "artifacts/design/build29-verification-20260927/log-time-mac.png"
       }
     ],
     "projectCheck": {
-      "command": "swift build && swift test (234 core + 36 UI package tests pass, including TimetableLayout lane packing and logged-entry review evidence); DebugLocal macOS and iOS app builds succeed",
+      "command": "DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer swift test; scripts/render-visual-catalog.sh (273 tests and all 28 catalog renders pass)",
       "status": "pass"
     },
     "critique": {
       "score": 33,
       "maximum": 40,
-      "note": "Fresh review of the new grid and log sheet renders: consistent tokens, honest states, lived trace reads as intended. Surface re-scoping keeps the same materials — the change removes surface competition rather than adding visual novelty. Re-render pending for the scoped surfaces."
+      "note": "Build 29 preserve review: inspected fresh native catalog renders for Today at 390, 768 and 1440, Habits and Log time. Established hour grid, overlap lanes and logger remain intact. At 390, Customize wraps over two lines; retained as minor polish. Phone-width catalog renders use macOS controls, not physical iPhone evidence."
     },
     "audit": {
       "score": 17,
       "maximum": 20,
-      "note": "Checked against the drawn-day contract: hairlines stay quiet, accent marks only now/active work, completed and skipped states dim rather than disappear."
+      "note": "Build 29 catalog audit preserves the selected materials and visible controls. Runtime Mac/iPhone evidence is tracked separately in native review run 36305708652; no physical-device acceptance inferred."
     },
     "unresolved": {
       "p0": 0,
@@ -87,7 +87,7 @@
       "findings": [
         "Native SwiftUI review, not a browser rendering; phone-width catalog images use macOS controls.",
         "Local Mac UI automation is environment-blocked on this machine (runner SIGKILL before bootstrap); the new grid+logging journey runs in the hosted native-review workflow.",
-        "Overlapping blocks share equal-width lanes within a cluster — deliberate, matching calendar conventions."
+        "Overlapping blocks share equal-width lanes within a cluster \u2014 deliberate, matching calendar conventions."
       ]
     },
     "comprehension": {
@@ -114,7 +114,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "approved",
+    "decision": "keep",
     "note": "Owner selected the hour-grid timetable, both logging modes (retroactive + quick), and Today-only scope via structured scoping options, then directed: Today = only what the day asks (customizable), Habits = the habit list + schedule-at-a-time."
   }
 }
