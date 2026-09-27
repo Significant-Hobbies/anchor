@@ -34,6 +34,17 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-27** — Reviewed and merged PR #74, including a fix preventing
+  manual actual-time edits from fighting timer-owned session times. Build 29
+  is live as the notarized Mac beta, installed locally, and processed in
+  TestFlight's Personal Testing group with its Watch companion. Preserved the
+  approved two-eyed logo and synchronized the website mark, favicon and social
+  image. Public DMG and brand asset hashes match their sources. Public App Store
+  release still requires current physical-phone, authenticated-account and
+  Production CloudKit observations. See the
+  [release receipt](docs/qualification/release-2026-09-27.md) for exact source,
+  artifacts, hosted checks and remaining gates.
+
 - **2026-09-26** — Hosted review
   [36256423165](https://github.com/Significant-Hobbies/anchor/actions/runs/36256423165)
   was down to exactly two failures; both are test-journey issues, not product
