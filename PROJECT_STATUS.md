@@ -60,7 +60,20 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
   `scrollToNow`); and the iOS habit journey tapped a weekday chip while the
   keyboard covered it — the journey now scrolls the chip clear and asserts it
   flipped to selected before saving (`d52e25b`). Verification run
-  [36265610087](https://github.com/Significant-Hobbies/anchor/actions/runs/36265610087).
+  [36265610087](https://github.com/Significant-Hobbies/anchor/actions/runs/36265610087)
+  still failed: the Mac journey gated on `isHittable`, which never scrolls —
+  the card can sit at the fold while scroll-to-now settles; and the iOS
+  journey typed the habit title first, so the keyboard's predictive bar
+  injected " for a" into the saved title while a covered chip was tapped.
+  `f1acc3e` drops the hittable gate (`click()` scrolls to visible itself) and
+  picks the weekday before focusing the title field. Hosted review
+  [36267634282](https://github.com/Significant-Hobbies/anchor/actions/runs/36267634282)
+  then went fully green — shared package, offscreen catalog, complete Mac and
+  iPhone UI suites, watchOS build, and the native gate all passed. Build 28
+  was cut, signed (Developer ID, hardened runtime, production CloudKit
+  entitlements), and installed at `/Applications/Anchor.app`; it idles at
+  0% CPU. DMG: `dist/Anchor-1.0-28.dmg` (unnotarised — the `anchor-notary`
+  keychain profile is still not set up).
 
 - **2026-09-26** — Idle-CPU runaway root-caused and fixed (issue 73): it was
   app code, not CloudKit. `FocusController`'s remote-change handler ran
