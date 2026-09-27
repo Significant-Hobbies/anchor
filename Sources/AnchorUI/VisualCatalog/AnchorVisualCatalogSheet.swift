@@ -10,6 +10,7 @@ public struct AnchorVisualCatalogSheet: View {
         case habitEditor
         case behaviorProfile
         case metadataLibrary
+        case logTime
     }
 
     private let kind: Kind
@@ -29,6 +30,8 @@ public struct AnchorVisualCatalogSheet: View {
             BehaviorProfileEditor()
         case .metadataLibrary:
             MetadataLibraryEditor()
+        case .logTime:
+            LogTimeSheet(day: Date()) {}
         }
     }
 }

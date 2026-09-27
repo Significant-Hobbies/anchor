@@ -34,6 +34,119 @@ Requires macOS 26 / iOS 26 / watchOS 26. Release archives use stable Xcode
 
 ## Timeline
 
+- **2026-09-26** — Hosted review
+  [36256423165](https://github.com/Significant-Hobbies/anchor/actions/runs/36256423165)
+  was down to exactly two failures; both are test-journey issues, not product
+  defects. Mac: the Log time sheet's "Still happening" checkbox reported a
+  frame while clipped below the scroll fold, so the synthesized click missed
+  and the retro entry saved in-progress ("1 finished" instead of "2
+  finished") — the journey now scrolls the sheet first and asserts the
+  "Ended" picker appears. iOS: a tap on "Shape these habits" landed while the
+  step transition was still settling and was swallowed — the journey retries
+  once. Pushed as `ee00ba4`; follow-up run
+  [36260820047](https://github.com/Significant-Hobbies/anchor/actions/runs/36260820047)
+  then passed the full iPhone suite, watchOS build and the Mac timetable
+  logging journey — leaving exactly one Mac failure: the card action popover
+  never showed "Start now". Root cause was a real race, not a test issue —
+  the card's `.onTapGesture` sets `showsActions` while the actions button
+  toggled it, so the popover could open then immediately close depending on
+  event order. The button now sets the flag unconditionally (`655d955`).
+  Verification run
+  [36262692191](https://github.com/Significant-Hobbies/anchor/actions/runs/36262692191)
+  surfaced two more swallowed-interaction failures: `scrollToNow` fired while
+  the editor sheet was still dismissing and got dropped, leaving the new card
+  at the bottom fold with its action button unhittable — the screen now
+  re-anchors after any block sheet closes (plus a delayed retry inside
+  `scrollToNow`); and the iOS habit journey tapped a weekday chip while the
+  keyboard covered it — the journey now scrolls the chip clear and asserts it
+  flipped to selected before saving (`d52e25b`). Verification run
+  [36265610087](https://github.com/Significant-Hobbies/anchor/actions/runs/36265610087)
+  still failed: the Mac journey gated on `isHittable`, which never scrolls —
+  the card can sit at the fold while scroll-to-now settles; and the iOS
+  journey typed the habit title first, so the keyboard's predictive bar
+  injected " for a" into the saved title while a covered chip was tapped.
+  `f1acc3e` drops the hittable gate (`click()` scrolls to visible itself) and
+  picks the weekday before focusing the title field. Hosted review
+  [36267634282](https://github.com/Significant-Hobbies/anchor/actions/runs/36267634282)
+  then went fully green — shared package, offscreen catalog, complete Mac and
+  iPhone UI suites, watchOS build, and the native gate all passed. Build 28
+  was cut, signed (Developer ID, hardened runtime, production CloudKit
+  entitlements), and installed at `/Applications/Anchor.app`; it idles at
+  0% CPU. DMG: `dist/Anchor-1.0-28.dmg` (unnotarised — the `anchor-notary`
+  keychain profile is still not set up).
+
+- **2026-09-26** — Idle-CPU runaway root-caused and fixed (issue 73): it was
+  app code, not CloudKit. `FocusController`'s remote-change handler ran
+  `migratePrivateNotes` on every `NSPersistentStoreRemoteChange`; the
+  migration dirtied every `Distraction` row (`note = ""` / `keywords = []`
+  unconditionally) and saved a transaction even when nothing changed, and each
+  mirrored save arrived back as another remote change — save → notify → save
+  forever, ~200+ CloudKit scheduler submissions/sec, ~110% CPU. Fix:
+  `persistPrivateContent` only clears fields when they differ, and
+  `migratePrivateNotes`/`AnchorStore.save` skip `context.save()` when
+  `!context.hasChanges`. A regression test fails on the old code
+  (`hasChanges` stays true). While diagnosing, hosted review also surfaced two
+  real timetable defects now fixed: cards that collide at the minimum
+  rendered height now lane-pack (`minSpan` on `TimetableLayout.place`), and
+  the full-grid tap-to-add overlay is no longer an accessibility element (it
+  swallowed hit-tests for the block-action buttons). `scrollToNow` also
+  retries once when `@Query` lands instead of racing it. Verified live:
+  installed build 27 idles at 0% CPU, ~2 scheduler submissions/min, all data
+  intact after a store reset + re-import (row counts identical).
+
+- **2026-09-26** — Owner scoped the surfaces sharper: **Today answers only "what
+  does this day ask of me"** (header, day picker, summary line, timetable, Add /
+  Log time / Customize). The habit checklist left Today entirely — unscheduled
+  habits were already excluded from `materialize`, so the grid now carries only
+  real commitments; a habit appears only once it's scheduled at a time from
+  **Habits**, which is now the single home for the habit list (add, check off,
+  schedule-at-time, archive) with the behaviour-profile editor demoted to a
+  quiet secondary button. **Customize Today** is a new sheet holding the
+  timetable's owner options — day start/end hours (the grid still grows to
+  cover outlying entries), lived-trace visibility, finished-entry dimming —
+  persisted on `AnchorPreferences` so the choices travel over private CloudKit;
+  "Your usual week" management moved inside it. Hosted UI evidence pending.
+
+- **2026-09-26** — Found a Mac battery-drain defect while verifying usability:
+  the installed build idles at ~110% CPU because CoreData's CloudKit export
+  activity resubmits its background-task request ~300×/sec forever
+  (`updateTaskRequest: No change in task request for
+  com.apple.coredata.cloudkit.activity.export…`). Same binary on a local-only
+  store idles at 0% — the loop is inside `NSPersistentCloudKitContainer`'s
+  mirroring layer, not app code. Tracked as [issue
+  73](https://github.com/Significant-Hobbies/anchor/issues/73); likely a stuck
+  export record or a macOS 27.2 beta regression.
+
+- **2026-09-26** — Today becomes a real timetable: an hour grid renders blocks
+  at their clock position sized by duration (overlaps share equal lanes), a thin
+  hand-drawn trace beside the rail marks when time actually passed, the view
+  opens scrolled to now, and tapping open space offers a new entry at that
+  time. A new Log time sheet records what really happened — "still happening"
+  opens an entry you finish later, a finished entry stores its real span — and
+  the day review counts it as observed lived time rather than a fabricated
+  timed session. Owner selected the hour grid, both logging modes, and
+  Today-only scope. 234 core + 36 UI package tests pass, including new
+  lane-packing and logged-entry review coverage; DebugLocal macOS and iOS
+  builds succeed; evidence under
+  `artifacts/design/timetable-logger-20260926/`. Hosted UI evidence for the new
+  journey is pending on the branch run.
+
+- **2026-09-26** — Qualification pass on build 25 (commit `62d3b3a`). Added the
+  missing provenance test — remote Hub history provably cannot enter the
+  planner before the owner approves history binding — and re-issued the design
+  receipt for build 25 with fresh catalog renders. Hosted `Anchor native
+  review` [36241896707](https://github.com/Significant-Hobbies/anchor/actions/runs/36241896707)
+  passed all gates on the exact commit: shared tests, on-device tagging,
+  catalog, full macOS and iPhone UI suites, watch build. The signed
+  ReleaseDirect archive and `dist/Anchor-1.0-25.dmg` carry Developer ID,
+  hardened runtime, Production CloudKit and no debug entitlement; the DMG is
+  not notarized. The signed export was observed importing and exporting
+  against the Production CloudKit container on this Mac with no CloudKit
+  errors. The development-signed build 25 is installed on the paired iPhone;
+  launch proof is pending because the phone is locked. Readiness audit stands
+  at 2 owner gates: physical-iPhone launch and a fresh authenticated-account
+  observation.
+
 - **2026-09-11** — Prepared the signed build 25 Mac distribution export and DMG; verified Production CloudKit and no debugger entitlement. Hosted source review passed 219 shared, 14 Mac UI and 8 simulator iPhone tests. Strengthened the release checks against real ordinary-build/export artifacts. Mac installation remains build 21; notarization and real account continuity remain open. A brief exported-app launch succeeded, but the tool did not forward isolation settings, so no isolated acceptance or owner-store outcome is claimed. See [the exact receipt and limits](docs/qualification/mac-release-2026-09-11.md).
 
 - **2026-09-09** — Prepared source-only daily-flow persistence repairs: failed resume/start/extension retain truthful state and drafts; planned starts commit new session, plan link and deliberate replan together, with exact-request retry reuse. Full 219 package tests pass, including synthetic disk/reopen and real caller handlers. No installed app or release changed; hosted billing, native/device and historical CloudKit gates remain. See [scheduled-start evidence](docs/qualification/scheduled-start-2026-09-09/README.md) and [resume/start evidence](docs/qualification/resume-2026-09-09/README.md).
@@ -365,8 +478,17 @@ CloudKit container and app group.
 
 ## Features (current source)
 
-- Local day planning with one-off blocks and recurring weekly routines for work,
-  commitments, rest, and intentional enjoyment
+- Today answers only "what does this day ask of me" — an hour-grid timetable
+  where one-off blocks, scheduled habits and recurring routines sit at their
+  clock position, overlaps share lanes, open space is one tap away from a new
+  entry, and a drawn lived trace shows the real day; **Customize Today** holds
+  the owner-set day window, lived-trace and finished-entry dimming options plus
+  the door to usual-week management
+- Habits is the single home for habits: the full list with check-off, weekly
+  progress, archive/restore, and schedule-at-time placement onto Today's grid
+- Time logging that needs no timer: "still happening" opens an entry you finish
+  later, and past spans can be recorded after the fact — both count as observed
+  lived time in the day review
 - Evidence-first daily review of planned versus observed time, with deliberate
   replans, internal pulls, external interruptions, human needs, estimation
   errors, and Unknown kept distinct — never collapsed into an adherence score

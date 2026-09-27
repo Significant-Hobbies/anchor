@@ -23,15 +23,29 @@ public enum AnchorAppearance: String, CaseIterable, Codable, Sendable {
 public final class AnchorPreferences {
     public var id: UUID = UUID()
     public var appearanceRaw: String = AnchorAppearance.dark.rawValue
+    /// The timetable's default window, stored as hours since midnight; entries
+    /// and the current hour may still expand it so nothing is ever hidden.
+    public var timetableStartHour: Int = 7
+    public var timetableEndHour: Int = 22
+    public var timetableShowsLivedTrace: Bool = true
+    public var timetableDimsFinished: Bool = true
     public var updatedAt: Date = Date()
 
     public init(
         id: UUID = UUID(),
         appearance: AnchorAppearance = .dark,
+        timetableStartHour: Int = 7,
+        timetableEndHour: Int = 22,
+        timetableShowsLivedTrace: Bool = true,
+        timetableDimsFinished: Bool = true,
         updatedAt: Date = Date()
     ) {
         self.id = id
         self.appearance = appearance
+        self.timetableStartHour = timetableStartHour
+        self.timetableEndHour = timetableEndHour
+        self.timetableShowsLivedTrace = timetableShowsLivedTrace
+        self.timetableDimsFinished = timetableDimsFinished
         self.updatedAt = updatedAt
     }
 

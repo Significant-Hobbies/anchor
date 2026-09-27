@@ -1,0 +1,110 @@
+{
+  "$schema": "fleet.design-review.v1",
+  "version": 1,
+  "project": "anchor",
+  "target": "Simple daily habits, schedule, and pause recovery",
+  "surfaceMode": "operate",
+  "mode": "preserve",
+  "register": "product",
+  "context": {
+    "product": "PRODUCT.md",
+    "design": "DESIGN.md"
+  },
+  "direction": {
+    "references": [],
+    "probes": [],
+    "selected": "existing-design",
+    "approval": "not-required",
+    "before": "artifacts/design/simple-day-20260907/before-today-mac.png",
+    "library": {
+      "strategy": "upstream-first",
+      "primary": "existing-project-system",
+      "sources": [],
+      "runtime": "existing",
+      "customReplacement": {
+        "used": false,
+        "authorization": "not-required",
+        "reason": ""
+      }
+    },
+    "contract": {
+      "purpose": "Replace unwanted habits, track good ones, plan a day and run its entries with honest interruption logging.",
+      "purposeSource": "Owner direction on 7 September 2026 and PRODUCT.md",
+      "canonicalPurpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
+      "purposeAlignment": "repository-override",
+      "driftNote": "Owner simplified the product to habits, editable daily schedules, project context and interruption recovery; progression and daily confirmation are no longer primary flows.",
+      "audience": "The owner using an iPhone and Mac throughout an ordinary day.",
+      "job": "Check off a habit or schedule and play an entry without configuring a behavior programme.",
+      "thesis": "Preserve The Drawn Day but give the actual daily actions the prominent controls.",
+      "system": "Existing paper/charcoal, native SF type, Anchor spacing, restrained ink actions and original doodles.",
+      "signature": "A drawn day with directly playable entries and habits that can be checked off without a time.",
+      "risk": "Removing progression prompts changes familiar placement; preserve saved history and keep editing available."
+    }
+  },
+  "evidence": {
+    "screenshots": [
+      {
+        "width": 390,
+        "path": "artifacts/design/simple-day-20260907/today-390.png"
+      },
+      {
+        "width": 768,
+        "path": "artifacts/design/simple-day-20260907/today-768.png"
+      },
+      {
+        "width": 1440,
+        "path": "artifacts/design/simple-day-20260907/today-1440.png"
+      }
+    ],
+    "projectCheck": {
+      "command": "scripts/render-visual-catalog.sh /tmp/anchor-simple-day-20260907/compact-visuals; xcodebuildmcp simulator test --scheme \"Anchor (iOS)\" --configuration DebugLocal --extra-args \"-only-testing:AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal\"",
+      "status": "pass"
+    },
+    "critique": {
+      "score": 34,
+      "maximum": 40
+    },
+    "audit": {
+      "score": 17,
+      "maximum": 20
+    },
+    "unresolved": {
+      "p0": 0,
+      "p1": 0
+    },
+    "detector": {
+      "posture": "advisory",
+      "findings": [
+        "Native SwiftUI review, not a browser rendering. Phone-width catalog images use macOS controls; actual iOS journeys are recorded separately.",
+        "Full Mac UI and physical-device journeys remain release gates; visual scores do not qualify them.",
+        "Actual iOS density check led to the existing compact Today header. Native screenshot and local copy/persistence test pass; full Mac correction rerun remains a separate gate."
+      ]
+    },
+    "comprehension": {
+      "status": "not-applicable",
+      "reviewer": "",
+      "answers": {
+        "product": "",
+        "audience": "",
+        "value": "",
+        "mechanism": "",
+        "proof": "",
+        "nextAction": ""
+      },
+      "purposeScore": {
+        "product": 0,
+        "audience": 0,
+        "value": 0,
+        "mechanism": 0,
+        "proof": 0,
+        "nextAction": 0,
+        "total": 0
+      },
+      "mismatches": []
+    }
+  },
+  "ownerFeedback": {
+    "decision": "delegated",
+    "note": "Owner specified the simpler workflow and asked for phone and Mac readiness for tomorrow."
+  }
+}

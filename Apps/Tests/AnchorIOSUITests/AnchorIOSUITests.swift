@@ -100,8 +100,18 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Show me how Anchor protects it"].tap()
 
         XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
-        app.buttons["Shape these habits"].tap()
-        XCTAssertTrue(app.staticTexts["Choose when each habit is available."].waitForExistence(timeout: 4))
+        let shape = app.buttons["Shape these habits"]
+        shape.tap()
+        // A tap that lands while the step transition is still settling can miss
+        // the button entirely — retry rather than failing on a swallowed tap.
+        let scheduleTitle = app.staticTexts["Choose when each habit is available."]
+        if !scheduleTitle.waitForExistence(timeout: 4) {
+            let retry = app.buttons.matching(NSPredicate(
+                format: "label == %@ OR label == %@", "Shape these habits", "Continue without habits"
+            )).firstMatch
+            retry.tap()
+        }
+        XCTAssertTrue(scheduleTitle.waitForExistence(timeout: 4))
         app.buttons["Save habits and continue"].tap()
 
         XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 5))
@@ -227,14 +237,18 @@ final class AnchorIOSUITests: XCTestCase {
         habits.tap()
         XCTAssertTrue(app.buttons["anchor.habits.add"].waitForExistence(timeout: 5))
         app.buttons["anchor.habits.add"].tap()
-        let title = app.textFields["What will you do?"]
-        title.tap()
-        title.typeText("Two-day reset")
+        // Pick the second day before typing — once the keyboard is up it can
+        // cover the weekday chips and swallow the tap.
         let secondDay = app.buttons.matching(
             NSPredicate(format: "label ENDSWITH %@", "not selected")
         ).firstMatch
-        XCTAssertTrue(secondDay.exists)
+        XCTAssertTrue(secondDay.waitForExistence(timeout: 3))
+        let secondDayName = secondDay.label.replacingOccurrences(of: " not selected", with: "")
         secondDay.tap()
+        XCTAssertTrue(app.buttons["\(secondDayName) selected"].waitForExistence(timeout: 3))
+        let title = app.textFields["What will you do?"]
+        title.tap()
+        title.typeText("Two-day reset")
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["Two-day reset"].waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts["0 of 2 this week"].exists)
@@ -251,17 +265,20 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.buttons["anchor.habits.complete"].exists)
 
 
+        // Habits live on the Habits tab; Today only gains one when it's
+        // scheduled at a time, which places it on the timetable.
         app.tabBars.buttons["Today"].tap()
-        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.habits"].waitForExistence(timeout: 4))
-        app.buttons["anchor.today.habit.done"].tap()
-        XCTAssertTrue(app.staticTexts["Completed today"].waitForExistence(timeout: 3))
-        app.buttons["anchor.today.habit.undo"].tap()
-        app.buttons["anchor.today.habit.place"].tap()
+        XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
+
+        app.tabBars.buttons["Habits"].tap()
+        app.buttons["Schedule"].tap()
         XCTAssertTrue(app.navigationBars["Place habit"].waitForExistence(timeout: 3))
         app.buttons["Save"].tap()
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Placed at")).firstMatch.waitForExistence(timeout: 3))
 
-        keepScreenshot(app, named: "anchor-build19-ios-flexible-habits-today")
+        app.tabBars.buttons["Today"].tap()
+        XCTAssertTrue(app.staticTexts["Two-day reset"].waitForExistence(timeout: 4))
+
+        keepScreenshot(app, named: "anchor-build19-ios-scheduled-habit-today")
 
     }
 

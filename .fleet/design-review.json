@@ -2,7 +2,7 @@
   "$schema": "fleet.design-review.v1",
   "version": 1,
   "project": "anchor",
-  "target": "Simple daily habits, schedule, and pause recovery",
+  "target": "Build 29 release verification: Today answers only 'what does this day ask of me' \u2014 hour-grid timetable + logger + owner customization; habits live entirely on Habits (list, check-off, schedule-at-time)",
   "surfaceMode": "operate",
   "mode": "preserve",
   "register": "product",
@@ -13,9 +13,9 @@
   "direction": {
     "references": [],
     "probes": [],
-    "selected": "existing-design",
-    "approval": "not-required",
-    "before": "artifacts/design/simple-day-20260907/before-today-mac.png",
+    "selected": "owner-picked-hour-grid-timetable",
+    "approval": "approved",
+    "before": "artifacts/design/build25-verification-20260926/today-mac.png",
     "library": {
       "strategy": "upstream-first",
       "primary": "existing-project-system",
@@ -24,49 +24,59 @@
       "customReplacement": {
         "used": false,
         "authorization": "not-required",
-        "reason": ""
+        "reason": "SwiftUI-only surface composed entirely from AnchorTheme tokens, Card, Chip and the existing drawn-day materials."
       }
     },
     "contract": {
-      "purpose": "Replace unwanted habits, track good ones, plan a day and run its entries with honest interruption logging.",
-      "purposeSource": "Owner direction on 7 September 2026 and PRODUCT.md",
+      "purpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
+      "purposeSource": "PRODUCT.md; owner stated on 26 September 2026 that the product they wanted was 'a well sorted timetable and logger'",
       "canonicalPurpose": "Anchor helps a person plan a realistic day, follow the current intention, and learn why the day lived differed from the day planned.",
-      "purposeAlignment": "repository-override",
-      "driftNote": "Owner simplified the product to habits, editable daily schedules, project context and interruption recovery; progression and daily confirmation are no longer primary flows.",
+      "purposeAlignment": "match",
+      "driftNote": "Owner then scoped the surfaces sharper on 26 September 2026: Today shows only the day's asks (timetable + logging + customize), and Habits owns the habit list plus scheduling a habit at a particular time. History stays as-is.",
       "audience": "The owner using an iPhone and Mac throughout an ordinary day.",
-      "job": "Check off a habit or schedule and play an entry without configuring a behavior programme.",
-      "thesis": "Preserve The Drawn Day but give the actual daily actions the prominent controls.",
-      "system": "Existing paper/charcoal, native SF type, Anchor spacing, restrained ink actions and original doodles.",
-      "signature": "A drawn day with directly playable entries and habits that can be checked off without a time.",
-      "risk": "Removing progression prompts changes familiar placement; preserve saved history and keep editing available."
+      "job": "See the day on a true time axis with nothing else competing, place or move entries by tapping open time, record what actually happened, and adjust how the grid draws itself.",
+      "thesis": "The plan is a straight, quiet hour grid; the day that was actually lived is drawn beside it in the hand-wiggled trace material the rest of the app uses.",
+      "system": "Existing paper/charcoal, native SF type, Anchor spacing, hairline hour marks, card surfaces and state tints \u2014 no new tokens.",
+      "signature": "Two traces on one timetable: planned blocks on the grid, and a thin drawn wiggle in the gutter marking when work really happened.",
+      "risk": "A full-day grid reads denser than the old compact list; mitigated by faint hairlines, an owner-adjustable day window (7\u201322 default), optional lived-trace, finished-entry dimming, and scroll-to-now on open."
     }
   },
   "evidence": {
     "screenshots": [
       {
         "width": 390,
-        "path": "artifacts/design/simple-day-20260907/today-390.png"
+        "path": "artifacts/design/build29-verification-20260927/today-390.png"
       },
       {
         "width": 768,
-        "path": "artifacts/design/simple-day-20260907/today-768.png"
+        "path": "artifacts/design/build29-verification-20260927/today-768.png"
       },
       {
         "width": 1440,
-        "path": "artifacts/design/simple-day-20260907/today-1440.png"
+        "path": "artifacts/design/build29-verification-20260927/today-1440.png"
+      },
+      {
+        "width": 1200,
+        "path": "artifacts/design/build29-verification-20260927/today-mac.png"
+      },
+      {
+        "width": 720,
+        "path": "artifacts/design/build29-verification-20260927/log-time-mac.png"
       }
     ],
     "projectCheck": {
-      "command": "scripts/render-visual-catalog.sh /tmp/anchor-simple-day-20260907/compact-visuals; xcodebuildmcp simulator test --scheme \"Anchor (iOS)\" --configuration DebugLocal --extra-args \"-only-testing:AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal\"",
+      "command": "DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer swift test; scripts/render-visual-catalog.sh (273 tests and all 28 catalog renders pass)",
       "status": "pass"
     },
     "critique": {
-      "score": 34,
-      "maximum": 40
+      "score": 33,
+      "maximum": 40,
+      "note": "Build 29 preserve review: inspected fresh native catalog renders for Today at 390, 768 and 1440, Habits and Log time. Established hour grid, overlap lanes and logger remain intact. At 390, Customize wraps over two lines; retained as minor polish. Phone-width catalog renders use macOS controls, not physical iPhone evidence."
     },
     "audit": {
       "score": 17,
-      "maximum": 20
+      "maximum": 20,
+      "note": "Build 29 catalog audit preserves the selected materials and visible controls. Runtime Mac/iPhone evidence is tracked separately in native review run 36305708652; no physical-device acceptance inferred."
     },
     "unresolved": {
       "p0": 0,
@@ -75,9 +85,9 @@
     "detector": {
       "posture": "advisory",
       "findings": [
-        "Native SwiftUI review, not a browser rendering. Phone-width catalog images use macOS controls; actual iOS journeys are recorded separately.",
-        "Full Mac UI and physical-device journeys remain release gates; visual scores do not qualify them.",
-        "Actual iOS density check led to the existing compact Today header. Native screenshot and local copy/persistence test pass; full Mac correction rerun remains a separate gate."
+        "Native SwiftUI review, not a browser rendering; phone-width catalog images use macOS controls.",
+        "Local Mac UI automation is environment-blocked on this machine (runner SIGKILL before bootstrap); the new grid+logging journey runs in the hosted native-review workflow.",
+        "Overlapping blocks share equal-width lanes within a cluster \u2014 deliberate, matching calendar conventions."
       ]
     },
     "comprehension": {
@@ -104,7 +114,7 @@
     }
   },
   "ownerFeedback": {
-    "decision": "delegated",
-    "note": "Owner specified the simpler workflow and asked for phone and Mac readiness for tomorrow."
+    "decision": "keep",
+    "note": "Owner selected the hour-grid timetable, both logging modes (retroactive + quick), and Today-only scope via structured scoping options, then directed: Today = only what the day asks (customizable), Habits = the habit list + schedule-at-a-time."
   }
 }
