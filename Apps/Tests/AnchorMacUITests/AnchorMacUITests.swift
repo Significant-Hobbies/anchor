@@ -483,6 +483,12 @@ final class AnchorMacUITests: XCTestCase {
         miniTimer.buttons["Start this block"].click()
         XCTAssertTrue(miniTimer.buttons["Lock a distraction"].waitForExistence(timeout: 3))
         miniTimer.buttons["End"].click()
+        app.buttons["Today"].click()
+        let completedActions = app.buttons["Actions for Menu-bar launch review"]
+        XCTAssertTrue(completedActions.waitForExistence(timeout: 4))
+        completedActions.click()
+        XCTAssertTrue(app.buttons["Edit or move"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["Log actual time…"].exists)
     }
 
     @MainActor

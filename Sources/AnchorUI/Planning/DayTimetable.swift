@@ -467,12 +467,14 @@ private struct TimetableBlockCard: View {
                 }
                 Button("Edit or move") { choose(onEdit) }
                 Button("Finished without timing") { choose(onComplete) }
-                Button("Log actual time…") { choose(onLogActual) }
             case .inProgress:
                 Button("Finish now") { choose(onComplete) }
-                Button("Log actual time…") { choose(onLogActual) }
             case .completed, .skipped, .moved:
                 Button("Edit or move") { choose(onEdit) }
+            }
+            // Linked sessions own actual timing; reconciliation would replace
+            // any manual timestamps entered here on the next refresh.
+            if block.sessionID == nil {
                 Button("Log actual time…") { choose(onLogActual) }
             }
         }

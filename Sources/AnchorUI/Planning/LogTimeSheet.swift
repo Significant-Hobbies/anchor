@@ -161,6 +161,11 @@ struct LogTimeSheet: View {
     }
 
     private func save() {
+        // Sync may attach a session while this sheet is open.
+        guard block?.sessionID == nil else {
+            saveError = "This entry is timed by a focus session. Its actual time comes from that timer."
+            return
+        }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let now = Date()
         if stillHappening {
