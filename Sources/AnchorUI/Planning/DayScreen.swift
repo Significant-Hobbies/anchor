@@ -6,6 +6,7 @@ import SwiftUI
 struct PlanScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.modelContext) private var context
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
@@ -239,19 +240,47 @@ struct PlanScreen: View {
                     .buttonStyle(.borderless)
                     .accessibilityLabel("Go to today")
             }
-            HStack(spacing: Space.xs) {
-                Button("Copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
-                    .buttonStyle(QuietButtonStyle(expands: false))
-                    .disabled(blocks.isEmpty)
-                    .accessibilityIdentifier("anchor.today.copy-day")
-                Button("Log time", systemImage: "clock.arrow.circlepath") { showsLogSheet = true }
-                    .buttonStyle(QuietButtonStyle(expands: false))
-                    .accessibilityIdentifier("anchor.today.log-time")
-                Button("Customize", systemImage: "slider.horizontal.3") { showsCustomize = true }
-                    .buttonStyle(QuietButtonStyle(expands: false))
-                    .accessibilityIdentifier("anchor.today.customize")
+            if horizontalSizeClass == .compact {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    HStack(spacing: Space.xs) {
+                        copyDayButton
+                        logTimeButton
+                    }
+                    HStack {
+                        customizeButton
+                        Spacer(minLength: 0)
+                    }
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
+            } else {
+                HStack(spacing: Space.xs) {
+                    copyDayButton
+                    logTimeButton
+                    customizeButton
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
             }
         }
+    }
+
+    private var copyDayButton: some View {
+        Button("Copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
+            .disabled(blocks.isEmpty)
+            .accessibilityIdentifier("anchor.today.copy-day")
+    }
+
+    private var logTimeButton: some View {
+        Button("Log time", systemImage: "clock.arrow.circlepath") {
+            showsLogSheet = true
+        }
+        .accessibilityIdentifier("anchor.today.log-time")
+    }
+
+    private var customizeButton: some View {
+        Button("Customize", systemImage: "slider.horizontal.3") {
+            showsCustomize = true
+        }
+        .accessibilityIdentifier("anchor.today.customize")
     }
 
     private var activeTemplates: [ScheduleTemplate] {
