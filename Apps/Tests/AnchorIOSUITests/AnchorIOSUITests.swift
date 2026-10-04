@@ -189,6 +189,40 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Morning walk"].waitForExistence(timeout: 4))
     }
 
+    func testTodayCompactControlsRemainReadableAndReachableOnPhone() {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-today-compact-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launch()
+
+        let todayTab = app.tabBars.buttons["Today"]
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 5))
+        todayTab.tap()
+
+        let controls = [
+            app.buttons["anchor.today.copy-day"],
+            app.buttons["anchor.today.log-time"],
+            app.buttons["anchor.today.customize"],
+        ]
+        let expectedLabels = ["Copy day", "Log time", "Customize"]
+        for (control, expectedLabel) in zip(controls, expectedLabels) {
+            XCTAssertTrue(control.waitForExistence(timeout: 5), "Expected Today control \(control.identifier) to be present")
+            XCTAssertEqual(control.label, expectedLabel, "The control should retain its clear accessible label")
+            XCTAssertTrue(control.isHittable, "Today control \(control.identifier) must be reachable")
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44, "Today control \(control.identifier) needs a 44pt hit width")
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "Today control \(control.identifier) needs a 44pt hit height")
+        }
+
+        let customize = controls[2]
+        XCTAssertGreaterThanOrEqual(customize.frame.minY, controls[0].frame.maxY - 1,
+                                    "Customize should occupy the second compact row")
+
+        let evidence = XCTAttachment(screenshot: app.screenshot())
+        evidence.name = "anchor-today-compact-phone-controls"
+        evidence.lifetime = .keepAlways
+        add(evidence)
+    }
+
     func testBehaviorProfileSavesImmediatelyAndPersists() {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-profile-ui-\(UUID().uuidString).store"

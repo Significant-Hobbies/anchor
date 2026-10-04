@@ -109,6 +109,7 @@ private struct VisualCatalogRenderer {
             _ name: String,
             width: CGFloat,
             height: CGFloat,
+            horizontalSizeClass: UserInterfaceSizeClass? = nil,
             @ViewBuilder content: @escaping () -> some View
         ) -> RenderSpec {
             RenderSpec(name: name, width: width, height: height) {
@@ -116,6 +117,7 @@ private struct VisualCatalogRenderer {
                     content()
                         .modelContainer(container)
                         .environment(\.anchorTheme, .dark)
+                        .environment(\.horizontalSizeClass, horizontalSizeClass)
                         .environment(\.anchorWorkspaceMaxWidth, min(width, 960))
                         .environment(\.anchorPlatformSync, platform)
                         .preferredColorScheme(.dark)
@@ -131,19 +133,19 @@ private struct VisualCatalogRenderer {
             page("focus-mac", width: 1_200, height: 800) {
                 FocusScreen(controller: controller)
             },
-            page("today-phone", width: 402, height: 874) {
+            page("today-phone", width: 402, height: 874, horizontalSizeClass: .compact) {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
             page("today-mac", width: 1_200, height: 800) {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
-            page("today-390", width: 390, height: 874) {
+            page("today-390", width: 390, height: 874, horizontalSizeClass: .compact) {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
-            page("today-768", width: 768, height: 900) {
+            page("today-768", width: 768, height: 900, horizontalSizeClass: .regular) {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
-            page("today-1440", width: 1_440, height: 900) {
+            page("today-1440", width: 1_440, height: 900, horizontalSizeClass: .regular) {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
             page("habits-phone", width: 402, height: 874) {
