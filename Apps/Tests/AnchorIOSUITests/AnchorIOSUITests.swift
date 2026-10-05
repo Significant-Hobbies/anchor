@@ -272,24 +272,72 @@ final class AnchorIOSUITests: XCTestCase {
                                     testCase: "testTodayLongLabelsEnabledDayOnPhone390",
                                     copyEnabled: true)
         controls[0].tap()
+        let sheet = app.navigationBars["Copy day Copy day"]
         let copyEntries = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Copy entries")).firstMatch
-        let cancel = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Cancel")).firstMatch
-        XCTAssertTrue(copyEntries.waitForExistence(timeout: 3))
-        XCTAssertTrue(cancel.waitForExistence(timeout: 3))
-        XCTAssertTrue(copyEntries.isEnabled && copyEntries.isHittable)
-        XCTAssertTrue(cancel.isHittable)
-        try keepTodayVariantEvidence(app, controls: [cancel, copyEntries], scenario: "copy-sheet",
+        let cancel = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Cancel")).firstMatch
+        let more = sheet.buttons["OverflowBarButtonItem"]
+        func nativeOverflowIsReady() -> Bool {
+            guard more.waitForExistence(timeout: 3), more.isEnabled, more.isHittable else {
+                XCTFail("The native Copy day overflow must be visible and tappable")
+                return false
+            }
+            guard more.label == "More More" else {
+                XCTFail("The native overflow must show the actual doubled More label: \(more.label)")
+                return false
+            }
+            return true
+        }
+        guard sheet.waitForExistence(timeout: 3), cancel.waitForExistence(timeout: 3),
+              cancel.isEnabled, cancel.isHittable else {
+            XCTFail("Copy day must open its real sheet with a reachable Cancel action")
+            return
+        }
+        let visibleAction: XCUIElement
+        if copyEntries.exists {
+            guard copyEntries.isEnabled, copyEntries.isHittable else {
+                XCTFail("The direct Copy entries action must be enabled and tappable")
+                return
+            }
+            visibleAction = copyEntries
+        } else {
+            guard nativeOverflowIsReady() else { return }
+            visibleAction = more
+        }
+        // Keep the actual visible toolbar before opening a menu, so cancellation
+        // exercises the sheet rather than a Cancel action covered by that menu.
+        try keepTodayVariantEvidence(app, controls: [cancel, visibleAction], scenario: "copy-sheet",
                                     testCase: "testTodayLongLabelsEnabledDayOnPhone390",
                                     copyEnabled: true)
         cancel.tap()
-        XCTAssertTrue(copyEntries.waitForNonExistence(timeout: 3))
+        guard sheet.waitForNonExistence(timeout: 3) else {
+            XCTFail("Cancel must dismiss the Copy day sheet")
+            return
+        }
         XCTAssertTrue(app.staticTexts[entryTitle].exists,
                       "Cancelling Copy day must preserve the original entry")
 
-        app.buttons["anchor.today.copy-day"].tap()
-        XCTAssertTrue(copyEntries.waitForExistence(timeout: 3))
+        let reopenedControls = verifyTodayLongLabelControls(app, copyEnabled: true)
+        reopenedControls[0].tap()
+        guard sheet.waitForExistence(timeout: 3), cancel.waitForExistence(timeout: 3),
+              cancel.isEnabled, cancel.isHittable else {
+            XCTFail("Copy day must reopen its real sheet with a reachable Cancel action")
+            return
+        }
+        if !copyEntries.exists {
+            guard nativeOverflowIsReady() else { return }
+            more.tap()
+        }
+        guard copyEntries.waitForExistence(timeout: 3),
+              copyEntries.label.components(separatedBy: "Copy entries").count - 1 == 2,
+              copyEntries.isEnabled, copyEntries.isHittable else {
+            XCTFail("The actual doubled Copy entries action must be enabled and tappable")
+            return
+        }
         copyEntries.tap()
-        XCTAssertTrue(copyEntries.waitForNonExistence(timeout: 3))
+        guard sheet.waitForNonExistence(timeout: 3) else {
+            XCTFail("Copy entries must complete and dismiss its sheet")
+            return
+        }
         XCTAssertTrue(app.staticTexts[entryTitle].waitForExistence(timeout: 4),
                       "The destination day must contain the copied entry")
         let goToToday = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Go to today")).firstMatch
