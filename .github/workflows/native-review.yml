@@ -24,6 +24,7 @@ jobs:
 
       - name: Verify shared package
         run: |
+          swift test --filter TimetableLayoutTests
           swift test
           swift build
           ./.build/debug/anchor-mcp --diagnose
