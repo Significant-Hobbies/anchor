@@ -48,17 +48,46 @@ jobs:
             --derived-data-path "$RUNNER_TEMP/DerivedData-Mac-UI" \
             --output json
 
-      - name: Run complete iPhone UI suite
+      # The width-specific method runs in the required 390-point step below.
+      # Every pre-existing iPhone test, including generic compact controls, stays here.
+      - name: Run iPhone UI suite on iPhone 17 Pro
         id: ios-ui
         continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 simulator test \
-            --project-path Apps/Anchor.xcodeproj \
-            --scheme "Anchor (iOS)" \
-            --configuration DebugLocal \
-            --simulator-name "iPhone 17 Pro" \
-            --derived-data-path "$RUNNER_TEMP/DerivedData-iOS-UI" \
-            --output json
+            --json "$(python3 - <<'PYJSON'
+          import json, os
+          print(json.dumps({
+              "projectPath": "Apps/Anchor.xcodeproj",
+              "scheme": "Anchor (iOS)",
+              "configuration": "DebugLocal",
+              "simulatorName": "iPhone 17 Pro",
+              "derivedDataPath": os.environ["RUNNER_TEMP"] + "/DerivedData-iOS-UI",
+              "extraArgs": ["-skip-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayCompactControlsRemainReadableAndReachableOnPhone390"]
+          }))
+          PYJSON
+          )" --output json
+
+      - name: Verify Today controls on an actual 390-point iPhone
+        id: ios-ui-390
+        continue-on-error: true
+        run: |
+          npx -y xcodebuildmcp@2.7.0 simulator test \
+            --json "$(python3 - <<'PYJSON'
+          import json, os
+          print(json.dumps({
+              "projectPath": "Apps/Anchor.xcodeproj",
+              "scheme": "Anchor (iOS)",
+              "configuration": "DebugLocal",
+              "simulatorName": "iPhone 16e",
+              "derivedDataPath": os.environ["RUNNER_TEMP"] + "/DerivedData-iOS-390",
+              "extraArgs": [
+                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayCompactControlsRemainReadableAndReachableOnPhone390",
+                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal"
+              ]
+          }))
+          PYJSON
+          )" --output json
 
       - name: Build watch companion
         id: watch-build
@@ -86,13 +115,16 @@ jobs:
                 ditto "$evidence_dir" "$evidence_root/$workspace_name/$evidence_kind"
               done
           fi
+          # Require retained results from Mac, standard iPhone, and 390-point runs.
+          result_count="$(find "$evidence_root" -type d -name '*.xcresult' -prune | wc -l | tr -d ' ')"
+          test "$result_count" -ge 3
 
       - name: Upload page catalog and native evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: anchor-native-review-${{ github.run_id }}
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
           path: |
             ${{ runner.temp }}/anchor-visual-catalog
@@ -103,8 +135,10 @@ jobs:
         env:
           MAC_UI_OUTCOME: ${{ steps.mac-ui.outcome }}
           IOS_UI_OUTCOME: ${{ steps.ios-ui.outcome }}
+          IOS_UI_390_OUTCOME: ${{ steps.ios-ui-390.outcome }}
           WATCH_BUILD_OUTCOME: ${{ steps.watch-build.outcome }}
         run: |
           test "$MAC_UI_OUTCOME" = success
           test "$IOS_UI_OUTCOME" = success
+          test "$IOS_UI_390_OUTCOME" = success
           test "$WATCH_BUILD_OUTCOME" = success

@@ -190,10 +190,23 @@ final class AnchorIOSUITests: XCTestCase {
     }
 
     func testTodayCompactControlsRemainReadableAndReachableOnPhone() {
+        verifyTodayCompactControls()
+    }
+
+    func testTodayCompactControlsRemainReadableAndReachableOnPhone390() {
+        verifyTodayCompactControls(expectedWidth: 390)
+    }
+
+    private func verifyTodayCompactControls(expectedWidth: CGFloat? = nil) {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-today-compact-\(UUID().uuidString).store"
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
+
+        if let expectedWidth {
+            XCTAssertEqual(app.frame.width, expectedWidth, accuracy: 0.5,
+                           "Qualification must use an actual 390-point app surface")
+        }
 
         let todayTab = app.tabBars.buttons["Today"]
         XCTAssertTrue(todayTab.waitForExistence(timeout: 5))
@@ -218,7 +231,9 @@ final class AnchorIOSUITests: XCTestCase {
                                     "Customize should occupy the second compact row")
 
         let evidence = XCTAttachment(screenshot: app.screenshot())
-        evidence.name = "anchor-today-compact-phone-controls"
+        evidence.name = expectedWidth == nil
+            ? "anchor-today-compact-phone-controls"
+            : "anchor-today-compact-phone-controls-390"
         evidence.lifetime = .keepAlways
         add(evidence)
     }
