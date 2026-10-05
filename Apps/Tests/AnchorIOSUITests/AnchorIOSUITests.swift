@@ -17,8 +17,21 @@ final class AnchorIOSUITests: XCTestCase {
         add.tap()
         let title = app.textFields["What will you do?"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
+        // The editor can exist while its presentation is still settling.
+        let titleReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in title.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [titleReady], timeout: 5) == .completed else {
+            XCTFail("The entry title must become hittable before typing")
+            return
+        }
         title.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 5) else {
+            XCTFail("Tapping the entry title must open the keyboard before typing")
+            return
+        }
         title.typeText("Read the next chapter")
+        XCTAssertEqual(title.value as? String, "Read the next chapter")
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["Read the next chapter"].waitForExistence(timeout: 4))
         app.buttons["anchor.today.copy-day"].tap()
