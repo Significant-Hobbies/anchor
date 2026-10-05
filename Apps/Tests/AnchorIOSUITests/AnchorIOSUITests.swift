@@ -214,6 +214,230 @@ final class AnchorIOSUITests: XCTestCase {
         verifyTodayCompactControls(expectedWidth: 390)
     }
 
+    func testTodayLongLabelsEmptyDayOnPhone390() throws {
+        let app = makeTodayVariantApp()
+        defer { app.terminate() }
+        launchTodayVariant(app, doublesLabels: true)
+        let controls = verifyTodayLongLabelControls(app, copyEnabled: false)
+        try keepTodayVariantEvidence(app, controls: controls, scenario: "empty-day",
+                                    testCase: "testTodayLongLabelsEmptyDayOnPhone390",
+                                    copyEnabled: false)
+
+        controls[1].tap()
+        let logTitle = app.descendants(matching: .any)["anchor.log.title"]
+        XCTAssertTrue(logTitle.waitForExistence(timeout: 5),
+                      "The enabled Log time control must open its real editor")
+        let cancel = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Cancel")).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 3))
+        cancel.tap()
+        XCTAssertTrue(logTitle.waitForNonExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["anchor.today.copy-day"].isEnabled,
+                       "Cancelling an empty log must leave Copy day disabled")
+    }
+
+    func testTodayLongLabelsEnabledDayOnPhone390() throws {
+        let app = makeTodayVariantApp()
+        defer { app.terminate() }
+        // Seed through the existing editor, then stress the same stored entry
+        // under pseudolocalization. No production fixture or UI hook is needed.
+        launchTodayVariant(app, doublesLabels: false)
+        let add = app.buttons["Add the first entry"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let title = app.textFields["What will you do?"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3))
+        let titleReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in title.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [titleReady], timeout: 5) == .completed else {
+            XCTFail("The synthetic entry editor must become hittable before typing")
+            return
+        }
+        title.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 5) else {
+            XCTFail("The synthetic entry title must have keyboard focus before typing")
+            return
+        }
+        let entryTitle = "Read the next chapter"
+        title.typeText(entryTitle)
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", entryTitle))
+            .firstMatch.waitForExistence(timeout: 3))
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[entryTitle].waitForExistence(timeout: 4))
+
+        app.terminate()
+        launchTodayVariant(app, doublesLabels: true)
+        let controls = verifyTodayLongLabelControls(app, copyEnabled: true)
+        try keepTodayVariantEvidence(app, controls: controls, scenario: "enabled-day",
+                                    testCase: "testTodayLongLabelsEnabledDayOnPhone390",
+                                    copyEnabled: true)
+        controls[0].tap()
+        let sheet = app.navigationBars["Copy day Copy day"]
+        let copyEntries = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Copy entries")).firstMatch
+        let cancel = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Cancel")).firstMatch
+        let more = sheet.buttons["OverflowBarButtonItem"]
+        func nativeOverflowIsReady() -> Bool {
+            guard more.waitForExistence(timeout: 3), more.isEnabled, more.isHittable else {
+                XCTFail("The native Copy day overflow must be visible and tappable")
+                return false
+            }
+            guard more.label == "More More" else {
+                XCTFail("The native overflow must show the actual doubled More label: \(more.label)")
+                return false
+            }
+            return true
+        }
+        guard sheet.waitForExistence(timeout: 3), cancel.waitForExistence(timeout: 3),
+              cancel.isEnabled, cancel.isHittable else {
+            XCTFail("Copy day must open its real sheet with a reachable Cancel action")
+            return
+        }
+        let visibleAction: XCUIElement
+        if copyEntries.exists {
+            guard copyEntries.isEnabled, copyEntries.isHittable else {
+                XCTFail("The direct Copy entries action must be enabled and tappable")
+                return
+            }
+            visibleAction = copyEntries
+        } else {
+            guard nativeOverflowIsReady() else { return }
+            visibleAction = more
+        }
+        // Keep the actual visible toolbar before opening a menu, so cancellation
+        // exercises the sheet rather than a Cancel action covered by that menu.
+        try keepTodayVariantEvidence(app, controls: [cancel, visibleAction], scenario: "copy-sheet",
+                                    testCase: "testTodayLongLabelsEnabledDayOnPhone390",
+                                    copyEnabled: true)
+        cancel.tap()
+        guard sheet.waitForNonExistence(timeout: 3) else {
+            XCTFail("Cancel must dismiss the Copy day sheet")
+            return
+        }
+        XCTAssertTrue(app.staticTexts[entryTitle].exists,
+                      "Cancelling Copy day must preserve the original entry")
+
+        let reopenedControls = verifyTodayLongLabelControls(app, copyEnabled: true)
+        reopenedControls[0].tap()
+        guard sheet.waitForExistence(timeout: 3), cancel.waitForExistence(timeout: 3),
+              cancel.isEnabled, cancel.isHittable else {
+            XCTFail("Copy day must reopen its real sheet with a reachable Cancel action")
+            return
+        }
+        if !copyEntries.exists {
+            guard nativeOverflowIsReady() else { return }
+            more.tap()
+        }
+        guard copyEntries.waitForExistence(timeout: 3),
+              copyEntries.label.components(separatedBy: "Copy entries").count - 1 == 2,
+              copyEntries.isEnabled, copyEntries.isHittable else {
+            XCTFail("The actual doubled Copy entries action must be enabled and tappable")
+            return
+        }
+        copyEntries.tap()
+        guard sheet.waitForNonExistence(timeout: 3) else {
+            XCTFail("Copy entries must complete and dismiss its sheet")
+            return
+        }
+        XCTAssertTrue(app.staticTexts[entryTitle].waitForExistence(timeout: 4),
+                      "The destination day must contain the copied entry")
+        let goToToday = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Go to today")).firstMatch
+        XCTAssertTrue(goToToday.waitForExistence(timeout: 3))
+        goToToday.tap()
+        XCTAssertTrue(app.staticTexts[entryTitle].waitForExistence(timeout: 4),
+                      "Copying must also preserve the original day")
+    }
+
+    private func makeTodayVariantApp() -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-today-variant-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        return app
+    }
+
+    private func launchTodayVariant(_ app: XCUIApplication, doublesLabels: Bool) {
+        app.launchArguments = ["-NSDoubleLocalizedStrings", doublesLabels ? "YES" : "NO"]
+        app.launch()
+        XCTAssertEqual(app.frame.width, 390, accuracy: 0.5,
+                       "Variant qualification must use an actual 390-point app")
+        let today = app.tabBars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Today")).firstMatch
+        XCTAssertTrue(today.waitForExistence(timeout: 5))
+        today.tap()
+    }
+
+    private func verifyTodayLongLabelControls(_ app: XCUIApplication, copyEnabled: Bool) -> [XCUIElement] {
+        let controls = [app.buttons["anchor.today.copy-day"],
+                        app.buttons["anchor.today.log-time"],
+                        app.buttons["anchor.today.customize"]]
+        for control in controls {
+            XCTAssertTrue(control.waitForExistence(timeout: 5))
+        }
+        // Populated Today deliberately scrolls to the current timetable position.
+        // Navigate back to its actions before qualifying their visible layout;
+        // this does not assert that the default populated viewport shows them.
+        for _ in 0..<8 {
+            let viewport = app.frame
+            let controlsAreVisible = controls.allSatisfy { control in
+                control.frame.minX >= viewport.minX - 0.5 &&
+                control.frame.maxX <= viewport.maxX + 0.5 &&
+                control.frame.minY >= viewport.minY - 0.5 &&
+                control.frame.maxY <= viewport.maxY + 0.5
+            }
+            let enabledControls = copyEnabled ? controls : Array(controls.dropFirst())
+            if controlsAreVisible && enabledControls.allSatisfy({ $0.isHittable }) { break }
+            app.swipeDown()
+        }
+        for (control, baseline) in zip(controls, ["Copy day", "Log time", "Customize"]) {
+            XCTAssertEqual(control.label.components(separatedBy: baseline).count - 1, 2,
+                           "Pseudolocalization must actually double \(baseline); baseline English is not variant evidence")
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44)
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44)
+            XCTAssertGreaterThanOrEqual(control.frame.minX, app.frame.minX - 0.5)
+            XCTAssertLessThanOrEqual(control.frame.maxX, app.frame.maxX + 0.5)
+            XCTAssertGreaterThanOrEqual(control.frame.minY, app.frame.minY - 0.5)
+            XCTAssertLessThanOrEqual(control.frame.maxY, app.frame.maxY + 0.5)
+        }
+        XCTAssertEqual(controls[0].isEnabled, copyEnabled)
+        for control in copyEnabled ? controls : Array(controls.dropFirst()) {
+            XCTAssertTrue(control.isEnabled)
+            XCTAssertTrue(control.isHittable)
+        }
+        XCTAssertLessThanOrEqual(controls[0].frame.maxX, controls[1].frame.minX + 0.5,
+                                 "The first-row actions must not overlap")
+        XCTAssertGreaterThanOrEqual(controls[2].frame.minY,
+                                    max(controls[0].frame.maxY, controls[1].frame.maxY) - 0.5,
+                                    "Customize must remain below both first-row actions")
+        return controls
+    }
+
+    private func keepTodayVariantEvidence(_ app: XCUIApplication, controls: [XCUIElement],
+                                         scenario: String, testCase: String, copyEnabled: Bool) throws {
+        let screenshot = app.screenshot()
+        let name = "anchor-r3-390-\(scenario)"
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        // Keep reviewable PNGs from these exact tested states alongside the
+        // XCResult attachments, without a raw xcresult export command.
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("anchor-r3-390-evidence", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try screenshot.pngRepresentation.write(to: directory.appendingPathComponent(name + ".png"))
+        let metadata: [String: Any] = [
+            "testCase": testCase, "scenario": scenario, "logicalWidth": app.frame.width,
+            "simulatorId": ProcessInfo.processInfo.environment["SIMULATOR_UDID"] ?? "",
+            "copyEnabled": copyEnabled, "imageName": name + ".png",
+            "controls": controls.map { control -> [String: Any] in
+                ["identifier": control.identifier, "label": control.label,
+                 "isEnabled": control.isEnabled, "isHittable": control.isHittable,
+                 "frame": ["x": control.frame.minX, "y": control.frame.minY,
+                           "width": control.frame.width, "height": control.frame.height]]
+            },
+        ]
+        let data = try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: directory.appendingPathComponent(name + ".json"))
+    }
+
     private func verifyTodayCompactControls(expectedWidth: CGFloat? = nil) {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-today-compact-\(UUID().uuidString).store"
@@ -372,11 +596,37 @@ final class AnchorIOSUITests: XCTestCase {
             XCTFail("Manage projects and tags did not open its editor")
             return
         }
+        let projectReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in project.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [projectReady], timeout: 5) == .completed else {
+            XCTFail("The new project field must become hittable before typing")
+            return
+        }
         project.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 5) else {
+            XCTFail("The new project field must have keyboard focus before typing")
+            return
+        }
         project.typeText("Launch\n")
         XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.waitForExistence(timeout: 3))
         let tag = app.textFields["anchor.metadata.new-tag"]
+        guard tag.waitForExistence(timeout: 5) else {
+            XCTFail("The new tag field must exist before typing")
+            return
+        }
+        let tagReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in tag.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [tagReady], timeout: 5) == .completed else {
+            XCTFail("The new tag field must become hittable before typing")
+            return
+        }
         tag.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 5) else {
+            XCTFail("The new tag field must have keyboard focus before typing")
+            return
+        }
         tag.typeText("Deep work\n")
 
         XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.exists)
