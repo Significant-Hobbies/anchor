@@ -43,17 +43,23 @@ struct TimetableLayoutTests {
 
     @Test("The visible window covers early blocks and the current hour")
     func displayRangeCoversNowAndBlocks() {
-        let calendar = Calendar.current
-        let today = Date()
-        let dayStart = calendar.startOfDay(for: today)
-        let range = TimetableLayout.displayRange(
-            for: today,
-            intervals: [(5 * 3_600, 6 * 3_600)],
-            now: today,
-            calendar: calendar
-        )
-        #expect(range.start == dayStart.addingTimeInterval(5 * 3_600))
-        #expect(range.contains(today))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let dayStart = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
+        // Fixed early/daytime/late clocks exercise the window without wall-clock dependence.
+        for (hour, expectedStartHour) in [(0, 0), (2, 1), (12, 5), (23, 5)] {
+            let now = dayStart.addingTimeInterval(Double(hour) * 3_600)
+            let range = TimetableLayout.displayRange(
+                for: dayStart,
+                intervals: [(5 * 3_600, 6 * 3_600)],
+                now: now,
+                calendar: calendar
+            )
+            #expect(range.start == dayStart.addingTimeInterval(Double(expectedStartHour) * 3_600))
+            #expect(range.contains(now))
+            #expect(range.contains(dayStart.addingTimeInterval(5 * 3_600)))
+            #expect(range.contains(dayStart.addingTimeInterval(6 * 3_600)))
+        }
     }
 
     @Test("A day without context defaults to a working window")
@@ -61,7 +67,7 @@ struct TimetableLayoutTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let day = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
-        let range = TimetableLayout.displayRange(for: day, intervals: [], now: Date(), calendar: calendar)
+        let range = TimetableLayout.displayRange(for: day, intervals: [], now: day.addingTimeInterval(24 * 3_600), calendar: calendar)
         #expect(range.start == day.addingTimeInterval(7 * 3_600))
         #expect(range.end == day.addingTimeInterval(22 * 3_600))
     }
@@ -74,7 +80,7 @@ struct TimetableLayoutTests {
         let custom = TimetableLayout.displayRange(
             for: day,
             intervals: [],
-            now: Date(),
+            now: day.addingTimeInterval(24 * 3_600),
             calendar: calendar,
             windowStartHour: 9,
             windowEndHour: 18
@@ -85,7 +91,7 @@ struct TimetableLayoutTests {
         let expanded = TimetableLayout.displayRange(
             for: day,
             intervals: [(23 * 3_600, 24 * 3_600)],
-            now: Date(),
+            now: day.addingTimeInterval(24 * 3_600),
             calendar: calendar,
             windowStartHour: 9,
             windowEndHour: 18

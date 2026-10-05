@@ -68,7 +68,7 @@ enum TimetableLayout {
             startHour = min(startHour, floor(start / 3600))
             endHour = max(endHour, ceil(end / 3600))
         }
-        if calendar.isDateInToday(day) {
+        if calendar.isDate(day, inSameDayAs: now) {
             let nowHour = Double(calendar.component(.hour, from: now))
                 + Double(calendar.component(.minute, from: now)) / 60
             startHour = min(startHour, floor(nowHour) - 1)

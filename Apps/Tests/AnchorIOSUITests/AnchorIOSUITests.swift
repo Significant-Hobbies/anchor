@@ -17,8 +17,25 @@ final class AnchorIOSUITests: XCTestCase {
         add.tap()
         let title = app.textFields["What will you do?"]
         XCTAssertTrue(title.waitForExistence(timeout: 3))
+        // The editor can exist while its presentation is still settling.
+        let titleReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in title.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [titleReady], timeout: 5) == .completed else {
+            XCTFail("The entry title must become hittable before typing")
+            return
+        }
         title.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 5) else {
+            XCTFail("Tapping the entry title must open the keyboard before typing")
+            return
+        }
         title.typeText("Read the next chapter")
+        let enteredTitle = app.textFields.matching(
+            NSPredicate(format: "value == %@", "Read the next chapter")
+        ).firstMatch
+        XCTAssertTrue(enteredTitle.waitForExistence(timeout: 3),
+                      "The entry title must contain the intended text before saving")
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["Read the next chapter"].waitForExistence(timeout: 4))
         app.buttons["anchor.today.copy-day"].tap()
@@ -187,6 +204,55 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons["Save"].tap()
 
         XCTAssertTrue(app.staticTexts["Morning walk"].waitForExistence(timeout: 4))
+    }
+
+    func testTodayCompactControlsRemainReadableAndReachableOnPhone() {
+        verifyTodayCompactControls()
+    }
+
+    func testTodayCompactControlsRemainReadableAndReachableOnPhone390() {
+        verifyTodayCompactControls(expectedWidth: 390)
+    }
+
+    private func verifyTodayCompactControls(expectedWidth: CGFloat? = nil) {
+        let app = XCUIApplication()
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-today-compact-\(UUID().uuidString).store"
+        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launch()
+
+        if let expectedWidth {
+            XCTAssertEqual(app.frame.width, expectedWidth, accuracy: 0.5,
+                           "Qualification must use an actual 390-point app surface")
+        }
+
+        let todayTab = app.tabBars.buttons["Today"]
+        XCTAssertTrue(todayTab.waitForExistence(timeout: 5))
+        todayTab.tap()
+
+        let controls = [
+            app.buttons["anchor.today.copy-day"],
+            app.buttons["anchor.today.log-time"],
+            app.buttons["anchor.today.customize"],
+        ]
+        let expectedLabels = ["Copy day", "Log time", "Customize"]
+        for (control, expectedLabel) in zip(controls, expectedLabels) {
+            XCTAssertTrue(control.waitForExistence(timeout: 5), "Expected Today control \(control.identifier) to be present")
+            XCTAssertEqual(control.label, expectedLabel, "The control should retain its clear accessible label")
+            XCTAssertTrue(control.isHittable, "Today control \(control.identifier) must be reachable")
+            XCTAssertGreaterThanOrEqual(control.frame.width, 44, "Today control \(control.identifier) needs a 44pt hit width")
+            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "Today control \(control.identifier) needs a 44pt hit height")
+        }
+
+        let customize = controls[2]
+        XCTAssertGreaterThanOrEqual(customize.frame.minY, controls[0].frame.maxY - 1,
+                                    "Customize should occupy the second compact row")
+
+        let evidence = XCTAttachment(screenshot: app.screenshot())
+        evidence.name = expectedWidth == nil
+            ? "anchor-today-compact-phone-controls"
+            : "anchor-today-compact-phone-controls-390"
+        evidence.lifetime = .keepAlways
+        add(evidence)
     }
 
     func testBehaviorProfileSavesImmediatelyAndPersists() {

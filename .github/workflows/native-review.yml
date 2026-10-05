@@ -24,6 +24,7 @@ jobs:
 
       - name: Verify shared package
         run: |
+          swift test --filter TimetableLayoutTests
           swift test
           swift build
           ./.build/debug/anchor-mcp --diagnose
@@ -48,17 +49,126 @@ jobs:
             --derived-data-path "$RUNNER_TEMP/DerivedData-Mac-UI" \
             --output json
 
-      - name: Run complete iPhone UI suite
+      # The width-specific method runs in the required 390-point step below.
+      # Every pre-existing iPhone test, including generic compact controls, stays here.
+      - name: Run iPhone UI suite on iPhone 17 Pro
         id: ios-ui
         continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 simulator test \
-            --project-path Apps/Anchor.xcodeproj \
-            --scheme "Anchor (iOS)" \
-            --configuration DebugLocal \
-            --simulator-name "iPhone 17 Pro" \
-            --derived-data-path "$RUNNER_TEMP/DerivedData-iOS-UI" \
-            --output json
+            --json "$(python3 - <<'PYJSON'
+          import json, os
+          print(json.dumps({
+              "projectPath": "Apps/Anchor.xcodeproj",
+              "scheme": "Anchor (iOS)",
+              "configuration": "DebugLocal",
+              "simulatorName": "iPhone 17 Pro",
+              "derivedDataPath": os.environ["RUNNER_TEMP"] + "/DerivedData-iOS-UI",
+              "extraArgs": ["-skip-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayCompactControlsRemainReadableAndReachableOnPhone390"]
+          }))
+          PYJSON
+          )" --output json
+
+      - name: Verify Today controls on an actual 390-point iPhone
+        id: ios-ui-390
+        continue-on-error: true
+        run: |
+          npx -y xcodebuildmcp@2.7.0 simulator test \
+            --json "$(python3 - <<'PYJSON'
+          import json, os
+          print(json.dumps({
+              "projectPath": "Apps/Anchor.xcodeproj",
+              "scheme": "Anchor (iOS)",
+              "configuration": "DebugLocal",
+              "simulatorName": "iPhone 16e",
+              "derivedDataPath": os.environ["RUNNER_TEMP"] + "/DerivedData-iOS-390",
+              "extraArgs": [
+                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayCompactControlsRemainReadableAndReachableOnPhone390",
+                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal"
+              ]
+          }))
+          PYJSON
+          )" --output json > "$RUNNER_TEMP/anchor-ios390-test.json"
+
+      - name: Capture the qualified 390-point Today surface
+        id: ios-render-390
+        if: steps.ios-ui-390.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python3 - <<'PYPROOF'
+          import hashlib, json, os, pathlib, plistlib, shutil, subprocess
+          root = pathlib.Path(os.environ["RUNNER_TEMP"])
+          evidence = root / "anchor-native-evidence" / "phone-390"
+          evidence.mkdir(parents=True, exist_ok=True)
+
+          def tool(label, *args, payload=None):
+              command = ["npx", "-y", "xcodebuildmcp@2.7.0", *args]
+              if payload is not None:
+                  command += ["--json", json.dumps(payload)]
+              command += ["--output", "json"]
+              result = subprocess.run(command, check=False, capture_output=True, text=True)
+              (evidence / (label + ".stdout.txt")).write_text(result.stdout)
+              (evidence / (label + ".stderr.txt")).write_text(result.stderr)
+              assert result.returncode == 0, label + " failed; inspect retained diagnostics"
+              record = json.loads(result.stdout)
+              (evidence / (label + ".json")).write_text(json.dumps(record, indent=2))
+              assert not record.get("didError"), record.get("error")
+              return record["data"]
+
+          test_record = json.loads((root / "anchor-ios390-test.json").read_text())
+          (evidence / "tests.json").write_text(json.dumps(test_record, indent=2))
+          assert test_record["didError"] is False, test_record.get("error")
+          test_data = test_record["data"]
+          assert test_data["summary"]["status"] == "SUCCEEDED"
+          assert test_data["summary"]["counts"] == {"passed": 2, "failed": 0, "skipped": 0}
+          passed_names = {case["test"].removesuffix("()")
+                          for case in test_data["testCases"] if case["status"] == "passed"}
+          assert {
+              "testTodayCompactControlsRemainReadableAndReachableOnPhone390",
+              "testDayCanBeCopiedWithoutReplacingTheOriginal"
+          } <= passed_names, "Both selected journeys must actually execute and pass"
+          devices = tool("simulators", "simulator", "list")["simulators"]
+          candidates = [d for d in devices if d["name"] == "iPhone 16e" and d["isAvailable"]]
+          requested_id = test_record.get("data", {}).get("request", {}).get("simulatorId")
+          if requested_id:
+              candidates = [d for d in candidates if d["simulatorId"] == requested_id]
+          assert len(candidates) == 1, "Require the exact unambiguous iPhone 16e destination"
+          device = candidates[0]
+          simulator_id = device["simulatorId"]
+          if device["state"] != "Booted":
+              tool("boot", "simulator", "boot", "--simulator-id", simulator_id)
+          app = tool("app-path", "simulator", "get-app-path",
+              "--project-path", "Apps/Anchor.xcodeproj", "--scheme", "Anchor (iOS)",
+              "--configuration", "DebugLocal", "--platform", "iOS Simulator",
+              "--simulator-id", simulator_id,
+              "--derived-data-path", str(root / "DerivedData-iOS-390"))
+          app_path = pathlib.Path(app["artifacts"]["appPath"])
+          with (app_path / "Info.plist").open("rb") as info_file:
+              info = plistlib.load(info_file)
+          assert info["CFBundleIdentifier"] == "com.significanthobbies.anchor"
+          executable = app_path / info["CFBundleExecutable"]
+          digest = hashlib.sha256(executable.read_bytes()).hexdigest()
+          tool("install", "simulator", "install", "--simulator-id", simulator_id,
+               "--app-path", str(app_path))
+          tool("launch", "simulator", "launch-app", "--simulator-id", simulator_id,
+               "--bundle-id", info["CFBundleIdentifier"], payload={"env": {
+                   "ANCHOR_DEMO_DATA": "1", "ANCHOR_INITIAL_TAB": "today",
+                   "ANCHOR_ONBOARDING_SKIP": "1",
+                   "ANCHOR_STORE_PATH": "/tmp/anchor-390-proof-" + os.environ["GITHUB_RUN_ID"] + ".store"
+               }})
+          tool("ready", "ui-automation", "wait-for-ui", "--simulator-id", simulator_id,
+               "--predicate", "exists", "--identifier", "anchor.today.customize", "--timeout-ms", "15000")
+          screenshot = tool("screenshot", "simulator", "screenshot", "--simulator-id", simulator_id,
+                            "--return-format", "path")
+          image_path = pathlib.Path(screenshot["artifacts"]["screenshotPath"])
+          shutil.copy2(image_path, evidence / ("today-390" + image_path.suffix))
+          (evidence / "qualification.json").write_text(json.dumps({
+              "headSha": os.environ["GITHUB_SHA"], "runId": os.environ["GITHUB_RUN_ID"],
+              "simulator": device, "bundleId": info["CFBundleIdentifier"],
+              "executableSha256": digest, "capture": screenshot["capture"],
+              "imageIsScaledByMCP": screenshot["capture"]["format"] == "image/jpeg", "logicalWidthAssertionLivesInRequiredUITest": True
+          }, indent=2))
+          PYPROOF
 
       - name: Build watch companion
         id: watch-build
@@ -86,13 +196,16 @@ jobs:
                 ditto "$evidence_dir" "$evidence_root/$workspace_name/$evidence_kind"
               done
           fi
+          # Require retained results from Mac, standard iPhone, and 390-point runs.
+          result_count="$(find "$evidence_root" -type d -name '*.xcresult' -prune | wc -l | tr -d ' ')"
+          test "$result_count" -ge 3
 
       - name: Upload page catalog and native evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
           name: anchor-native-review-${{ github.run_id }}
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
           path: |
             ${{ runner.temp }}/anchor-visual-catalog
@@ -103,8 +216,12 @@ jobs:
         env:
           MAC_UI_OUTCOME: ${{ steps.mac-ui.outcome }}
           IOS_UI_OUTCOME: ${{ steps.ios-ui.outcome }}
+          IOS_UI_390_OUTCOME: ${{ steps.ios-ui-390.outcome }}
+          IOS_RENDER_390_OUTCOME: ${{ steps.ios-render-390.outcome }}
           WATCH_BUILD_OUTCOME: ${{ steps.watch-build.outcome }}
         run: |
           test "$MAC_UI_OUTCOME" = success
           test "$IOS_UI_OUTCOME" = success
+          test "$IOS_UI_390_OUTCOME" = success
+          test "$IOS_RENDER_390_OUTCOME" = success
           test "$WATCH_BUILD_OUTCOME" = success
