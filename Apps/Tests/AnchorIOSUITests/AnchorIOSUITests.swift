@@ -320,8 +320,25 @@ final class AnchorIOSUITests: XCTestCase {
         let controls = [app.buttons["anchor.today.copy-day"],
                         app.buttons["anchor.today.log-time"],
                         app.buttons["anchor.today.customize"]]
-        for (control, baseline) in zip(controls, ["Copy day", "Log time", "Customize"]) {
+        for control in controls {
             XCTAssertTrue(control.waitForExistence(timeout: 5))
+        }
+        // Populated Today deliberately scrolls to the current timetable position.
+        // Navigate back to its actions before qualifying their visible layout;
+        // this does not assert that the default populated viewport shows them.
+        for _ in 0..<8 {
+            let viewport = app.frame
+            let controlsAreVisible = controls.allSatisfy { control in
+                control.frame.minX >= viewport.minX - 0.5 &&
+                control.frame.maxX <= viewport.maxX + 0.5 &&
+                control.frame.minY >= viewport.minY - 0.5 &&
+                control.frame.maxY <= viewport.maxY + 0.5
+            }
+            let enabledControls = copyEnabled ? controls : Array(controls.dropFirst())
+            if controlsAreVisible && enabledControls.allSatisfy({ $0.isHittable }) { break }
+            app.swipeDown()
+        }
+        for (control, baseline) in zip(controls, ["Copy day", "Log time", "Customize"]) {
             XCTAssertEqual(control.label.components(separatedBy: baseline).count - 1, 2,
                            "Pseudolocalization must actually double \(baseline); baseline English is not variant evidence")
             XCTAssertGreaterThanOrEqual(control.frame.width, 44)
@@ -531,11 +548,37 @@ final class AnchorIOSUITests: XCTestCase {
             XCTFail("Manage projects and tags did not open its editor")
             return
         }
+        let projectReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in project.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [projectReady], timeout: 5) == .completed else {
+            XCTFail("The new project field must become hittable before typing")
+            return
+        }
         project.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 5) else {
+            XCTFail("The new project field must have keyboard focus before typing")
+            return
+        }
         project.typeText("Launch\n")
         XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.waitForExistence(timeout: 3))
         let tag = app.textFields["anchor.metadata.new-tag"]
+        guard tag.waitForExistence(timeout: 5) else {
+            XCTFail("The new tag field must exist before typing")
+            return
+        }
+        let tagReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in tag.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [tagReady], timeout: 5) == .completed else {
+            XCTFail("The new tag field must become hittable before typing")
+            return
+        }
         tag.tap()
+        guard app.keyboards.firstMatch.waitForExistence(timeout: 5) else {
+            XCTFail("The new tag field must have keyboard focus before typing")
+            return
+        }
         tag.typeText("Deep work\n")
 
         XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.exists)

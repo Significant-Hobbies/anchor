@@ -247,6 +247,10 @@ jobs:
           evidence_root="$RUNNER_TEMP/anchor-native-evidence"
           workspace_root="$HOME/Library/Developer/XcodeBuildMCP/workspaces"
           mkdir -p "$evidence_root"
+          # Retain structured 390-point diagnostics even when qualification fails.
+          if [ -f "$RUNNER_TEMP/anchor-ios390-test.json" ]; then
+            cp "$RUNNER_TEMP/anchor-ios390-test.json" "$evidence_root/anchor-ios390-test.json"
+          fi
           if [ -d "$workspace_root" ]; then
             find "$workspace_root" -type d \( -name logs -o -name result-bundles \) -prune -print0 |
               while IFS= read -r -d '' evidence_dir; do
