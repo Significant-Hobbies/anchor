@@ -31,7 +31,11 @@ final class AnchorIOSUITests: XCTestCase {
             return
         }
         title.typeText("Read the next chapter")
-        XCTAssertEqual(title.value as? String, "Read the next chapter")
+        let enteredTitle = app.textFields.matching(
+            NSPredicate(format: "value == %@", "Read the next chapter")
+        ).firstMatch
+        XCTAssertTrue(enteredTitle.waitForExistence(timeout: 3),
+                      "The entry title must contain the intended text before saving")
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["Read the next chapter"].waitForExistence(timeout: 4))
         app.buttons["anchor.today.copy-day"].tap()
