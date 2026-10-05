@@ -64,7 +64,11 @@ jobs:
               "configuration": "DebugLocal",
               "simulatorName": "iPhone 17 Pro",
               "derivedDataPath": os.environ["RUNNER_TEMP"] + "/DerivedData-iOS-UI",
-              "extraArgs": ["-skip-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayCompactControlsRemainReadableAndReachableOnPhone390"]
+              "extraArgs": [
+                  "-skip-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayCompactControlsRemainReadableAndReachableOnPhone390",
+                  "-skip-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayLongLabelsEmptyDayOnPhone390",
+                  "-skip-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayLongLabelsEnabledDayOnPhone390"
+              ]
           }))
           PYJSON
           )" --output json
@@ -84,7 +88,9 @@ jobs:
               "derivedDataPath": os.environ["RUNNER_TEMP"] + "/DerivedData-iOS-390",
               "extraArgs": [
                   "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayCompactControlsRemainReadableAndReachableOnPhone390",
-                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal"
+                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testDayCanBeCopiedWithoutReplacingTheOriginal",
+                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayLongLabelsEmptyDayOnPhone390",
+                  "-only-testing:AnchorIOSUITests/AnchorIOSUITests/testTodayLongLabelsEnabledDayOnPhone390"
               ]
           }))
           PYJSON
@@ -96,7 +102,7 @@ jobs:
         continue-on-error: true
         run: |
           python3 - <<'PYPROOF'
-          import hashlib, json, os, pathlib, plistlib, shutil, subprocess
+          import hashlib, json, os, pathlib, plistlib, shutil, struct, subprocess
           root = pathlib.Path(os.environ["RUNNER_TEMP"])
           evidence = root / "anchor-native-evidence" / "phone-390"
           evidence.mkdir(parents=True, exist_ok=True)
@@ -120,13 +126,15 @@ jobs:
           assert test_record["didError"] is False, test_record.get("error")
           test_data = test_record["data"]
           assert test_data["summary"]["status"] == "SUCCEEDED"
-          assert test_data["summary"]["counts"] == {"passed": 2, "failed": 0, "skipped": 0}
+          assert test_data["summary"]["counts"] == {"passed": 4, "failed": 0, "skipped": 0}
           passed_names = {case["test"].removesuffix("()")
                           for case in test_data["testCases"] if case["status"] == "passed"}
           assert {
               "testTodayCompactControlsRemainReadableAndReachableOnPhone390",
-              "testDayCanBeCopiedWithoutReplacingTheOriginal"
-          } <= passed_names, "Both selected journeys must actually execute and pass"
+              "testDayCanBeCopiedWithoutReplacingTheOriginal",
+              "testTodayLongLabelsEmptyDayOnPhone390",
+              "testTodayLongLabelsEnabledDayOnPhone390"
+          } == passed_names, "All four selected journeys must actually execute and pass without skips"
           devices = tool("simulators", "simulator", "list")["simulators"]
           candidates = [d for d in devices if d["name"] == "iPhone 16e" and d["isAvailable"]]
           requested_id = test_record.get("data", {}).get("request", {}).get("simulatorId")
@@ -135,6 +143,57 @@ jobs:
           assert len(candidates) == 1, "Require the exact unambiguous iPhone 16e destination"
           device = candidates[0]
           simulator_id = device["simulatorId"]
+          # Read only the named screenshot proofs written by our UI-test runner
+          # on this exact hosted destination; do not export or expand XCResults.
+          container_root = pathlib.Path.home() / "Library/Developer/CoreSimulator/Devices" / simulator_id / "data/Containers/Data/Application"
+          expected_states = {
+              "empty-day": ("testTodayLongLabelsEmptyDayOnPhone390", False),
+              "enabled-day": ("testTodayLongLabelsEnabledDayOnPhone390", True),
+              "copy-sheet": ("testTodayLongLabelsEnabledDayOnPhone390", True)
+          }
+          directories = list(container_root.glob("*/tmp/anchor-r3-390-evidence"))
+          assert len(directories) == 1, "Require one unambiguous variant evidence directory on the tested simulator"
+          variants = evidence / "variants"
+          variants.mkdir(exist_ok=True)
+          variant_receipts = []
+          for state, (test_name, copy_enabled) in expected_states.items():
+              name = "anchor-r3-390-" + state
+              image = directories[0] / (name + ".png")
+              metadata = directories[0] / (name + ".json")
+              for proof_path in (image, metadata):
+                  assert proof_path.is_file() and not proof_path.is_symlink(), "Missing or unsafe named variant proof"
+                  assert proof_path.resolve().is_relative_to(container_root.resolve()), "Variant proof must remain inside the tested runner container"
+              record = json.loads(metadata.read_text())
+              assert record["testCase"] == test_name and record["scenario"] == state
+              assert record["simulatorId"] == simulator_id, "The screenshots must come from the tested 390-point destination"
+              assert abs(record["logicalWidth"] - 390) <= 0.5
+              assert record["copyEnabled"] is copy_enabled
+              assert record["imageName"] == image.name
+              if state != "copy-sheet":
+                  controls = record["controls"]
+                  assert len(controls) == 3
+                  for control, baseline in zip(controls, ("Copy day", "Log time", "Customize")):
+                      assert control["label"].count(baseline) == 2, "Unchanged English labels cannot qualify longer-label states"
+                      assert control["frame"]["width"] >= 44 and control["frame"]["height"] >= 44
+                  assert controls[0]["isEnabled"] is copy_enabled
+                  assert all(c["isEnabled"] and c["isHittable"] for c in controls[1:])
+                  assert not copy_enabled or controls[0]["isHittable"]
+              image_bytes = image.read_bytes()
+              assert image_bytes[:8] == b"\x89PNG\r\n\x1a\n" and image_bytes[12:16] == b"IHDR"
+              width, height = struct.unpack(">II", image_bytes[16:24])
+              assert width > 0 and height > 0
+              shutil.copy2(image, variants / image.name)
+              shutil.copy2(metadata, variants / metadata.name)
+              variant_receipts.append({"scenario": state, "testCase": test_name,
+                  "pngWidth": width, "pngHeight": height,
+                  "imageSha256": hashlib.sha256(image_bytes).hexdigest(),
+                  "metadataSha256": hashlib.sha256(metadata.read_bytes()).hexdigest()})
+          (variants / "qualification.json").write_text(json.dumps({
+              "headSha": os.environ["GITHUB_SHA"], "runId": os.environ["GITHUB_RUN_ID"],
+              "simulatorId": simulator_id, "testCounts": test_data["summary"]["counts"],
+              "passedNames": sorted(passed_names), "states": variant_receipts,
+              "captureSource": "XCTest screenshots from the same passing variant journeys"
+          }, indent=2))
           if device["state"] != "Booted":
               tool("boot", "simulator", "boot", "--simulator-id", simulator_id)
           app = tool("app-path", "simulator", "get-app-path",
