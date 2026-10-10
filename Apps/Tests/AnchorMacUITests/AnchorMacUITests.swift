@@ -48,7 +48,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("History").click()
         app.radioButtons.ci("Interruptions").click()
         let parkedRow = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Synthetic interruption")
+            NSPredicate(format: "label  %@", "Synthetic interruption")
         ).firstMatch
         XCTAssertTrue(parkedRow.waitForExistence(timeout: 3))
 
@@ -92,7 +92,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(finish.waitForExistence(timeout: 2))
         finish.click()
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "1 finished"))
+            app.staticTexts.matching(NSPredicate(format: "value  %@", "1 finished"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
 
@@ -108,7 +108,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("Today").click()
         XCTAssertTrue(app.staticTexts.ci("Mac schedule acceptance").waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "1 finished"))
+            app.staticTexts.matching(NSPredicate(format: "value  %@", "1 finished"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
     }
@@ -240,7 +240,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("Today").click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "Two-day reset edited"))
+            app.staticTexts.matching(NSPredicate(format: "value  %@", "Two-day reset edited"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
 
@@ -309,7 +309,7 @@ final class AnchorMacUITests: XCTestCase {
         let selectedDay = app.radioButtons.matching(NSPredicate(format: "value == 1")).firstMatch
         XCTAssertTrue(selectedDay.waitForExistence(timeout: 3))
         let firstDay = selectedDay.label
-        let addFirstDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Add to ")).firstMatch
+        let addFirstDay = app.buttons.matching(NSPredicate(format: "label  %@", "Add to ")).firstMatch
         XCTAssertTrue(addFirstDay.waitForExistence(timeout: 3))
         addFirstDay.click()
         let firstTitle = app.textFields.ci("What will you do?")
@@ -317,7 +317,7 @@ final class AnchorMacUITests: XCTestCase {
         firstTitle.typeText("\(firstDay) planning")
         app.buttons.ci("Save").click()
         XCTAssertTrue(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(firstDay) planning"))
+            app.buttons.matching(NSPredicate(format: "label  %@", "\(firstDay) planning"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
 
@@ -325,7 +325,7 @@ final class AnchorMacUITests: XCTestCase {
         let secondDayName = secondDay.label
         secondDay.click()
         XCTAssertTrue(app.staticTexts.ci("0 usual items on \(secondDayName)").waitForExistence(timeout: 2))
-        let addSecondDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Add to ")).firstMatch
+        let addSecondDay = app.buttons.matching(NSPredicate(format: "label  %@", "Add to ")).firstMatch
         XCTAssertTrue(addSecondDay.waitForExistence(timeout: 3))
         addSecondDay.click()
         let secondTitle = app.textFields.ci("What will you do?")
@@ -333,11 +333,11 @@ final class AnchorMacUITests: XCTestCase {
         secondTitle.typeText("\(secondDayName) planning")
         app.buttons.ci("Save").click()
         XCTAssertTrue(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(secondDayName) planning"))
+            app.buttons.matching(NSPredicate(format: "label  %@", "\(secondDayName) planning"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
         XCTAssertFalse(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(firstDay) planning"))
+            app.buttons.matching(NSPredicate(format: "label  %@", "\(firstDay) planning"))
                 .firstMatch.isHittable
         )
 
@@ -401,7 +401,7 @@ final class AnchorMacUITests: XCTestCase {
 
         app.radioButtons.ci("Interruptions").click()
         XCTAssertTrue(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "To deal with"))
+            app.buttons.matching(NSPredicate(format: "label  %@", "To deal with"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
         XCTAssertTrue(app.buttons.ci("Everything parked").exists)
@@ -504,10 +504,10 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.ci("Plan the day. Learn what moved it.").waitForExistence(timeout: 4))
         app.buttons.ci("Choose what to protect").click()
         XCTAssertTrue(app.staticTexts.ci("What tends to take more time than you want?").waitForExistence(timeout: 4))
-        app.buttons.matching(NSPredicate(format: "label == %@", "Short videos")).firstMatch.click()
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Continue with")).firstMatch.click()
+        app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Short videos")).firstMatch.click()
+        app.buttons.matching(NSPredicate(format: "label  %@", "Continue with")).firstMatch.click()
         XCTAssertTrue(app.staticTexts.ci("What do you want that time to make room for?").waitForExistence(timeout: 4))
-        app.buttons.matching(NSPredicate(format: "label == %@", "More creativity")).firstMatch.click()
+        app.buttons.matching(NSPredicate(format: "label ==[c] %@", "More creativity")).firstMatch.click()
         app.buttons.ci("Show me how Anchor protects it").click()
 
         XCTAssertTrue(app.staticTexts.ci("Turn that time into something concrete.").waitForExistence(timeout: 4))
@@ -676,7 +676,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.log.save").click()
         XCTAssertTrue(app.staticTexts.ci("In-flight entry").waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "1 now"))
+            app.staticTexts.matching(NSPredicate(format: "value  %@", "1 now"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
 
@@ -710,7 +710,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.log.save").click()
         XCTAssertTrue(app.staticTexts.ci("Logged earlier").waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "2 finished"))
+            app.staticTexts.matching(NSPredicate(format: "value  %@", "2 finished"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
         keepScreenshot(app, named: "anchor-timetable-logged")
@@ -753,7 +753,7 @@ final class AnchorMacUITests: XCTestCase {
     private func element(containing text: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(
             NSPredicate(
-                format: "label CONTAINS %@ OR value CONTAINS %@",
+                format: "label  %@ OR value CONTAINS %@",
                 text,
                 text
             )
