@@ -110,10 +110,10 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.ci("Plan the day. Learn what moved it.").waitForExistence(timeout: 5))
         app.buttons.ci("Choose what to protect").tap()
         XCTAssertTrue(app.staticTexts.ci("What tends to take more time than you want?").waitForExistence(timeout: 4))
-        app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Short videos")).firstMatch.tap()
-        app.buttons.matching(NSPredicate(format: "label  %@", "Continue with")).firstMatch.tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "Short videos")).firstMatch.tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Continue with")).firstMatch.tap()
         XCTAssertTrue(app.staticTexts.ci("What do you want that time to make room for?").waitForExistence(timeout: 4))
-        app.buttons.matching(NSPredicate(format: "label ==[c] %@", "More creativity")).firstMatch.tap()
+        app.buttons.matching(NSPredicate(format: "label == %@", "More creativity")).firstMatch.tap()
         app.buttons.ci("Show me how Anchor protects it").tap()
 
         XCTAssertTrue(app.staticTexts.ci("Turn that time into something concrete.").waitForExistence(timeout: 4))
@@ -124,7 +124,7 @@ final class AnchorIOSUITests: XCTestCase {
         let scheduleTitle = app.staticTexts.ci("Choose when each habit is available.")
         if !scheduleTitle.waitForExistence(timeout: 4) {
             let retry = app.buttons.matching(NSPredicate(
-                format: "label ==[c] %@ OR label ==[c] %@", "Shape these habits", "Continue without habits"
+                format: "label == %@ OR label == %@", "Shape these habits", "Continue without habits"
             )).firstMatch
             retry.tap()
         }
@@ -227,7 +227,7 @@ final class AnchorIOSUITests: XCTestCase {
         let logTitle = app.descendants(matching: .any)["anchor.log.title"]
         XCTAssertTrue(logTitle.waitForExistence(timeout: 5),
                       "The enabled Log time control must open its real editor")
-        let cancel = app.buttons.matching(NSPredicate(format: "label  %@", "Cancel")).firstMatch
+        let cancel = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Cancel")).firstMatch
         XCTAssertTrue(cancel.waitForExistence(timeout: 3))
         cancel.tap()
         XCTAssertTrue(logTitle.waitForNonExistence(timeout: 3))
@@ -273,8 +273,8 @@ final class AnchorIOSUITests: XCTestCase {
                                     copyEnabled: true)
         controls[0].tap()
         let sheet = app.navigationBars.ci("Copy day Copy day")
-        let copyEntries = app.buttons.matching(NSPredicate(format: "label  %@", "Copy entries")).firstMatch
-        let cancel = sheet.buttons.matching(NSPredicate(format: "label  %@", "Cancel")).firstMatch
+        let copyEntries = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Copy entries")).firstMatch
+        let cancel = sheet.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Cancel")).firstMatch
         let more = sheet.buttons.ci("OverflowBarButtonItem")
         func nativeOverflowIsReady() -> Bool {
             guard more.waitForExistence(timeout: 3), more.isEnabled, more.isHittable else {
@@ -340,7 +340,7 @@ final class AnchorIOSUITests: XCTestCase {
         }
         XCTAssertTrue(app.staticTexts.ci(entryTitle).waitForExistence(timeout: 4),
                       "The destination day must contain the copied entry")
-        let goToToday = app.buttons.matching(NSPredicate(format: "label  %@", "Go to today")).firstMatch
+        let goToToday = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Go to today")).firstMatch
         XCTAssertTrue(goToToday.waitForExistence(timeout: 3))
         goToToday.tap()
         XCTAssertTrue(app.staticTexts.ci(entryTitle).waitForExistence(timeout: 4),
@@ -359,7 +359,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.launch()
         XCTAssertEqual(app.frame.width, 390, accuracy: 0.5,
                        "Variant qualification must use an actual 390-point app")
-        let today = app.tabBars.buttons.matching(NSPredicate(format: "label  %@", "Today")).firstMatch
+        let today = app.tabBars.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Today")).firstMatch
         XCTAssertTrue(today.waitForExistence(timeout: 5))
         today.tap()
     }
@@ -530,7 +530,7 @@ final class AnchorIOSUITests: XCTestCase {
         // Pick the second day before typing — once the keyboard is up it can
         // cover the weekday chips and swallow the tap.
         let secondDay = app.buttons.matching(
-            NSPredicate(format: "label  %@", "not selected")
+            NSPredicate(format: "label ENDSWITH %@", "not selected")
         ).firstMatch
         XCTAssertTrue(secondDay.waitForExistence(timeout: 3))
         let secondDayName = secondDay.label.replacingOccurrences(of: " not selected", with: "")
@@ -542,7 +542,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.ci("Save").tap()
         XCTAssertTrue(app.staticTexts.ci("Two-day reset").waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts.ci("0 of 2 this week").exists)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label  %@", "Any time")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Any time")).firstMatch.exists)
         let checkOff = app.buttons.ci("anchor.habits.complete")
         XCTAssertTrue(checkOff.exists)
         checkOff.tap()
