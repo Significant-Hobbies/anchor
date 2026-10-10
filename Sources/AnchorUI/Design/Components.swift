@@ -1,5 +1,8 @@
 import AnchorCore
 import SwiftUI
+#if !os(watchOS) && canImport(SaaSMakerUI)
+import SaaSMakerUI
+#endif
 
 // MARK: - Doodle scenes
 
@@ -29,18 +32,10 @@ public struct DoodleScene: View {
 
     public var body: some View {
         Group {
-            #if os(macOS)
-            // Mac content columns have plenty of width but SwiftUI can still
-            // choose the stacked fallback from an image's ideal size. Keep the
-            // artwork editorial and horizontal here so the actual work remains
-            // above the fold.
-            scene(horizontal: true)
-            #else
             ViewThatFits(in: .horizontal) {
                 scene(horizontal: true)
                 scene(horizontal: false)
             }
-            #endif
         }
         .frame(minHeight: compact ? 112 : 152)
         .fixedSize(horizontal: false, vertical: true)
@@ -67,11 +62,15 @@ public struct DoodleScene: View {
     private var copy: some View {
         VStack(alignment: .leading, spacing: Space.xxs) {
             if let eyebrow {
-                Text(eyebrow.uppercased())
+                Text(eyebrow)
                     .font(.system(.caption2, design: .rounded).weight(.semibold))
                     .tracking(1.25)
                     .foregroundStyle(theme.accent)
             }
+            #if !os(watchOS) && canImport(SaaSMakerUI)
+            SMDisplay(title.lowercased(), size: compact ? 22 : 28)
+                .accessibilityLabel(title)
+            #else
             Text(title)
                 .font(
                     .system(compact ? .title2 : .title, design: .rounded)
@@ -79,6 +78,7 @@ public struct DoodleScene: View {
                 )
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
+            #endif
             DrawnUnderline(width: compact ? 48 : 64)
             .accessibilityHidden(true)
             Text(message)
@@ -269,6 +269,9 @@ public struct Card<Content: View>: View {
     }
 
     public var body: some View {
+        #if !os(watchOS) && canImport(SaaSMakerUI)
+        SMCard(padding: padding) { content }
+        #else
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -278,12 +281,14 @@ public struct Card<Content: View>: View {
                     .strokeBorder(theme.hairline, lineWidth: 1)
             )
             .shadow(color: .black.opacity(theme.isDark ? 0.28 : 0.05), radius: 18, y: 6)
+        #endif
     }
 }
 
 /// Section heading with an optional trailing control.
 public struct SectionHeader<Trailing: View>: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let title: String
     private let subtitle: String?
     private let trailing: Trailing
@@ -295,18 +300,27 @@ public struct SectionHeader<Trailing: View>: View {
     }
 
     public var body: some View {
-        HStack(alignment: .firstTextBaseline) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.xs))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+        layout {
             VStack(alignment: .leading, spacing: 2) {
+                #if !os(watchOS) && canImport(SaaSMakerUI)
+                SMSectionHeader(title.lowercased(), size: 17)
+                    .accessibilityLabel(title)
+                #else
                 Text(title)
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundStyle(theme.textPrimary)
+                #endif
                 if let subtitle {
                     Text(subtitle)
                         .font(.system(size: 12))
                         .foregroundStyle(theme.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer(minLength: Space.sm)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Space.sm) }
             trailing
         }
     }
@@ -314,6 +328,66 @@ public struct SectionHeader<Trailing: View>: View {
 
 // MARK: - Buttons
 
+#if !os(watchOS) && canImport(SaaSMakerUI)
+/// The single filled action on a screen. There is never more than one.
+public struct PrimaryButtonStyle: PrimitiveButtonStyle {
+    public var isDestructive: Bool = false
+    public var expands: Bool = true
+
+    public init(isDestructive: Bool = false, expands: Bool = true) {
+        self.isDestructive = isDestructive
+        self.expands = expands
+    }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        AnchorSMButton(configuration: configuration, kind: .brand,
+                       expands: expands, isDestructive: isDestructive)
+    }
+}
+
+/// Everything that isn't the primary action.
+public struct QuietButtonStyle: PrimitiveButtonStyle {
+    public var expands: Bool = true
+
+    public init(expands: Bool = true) { self.expands = expands }
+
+    public func makeBody(configuration: Configuration) -> some View {
+        AnchorSMButton(configuration: configuration, kind: .outline, expands: expands)
+    }
+}
+
+private struct AnchorSMButton: View {
+    @Environment(\.anchorTheme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let configuration: PrimitiveButtonStyleConfiguration
+    let kind: SMButtonStyle.Kind
+    let expands: Bool
+    var isDestructive = false
+
+    private var palette: SMPalette {
+        var palette = theme.smPalette
+        if isDestructive {
+            palette = palette.brand(theme.negative, foreground: theme.onAccent)
+        }
+        return palette
+    }
+
+    var body: some View {
+        Button(role: configuration.role, action: configuration.trigger) {
+            configuration.label
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: expands ? .infinity : nil)
+                .padding(.vertical, Space.xs)
+        }
+        .buttonStyle(SMButtonStyle(kind))
+        .background(kind == .outline ? theme.surfaceRaised : .clear, in: .capsule)
+        .environment(\.smPalette, palette)
+        .opacity(isEnabled ? 1 : 0.4)
+        .transaction { if reduceMotion { $0.animation = nil } }
+    }
+}
+#else
 /// The single filled action on a screen. There is never more than one.
 public struct PrimaryButtonStyle: ButtonStyle {
     public var isDestructive: Bool = false
@@ -350,6 +424,8 @@ public struct QuietButtonStyle: ButtonStyle {
         )
     }
 }
+
+#endif
 
 /// Circular control used for the transport buttons under the ring.
 public struct CircleButtonStyle: ButtonStyle {

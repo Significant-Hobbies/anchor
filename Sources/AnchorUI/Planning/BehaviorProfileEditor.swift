@@ -21,7 +21,7 @@ struct BehaviorProfileEditor: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.xl) {
                     VStack(alignment: .leading, spacing: Space.xs) {
-                        Text("Time that sometimes slips away")
+                        Text("time that sometimes slips away")
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(theme.textPrimary)
                         Text("Intentional enjoyment remains yours. Choose only the patterns you want Anchor to help you notice.")
@@ -39,7 +39,7 @@ struct BehaviorProfileEditor: View {
                     }
 
                     VStack(alignment: .leading, spacing: Space.xs) {
-                        Text("What you want to make room for")
+                        Text("what you want to make room for")
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(theme.textPrimary)
                         Text("Anchor uses these only to suggest evidence-linked replacements you can accept or ignore.")
@@ -62,7 +62,7 @@ struct BehaviorProfileEditor: View {
                 .frame(maxWidth: .infinity)
             }
             .background(theme.canvas)
-            .navigationTitle("Patterns and replacements")
+            .navigationTitle("patterns and replacements")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -70,7 +70,7 @@ struct BehaviorProfileEditor: View {
                 HStack(spacing: Space.md) {
                     saveStatus
                     Spacer(minLength: 0)
-                    Button("Done") { close() }
+                    Button("done") { close() }
                         .buttonStyle(PrimaryButtonStyle(expands: false))
                 }
                 .padding(.horizontal, Space.lg)
@@ -88,9 +88,9 @@ struct BehaviorProfileEditor: View {
                 isPresented: $showsUnsavedConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Try saving again") { _ = save() }
-                Button("Close without saving", role: .destructive) { dismiss() }
-                Button("Keep editing", role: .cancel) {}
+                Button("try saving again") { _ = save() }
+                Button("close without saving", role: .destructive) { dismiss() }
+                Button("keep editing", role: .cancel) {}
             } message: {
                 Text("Try again, or close and leave your previously saved choices unchanged.")
             }
@@ -113,7 +113,7 @@ struct BehaviorProfileEditor: View {
                     .font(.callout)
                     .foregroundStyle(theme.negative)
                     .accessibilityIdentifier("anchor.profile.save-error")
-                Button("Try saving again") { _ = save() }
+                Button("try saving again") { _ = save() }
                     .buttonStyle(QuietButtonStyle(expands: false))
             }
         } else {
