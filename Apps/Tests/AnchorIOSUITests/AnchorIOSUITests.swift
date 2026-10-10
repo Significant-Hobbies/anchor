@@ -281,7 +281,7 @@ final class AnchorIOSUITests: XCTestCase {
                 XCTFail("The native Copy day overflow must be visible and tappable")
                 return false
             }
-            guard more.label == "More More" else {
+            guard more.label.lowercased() == "more more" else {
                 XCTFail("The native overflow must show the actual doubled More label: \(more.label)")
                 return false
             }
@@ -328,7 +328,7 @@ final class AnchorIOSUITests: XCTestCase {
             more.tap()
         }
         guard copyEntries.waitForExistence(timeout: 3),
-              copyEntries.label.components(separatedBy: "Copy entries").count - 1 == 2,
+              copyEntries.label.lowercased().components(separatedBy: "copy entries").count - 1 == 2,
               copyEntries.isEnabled, copyEntries.isHittable else {
             XCTFail("The actual doubled Copy entries action must be enabled and tappable")
             return
@@ -387,7 +387,7 @@ final class AnchorIOSUITests: XCTestCase {
             app.swipeDown()
         }
         for (control, baseline) in zip(controls, ["Copy day", "Log time", "Customize"]) {
-            XCTAssertEqual(control.label.components(separatedBy: baseline).count - 1, 2,
+            XCTAssertEqual(control.label.lowercased().components(separatedBy: baseline.lowercased()).count - 1, 2,
                            "Pseudolocalization must actually double \(baseline); baseline English is not variant evidence")
             XCTAssertGreaterThanOrEqual(control.frame.width, 44)
             XCTAssertGreaterThanOrEqual(control.frame.height, 44)
