@@ -32,10 +32,18 @@ public struct DoodleScene: View {
 
     public var body: some View {
         Group {
+            #if os(macOS)
+            // Mac content columns have plenty of width but SwiftUI can still
+            // choose the stacked fallback from an image's ideal size. Keep the
+            // artwork editorial and horizontal here so the actual work remains
+            // above the fold.
+            scene(horizontal: true)
+            #else
             ViewThatFits(in: .horizontal) {
                 scene(horizontal: true)
                 scene(horizontal: false)
             }
+            #endif
         }
         .frame(minHeight: compact ? 112 : 152)
         .fixedSize(horizontal: false, vertical: true)
