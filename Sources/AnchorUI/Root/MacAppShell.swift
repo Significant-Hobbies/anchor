@@ -253,7 +253,8 @@ private struct MacRailDestination: View {
                 }
 
                 if presentation != .icons {
-                    Text(item.label)
+                    Text(item.label.lowercased())
+                        .accessibilityLabel(item.label)
                         .font(.system(size: 14, weight: isSelected ? .semibold : .medium, design: .rounded))
                         .foregroundStyle(isSelected ? theme.textPrimary : theme.textSecondary)
                     Spacer(minLength: 0)

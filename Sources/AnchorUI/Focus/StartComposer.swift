@@ -144,11 +144,11 @@ public struct StartComposer: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 #if os(iOS)
-                Button("Start focusing", action: start)
+                Button("start focusing", action: start)
                     .disabled(!canStart)
                 #endif
                 Spacer()
-                Button("Done") { focusedField = nil }
+                Button("done") { focusedField = nil }
             }
         }
         .background(theme.canvas)
@@ -165,7 +165,7 @@ public struct StartComposer: View {
 
     private var startButton: some View {
         Button(action: start) {
-            Label("Start focusing", systemImage: "play.fill")
+            Label("start focusing", systemImage: "play.fill")
         }
         .buttonStyle(PrimaryButtonStyle())
         .disabled(!canStart)
@@ -175,7 +175,7 @@ public struct StartComposer: View {
     private var header: some View {
         DoodleScene(
             "FocusDoodle",
-            eyebrow: "Focus",
+            eyebrow: "focus",
             title: "Hold one thing",
             message: "Name the work. Park what pulls you away. Return without losing the thread."
         )

@@ -99,7 +99,7 @@ struct ProjectPicker: View {
                 .padding(.vertical, Space.xs)
                 .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
                 .onSubmit(save)
-            Button("Save", action: save)
+            Button("save", action: save)
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .disabled(text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
@@ -155,7 +155,7 @@ struct SavedTagPicker: View {
                         .padding(.vertical, Space.xs)
                         .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
                         .onSubmit(saveTag)
-                    Button("Save", action: saveTag)
+                    Button("save", action: saveTag)
                         .buttonStyle(QuietButtonStyle(expands: false))
                         .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }

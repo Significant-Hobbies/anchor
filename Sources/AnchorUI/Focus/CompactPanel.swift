@@ -118,7 +118,7 @@ public struct CompactPanel: View {
             Button {
                 controller.beginManualCapture()
             } label: {
-                Label("Lock a distraction", systemImage: "lock.fill")
+                Label("lock a distraction", systemImage: "lock.fill")
             }
             .buttonStyle(PrimaryButtonStyle())
 
@@ -136,7 +136,7 @@ public struct CompactPanel: View {
                 Button {
                     controller.end(reason: .endedEarly)
                 } label: {
-                    Label("End", systemImage: "stop.fill")
+                    Label("end", systemImage: "stop.fill")
                 }
                 .buttonStyle(QuietButtonStyle())
             }
@@ -232,13 +232,13 @@ public struct CompactPanel: View {
             }
 
             Button(action: start) {
-                Label("Start focusing", systemImage: "play.fill")
+                Label("start focusing", systemImage: "play.fill")
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(intent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             if scheduledBlock != nil {
-                Button("Use the scheduled block") {
+                Button("use the scheduled block") {
                     showsAdHocComposer = false
                     startError = nil
                 }
@@ -270,11 +270,11 @@ public struct CompactPanel: View {
             Button {
                 start(block)
             } label: {
-                Label("Start this block", systemImage: "play.fill")
+                Label("start this block", systemImage: "play.fill")
             }
             .buttonStyle(PrimaryButtonStyle())
 
-            Button("Start something else") {
+            Button("start something else") {
                 showsAdHocComposer = true
                 startError = nil
                 Task { @MainActor in intentFocused = true }
@@ -346,13 +346,13 @@ public struct CompactPanel: View {
 
     private var footer: some View {
         HStack {
-            Button("Open Anchor", action: onOpenWindow)
+            Button("open anchor", action: onOpenWindow)
                 .buttonStyle(.plain)
                 .font(.system(size: 11))
                 .foregroundStyle(theme.textSecondary)
             Spacer()
             if let onQuit {
-                Button("Quit", action: onQuit)
+                Button("quit", action: onQuit)
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
                     .foregroundStyle(theme.textTertiary)
@@ -418,14 +418,14 @@ struct CompactCapture: View {
             .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             if !isReturningFromPause {
-                Button("Pause — come back later", systemImage: "pause.fill") {
+                Button("pause — come back later", systemImage: "pause.fill") {
                     if controller.pauseFromCapture(note: note) { note = "" }
                 }
                 .buttonStyle(QuietButtonStyle())
             }
 
             if let error = controller.lastError { Text(error).font(.caption) }
-            Button(isReturningFromPause ? "Nothing — just a break" : "Cancel") {
+            Button(isReturningFromPause ? "nothing — just a break" : "cancel") {
                 controller.dismissCapture()
             }
             .buttonStyle(QuietButtonStyle(expands: false))

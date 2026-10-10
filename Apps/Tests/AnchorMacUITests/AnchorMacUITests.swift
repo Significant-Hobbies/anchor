@@ -18,44 +18,44 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = storePath
         app.launch()
 
-        app.buttons["Focus"].click()
-        let adHoc = app.buttons["anchor.focus.start-unplanned"]
+        app.buttons.ci("Focus").click()
+        let adHoc = app.buttons.ci("anchor.focus.start-unplanned")
         XCTAssertTrue(adHoc.waitForExistence(timeout: 5))
         adHoc.click()
 
-        let intention = app.textFields["Ship the auth flow"]
+        let intention = app.textFields.ci("Ship the auth flow")
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
         intention.click()
         intention.typeText("Mac focus acceptance")
-        app.buttons["Start focusing"].click()
-        XCTAssertTrue(app.staticTexts["Mac focus acceptance"].waitForExistence(timeout: 4))
+        app.buttons.ci("Start focusing").click()
+        XCTAssertTrue(app.staticTexts.ci("Mac focus acceptance").waitForExistence(timeout: 4))
 
-        app.buttons["Lock a distraction"].click()
-        let note = app.textFields["Slack from Ravi about the invoice"]
+        app.buttons.ci("Lock a distraction").click()
+        let note = app.textFields.ci("Slack from Ravi about the invoice")
         XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.click()
         note.typeText("Synthetic interruption")
-        app.buttons["anchor.capture.pause"].click()
-        let resume = app.buttons["Resume"]
+        app.buttons.ci("anchor.capture.pause").click()
+        let resume = app.buttons.ci("Resume")
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-build25-mac-paused")
         resume.click()
-        let decline = app.buttons["Nothing — just a break"]
+        let decline = app.buttons.ci("Nothing — just a break")
         XCTAssertTrue(decline.waitForExistence(timeout: 3))
         decline.click()
 
-        app.buttons["End session"].click()
-        app.buttons["History"].click()
-        app.radioButtons["Interruptions"].click()
+        app.buttons.ci("End session").click()
+        app.buttons.ci("History").click()
+        app.radioButtons.ci("Interruptions").click()
         let parkedRow = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Synthetic interruption")
+            NSPredicate(format: "label BEGINSWITH[c] %@", "Synthetic interruption")
         ).firstMatch
         XCTAssertTrue(parkedRow.waitForExistence(timeout: 3))
 
         app.terminate()
         app.launch()
-        app.buttons["History"].click()
-        app.radioButtons["Interruptions"].click()
+        app.buttons.ci("History").click()
+        app.radioButtons.ci("Interruptions").click()
         XCTAssertTrue(parkedRow.waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-build25-mac-interruption-reopened")
     }
@@ -67,48 +67,48 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "schedule")
         app.launch()
 
-        app.buttons["Today"].click()
-        XCTAssertTrue(app.staticTexts["Give the day one anchor"].waitForExistence(timeout: 5))
+        app.buttons.ci("Today").click()
+        XCTAssertTrue(app.staticTexts.ci("Give the day one anchor").waitForExistence(timeout: 5))
         XCTAssertGreaterThan(app.datePickers.count, 0, "The schedule must allow choosing a day.")
 
-        app.buttons["Add the first entry"].click()
-        let title = app.textFields["What will you do?"]
+        app.buttons.ci("Add the first entry").click()
+        let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
         title.typeText("Mac schedule acceptance")
-        XCTAssertTrue(app.switches["Repeat weekly"].exists || app.checkBoxes["Repeat weekly"].exists)
-        app.buttons["Save"].click()
+        XCTAssertTrue(app.switches.ci("Repeat weekly").exists || app.checkBoxes.ci("Repeat weekly").exists)
+        app.buttons.ci("Save").click()
 
-        XCTAssertTrue(app.staticTexts["Mac schedule acceptance"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("Mac schedule acceptance").waitForExistence(timeout: 4))
         let actions = app.descendants(matching: .any)["anchor.today.block-actions"].firstMatch
         XCTAssertTrue(actions.waitForExistence(timeout: 3))
         // Don't gate on isHittable — a fresh card can sit at the scroll fold
         // while scroll-to-now settles; click() scrolls it into view itself.
         actions.click()
-        XCTAssertTrue(app.buttons["Start now"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Edit or move"].exists)
-        XCTAssertTrue(app.buttons["Explain a change"].exists)
-        let finish = app.buttons["Finished without timing"]
+        XCTAssertTrue(app.buttons.ci("Start now").waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.ci("Edit or move").exists)
+        XCTAssertTrue(app.buttons.ci("Explain a change").exists)
+        let finish = app.buttons.ci("Finished without timing")
         XCTAssertTrue(finish.waitForExistence(timeout: 2))
         finish.click()
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "1 finished"))
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "1 finished"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
 
-        app.buttons["History"].click()
-        XCTAssertTrue(app.radioButtons["Day review"].waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts["Reviewing today"].exists)
+        app.buttons.ci("History").click()
+        XCTAssertTrue(app.radioButtons.ci("Day review").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("Reviewing today").exists)
         let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
         XCTAssertTrue(comparison.waitForExistence(timeout: 3))
         XCTAssertTrue(String(describing: comparison.value).contains("1 untimed"))
 
         app.terminate()
         app.launch()
-        app.buttons["Today"].click()
-        XCTAssertTrue(app.staticTexts["Mac schedule acceptance"].waitForExistence(timeout: 4))
+        app.buttons.ci("Today").click()
+        XCTAssertTrue(app.staticTexts.ci("Mac schedule acceptance").waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "1 finished"))
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "1 finished"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
     }
@@ -120,37 +120,37 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "usual-week")
         app.launch()
 
-        app.buttons["Today"].click()
-        app.buttons["Add the first entry"].click()
-        let recurringTitle = app.textFields["What will you do?"]
+        app.buttons.ci("Today").click()
+        app.buttons.ci("Add the first entry").click()
+        let recurringTitle = app.textFields.ci("What will you do?")
         XCTAssertTrue(recurringTitle.waitForExistence(timeout: 3))
         recurringTitle.click()
         recurringTitle.typeText("Mac weekly planning")
-        app.checkBoxes["Repeat weekly"].click()
-        app.buttons["Save"].click()
-        XCTAssertTrue(app.staticTexts["Mac weekly planning"].waitForExistence(timeout: 4))
+        app.checkBoxes.ci("Repeat weekly").click()
+        app.buttons.ci("Save").click()
+        XCTAssertTrue(app.staticTexts.ci("Mac weekly planning").waitForExistence(timeout: 4))
 
         XCTAssertFalse(app.otherElements["anchor.today.daily-check-in"].exists)
 
-        app.buttons["Habits"].click()
-        XCTAssertTrue(app.staticTexts["Your habits"].waitForExistence(timeout: 4))
-        app.buttons["Add a habit"].click()
-        let habitTitle = app.textFields["What will you do?"]
+        app.buttons.ci("Habits").click()
+        XCTAssertTrue(app.staticTexts.ci("Your habits").waitForExistence(timeout: 4))
+        app.buttons.ci("Add a habit").click()
+        let habitTitle = app.textFields.ci("What will you do?")
         XCTAssertTrue(habitTitle.waitForExistence(timeout: 3))
         habitTitle.click()
         habitTitle.typeText("Mac reset walk")
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
         XCTAssertTrue(element(containing: "Mac reset walk", in: app).waitForExistence(timeout: 4))
 
         app.terminate()
         app.launch()
-        app.buttons["Habits"].click()
+        app.buttons.ci("Habits").click()
         XCTAssertTrue(element(containing: "Mac reset walk", in: app).waitForExistence(timeout: 4))
-        app.buttons["Today"].click()
-        XCTAssertTrue(app.staticTexts["Mac weekly planning"].waitForExistence(timeout: 4))
+        app.buttons.ci("Today").click()
+        XCTAssertTrue(app.staticTexts.ci("Mac weekly planning").waitForExistence(timeout: 4))
         // Unscheduled habits stay on Habits — Today is the timetable only.
         XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
-        XCTAssertFalse(app.staticTexts["Mac reset walk"].exists)
+        XCTAssertFalse(app.staticTexts.ci("Mac reset walk").exists)
     }
 
     @MainActor
@@ -160,22 +160,22 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "behavior-profile")
         app.launch()
 
-        app.buttons["Habits"].click()
-        let editor = app.buttons["anchor.habits.behavior-profile"]
+        app.buttons.ci("Habits").click()
+        let editor = app.buttons.ci("anchor.habits.behavior-profile")
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.click()
 
-        let shortVideos = app.buttons["Short videos"]
+        let shortVideos = app.buttons.ci("Short videos")
         XCTAssertTrue(shortVideos.waitForExistence(timeout: 4))
         shortVideos.click()
-        XCTAssertTrue(app.staticTexts["anchor.profile.saved"].waitForExistence(timeout: 3))
-        app.buttons["Done"].click()
+        XCTAssertTrue(app.staticTexts.ci("anchor.profile.saved").waitForExistence(timeout: 3))
+        app.buttons.ci("Done").click()
         XCTAssertTrue(editor.waitForExistence(timeout: 3))
         XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
 
         app.terminate()
         app.launch()
-        app.buttons["Habits"].click()
+        app.buttons.ci("Habits").click()
         XCTAssertTrue(editor.waitForExistence(timeout: 4))
         XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
     }
@@ -187,60 +187,60 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "habit-management")
         app.launch()
 
-        app.buttons["Habits"].click()
-        XCTAssertTrue(app.buttons["anchor.habits.add"].waitForExistence(timeout: 5))
-        app.buttons["anchor.habits.add"].click()
-        let title = app.textFields["What will you do?"]
+        app.buttons.ci("Habits").click()
+        XCTAssertTrue(app.buttons.ci("anchor.habits.add").waitForExistence(timeout: 5))
+        app.buttons.ci("anchor.habits.add").click()
+        let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
         title.typeText("Two-day reset")
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
 
         XCTAssertTrue(element(containing: "Two-day reset", in: app).waitForExistence(timeout: 4))
         XCTAssertTrue(element(containing: "this week", in: app).exists)
         XCTAssertTrue(element(containing: "Any time", in: app).exists)
-        let checkOff = app.buttons["anchor.habits.complete"]
+        let checkOff = app.buttons.ci("anchor.habits.complete")
         XCTAssertTrue(checkOff.exists)
         checkOff.click()
-        XCTAssertTrue(app.buttons["Undo check-off"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.ci("Undo check-off").waitForExistence(timeout: 3))
         app.terminate()
         app.launch()
-        app.buttons["Habits"].click()
-        XCTAssertTrue(app.buttons["Undo check-off"].waitForExistence(timeout: 4))
-        app.buttons["Undo check-off"].click()
-        XCTAssertTrue(app.buttons["anchor.habits.complete"].exists)
+        app.buttons.ci("Habits").click()
+        XCTAssertTrue(app.buttons.ci("Undo check-off").waitForExistence(timeout: 4))
+        app.buttons.ci("Undo check-off").click()
+        XCTAssertTrue(app.buttons.ci("anchor.habits.complete").exists)
 
         let habitMenu = app.menuButtons["More actions for Two-day reset"]
         XCTAssertTrue(habitMenu.waitForExistence(timeout: 4))
         habitMenu.click()
-        let editHabit = app.menuItems["Edit habit"]
+        let editHabit = app.menuItems.ci("Edit habit")
         XCTAssertTrue(editHabit.waitForExistence(timeout: 3))
         editHabit.click()
-        let editedTitle = app.textFields["What will you do?"]
+        let editedTitle = app.textFields.ci("What will you do?")
         editedTitle.click()
         editedTitle.typeKey("a", modifierFlags: .command)
         editedTitle.typeText("Two-day reset edited")
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
         XCTAssertTrue(element(containing: "Two-day reset edited", in: app).waitForExistence(timeout: 4))
 
         // Habits live on the Habits tab; Today stays free of them until one is
         // scheduled at a time, which places it on the timetable.
-        app.buttons["Today"].click()
+        app.buttons.ci("Today").click()
         XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
 
-        app.buttons["Habits"].click()
-        let schedule = app.buttons["Schedule"]
+        app.buttons.ci("Habits").click()
+        let schedule = app.buttons.ci("Schedule")
         XCTAssertTrue(schedule.waitForExistence(timeout: 4))
         schedule.click()
-        let placeHabitTitle = app.staticTexts["Place habit"]
+        let placeHabitTitle = app.staticTexts.ci("Place habit")
         XCTAssertTrue(placeHabitTitle.waitForExistence(timeout: 3))
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
         XCTAssertTrue(placeHabitTitle.waitForNonExistence(timeout: 4))
 
-        app.buttons["Today"].click()
+        app.buttons.ci("Today").click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "Two-day reset edited"))
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "Two-day reset edited"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
 
@@ -254,32 +254,32 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "habit-archive")
         app.launch()
 
-        app.buttons["Habits"].click()
-        XCTAssertTrue(app.buttons["anchor.habits.add"].waitForExistence(timeout: 5))
-        app.buttons["anchor.habits.add"].click()
-        let title = app.textFields["What will you do?"]
+        app.buttons.ci("Habits").click()
+        XCTAssertTrue(app.buttons.ci("anchor.habits.add").waitForExistence(timeout: 5))
+        app.buttons.ci("anchor.habits.add").click()
+        let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
         title.typeText("Evening reset")
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
 
         let habitMenu = app.menuButtons["More actions for Evening reset"]
         XCTAssertTrue(habitMenu.waitForExistence(timeout: 4))
         habitMenu.click()
-        XCTAssertTrue(app.menuItems["Archive habit"].waitForExistence(timeout: 3))
-        app.menuItems["Archive habit"].click()
+        XCTAssertTrue(app.menuItems.ci("Archive habit").waitForExistence(timeout: 3))
+        app.menuItems.ci("Archive habit").click()
 
-        let archivedToggle = app.buttons["anchor.habits.archived-toggle"]
+        let archivedToggle = app.buttons.ci("anchor.habits.archived-toggle")
         XCTAssertTrue(archivedToggle.waitForExistence(timeout: 4))
         XCTAssertEqual(archivedToggle.value as? String, "expanded")
-        XCTAssertTrue(app.buttons["Inspect Evening reset"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons.ci("Inspect Evening reset").waitForExistence(timeout: 3))
 
-        app.buttons["Inspect Evening reset"].click()
-        XCTAssertTrue(app.textFields["What will you do?"].waitForExistence(timeout: 3))
-        app.buttons["Cancel"].click()
+        app.buttons.ci("Inspect Evening reset").click()
+        XCTAssertTrue(app.textFields.ci("What will you do?").waitForExistence(timeout: 3))
+        app.buttons.ci("Cancel").click()
 
-        XCTAssertTrue(app.buttons["Restore"].waitForExistence(timeout: 3))
-        app.buttons["Restore"].click()
+        XCTAssertTrue(app.buttons.ci("Restore").waitForExistence(timeout: 3))
+        app.buttons.ci("Restore").click()
         XCTAssertTrue(element(containing: "Evening reset", in: app).waitForExistence(timeout: 4))
         XCTAssertTrue(archivedToggle.waitForNonExistence(timeout: 3))
     }
@@ -291,53 +291,53 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "weekday-schedules")
         app.launch()
 
-        app.buttons["Today"].click()
-        app.buttons["Add the first entry"].click()
-        let initialTitle = app.textFields["What will you do?"]
+        app.buttons.ci("Today").click()
+        app.buttons.ci("Add the first entry").click()
+        let initialTitle = app.textFields.ci("What will you do?")
         XCTAssertTrue(initialTitle.waitForExistence(timeout: 3))
         initialTitle.click()
         initialTitle.typeText("Initial weekly entry")
-        app.checkBoxes["Repeat weekly"].click()
-        app.buttons["Save"].click()
-        app.buttons["anchor.today.customize"].click()
-        let usualWeek = app.buttons["anchor.timetable.routines"]
+        app.checkBoxes.ci("Repeat weekly").click()
+        app.buttons.ci("Save").click()
+        app.buttons.ci("anchor.today.customize").click()
+        let usualWeek = app.buttons.ci("anchor.timetable.routines")
         XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))
         usualWeek.click()
-        XCTAssertTrue(app.radioButtons["Monday"].waitForExistence(timeout: 4))
-        XCTAssertTrue(app.radioButtons["Sunday"].exists)
+        XCTAssertTrue(app.radioButtons.ci("Monday").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.radioButtons.ci("Sunday").exists)
 
         let selectedDay = app.radioButtons.matching(NSPredicate(format: "value == 1")).firstMatch
         XCTAssertTrue(selectedDay.waitForExistence(timeout: 3))
         let firstDay = selectedDay.label
-        let addFirstDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Add to ")).firstMatch
+        let addFirstDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Add to ")).firstMatch
         XCTAssertTrue(addFirstDay.waitForExistence(timeout: 3))
         addFirstDay.click()
-        let firstTitle = app.textFields["What will you do?"]
+        let firstTitle = app.textFields.ci("What will you do?")
         firstTitle.click()
         firstTitle.typeText("\(firstDay) planning")
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
         XCTAssertTrue(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(firstDay) planning"))
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "\(firstDay) planning"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
 
         let secondDay = app.radioButtons.matching(NSPredicate(format: "value == 0")).firstMatch
         let secondDayName = secondDay.label
         secondDay.click()
-        XCTAssertTrue(app.staticTexts["0 usual items on \(secondDayName)"].waitForExistence(timeout: 2))
-        let addSecondDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Add to ")).firstMatch
+        XCTAssertTrue(app.staticTexts.ci("0 usual items on \(secondDayName)").waitForExistence(timeout: 2))
+        let addSecondDay = app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Add to ")).firstMatch
         XCTAssertTrue(addSecondDay.waitForExistence(timeout: 3))
         addSecondDay.click()
-        let secondTitle = app.textFields["What will you do?"]
+        let secondTitle = app.textFields.ci("What will you do?")
         secondTitle.click()
         secondTitle.typeText("\(secondDayName) planning")
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
         XCTAssertTrue(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(secondDayName) planning"))
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "\(secondDayName) planning"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
         XCTAssertFalse(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "\(firstDay) planning"))
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "\(firstDay) planning"))
                 .firstMatch.isHittable
         )
 
@@ -351,31 +351,31 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "metadata-library")
         app.launch()
 
-        app.buttons["Settings"].click()
-        let manage = app.buttons["anchor.settings.manage-metadata"]
+        app.buttons.ci("Settings").click()
+        let manage = app.buttons.ci("anchor.settings.manage-metadata")
         for _ in 0..<6 where !manage.exists { app.scrollViews.firstMatch.swipeUp() }
         XCTAssertTrue(manage.waitForExistence(timeout: 3))
         manage.click()
 
-        let project = app.textFields["anchor.metadata.new-project"]
+        let project = app.textFields.ci("anchor.metadata.new-project")
         project.click()
         project.typeText("Launch")
-        app.buttons["anchor.metadata.add-project"].click()
-        let tag = app.textFields["anchor.metadata.new-tag"]
+        app.buttons.ci("anchor.metadata.add-project").click()
+        let tag = app.textFields.ci("anchor.metadata.new-tag")
         tag.click()
         tag.typeText("Deep work")
-        app.buttons["anchor.metadata.add-tag"].click()
+        app.buttons.ci("anchor.metadata.add-tag").click()
 
         XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch.exists)
         XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == %@", "Deep work")).firstMatch.exists)
-        XCTAssertTrue(app.buttons["Archive Launch"].exists)
-        XCTAssertTrue(app.buttons["Archive Deep work"].exists)
+        XCTAssertTrue(app.buttons.ci("Archive Launch").exists)
+        XCTAssertTrue(app.buttons.ci("Archive Deep work").exists)
 
         let projectName = app.textFields.matching(NSPredicate(format: "value == %@", "Launch")).firstMatch
         projectName.click()
         projectName.typeKey("a", modifierFlags: .command)
         projectName.typeText("Launch plan")
-        app.buttons["Done"].click()
+        app.buttons.ci("Done").click()
 
         XCTAssertTrue(manage.waitForExistence(timeout: 3))
         manage.click()
@@ -396,31 +396,31 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "history")
         app.launch()
 
-        XCTAssertTrue(app.radioButtons["Day review"].waitForExistence(timeout: 6))
-        XCTAssertTrue(app.staticTexts["Reviewing today"].exists)
+        XCTAssertTrue(app.radioButtons.ci("Day review").waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts.ci("Reviewing today").exists)
 
-        app.radioButtons["Interruptions"].click()
+        app.radioButtons.ci("Interruptions").click()
         XCTAssertTrue(
-            app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "To deal with"))
+            app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "To deal with"))
                 .firstMatch.waitForExistence(timeout: 4)
         )
-        XCTAssertTrue(app.buttons["Everything parked"].exists)
-        XCTAssertTrue(app.buttons["Sessions"].exists)
+        XCTAssertTrue(app.buttons.ci("Everything parked").exists)
+        XCTAssertTrue(app.buttons.ci("Sessions").exists)
 
-        app.radioButtons["Trends"].click()
-        XCTAssertTrue(app.staticTexts["When you focus"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Weekday rhythm"].exists)
+        app.radioButtons.ci("Trends").click()
+        XCTAssertTrue(app.staticTexts.ci("When you focus").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.ci("Weekday rhythm").exists)
 
-        let export = app.buttons["Excel workbook"]
+        let export = app.buttons.ci("Excel workbook")
         let scrollView = app.scrollViews.firstMatch
         for _ in 0..<12 where !export.exists {
             scrollView.swipeUp()
         }
         XCTAssertTrue(export.waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons["Excel workbook"].exists)
-        XCTAssertTrue(app.buttons["Sessions CSV"].exists)
-        XCTAssertTrue(app.buttons["Distractions CSV"].exists)
-        XCTAssertTrue(app.buttons["JSON"].exists)
+        XCTAssertTrue(app.buttons.ci("Excel workbook").exists)
+        XCTAssertTrue(app.buttons.ci("Sessions CSV").exists)
+        XCTAssertTrue(app.buttons.ci("Distractions CSV").exists)
+        XCTAssertTrue(app.buttons.ci("JSON").exists)
     }
 
     @MainActor
@@ -433,23 +433,23 @@ final class AnchorMacUITests: XCTestCase {
         app.typeKey("0", modifierFlags: .command)
         let miniTimer = app.windows["Mini Timer"]
         XCTAssertTrue(miniTimer.waitForExistence(timeout: 4))
-        XCTAssertTrue(miniTimer.staticTexts["Set your anchor"].exists)
+        XCTAssertTrue(miniTimer.staticTexts.ci("Set your anchor").exists)
 
-        let intent = miniTimer.textFields["What are you working on?"]
+        let intent = miniTimer.textFields.ci("What are you working on?")
         XCTAssertTrue(intent.waitForExistence(timeout: 2))
         intent.click()
         intent.typeText("Compact timer acceptance")
-        miniTimer.buttons["Start focusing"].click()
-        XCTAssertTrue(miniTimer.staticTexts["Compact timer acceptance"].waitForExistence(timeout: 3))
+        miniTimer.buttons.ci("Start focusing").click()
+        XCTAssertTrue(miniTimer.staticTexts.ci("Compact timer acceptance").waitForExistence(timeout: 3))
 
-        miniTimer.buttons["Pause"].click()
-        miniTimer.buttons["Resume"].click()
-        XCTAssertTrue(miniTimer.staticTexts["What pulled you away?"].waitForExistence(timeout: 3))
-        XCTAssertTrue(miniTimer.buttons["Nothing — just a break"].waitForExistence(timeout: 3))
+        miniTimer.buttons.ci("Pause").click()
+        miniTimer.buttons.ci("Resume").click()
+        XCTAssertTrue(miniTimer.staticTexts.ci("What pulled you away?").waitForExistence(timeout: 3))
+        XCTAssertTrue(miniTimer.buttons.ci("Nothing — just a break").waitForExistence(timeout: 3))
         miniTimer.typeKey(.escape, modifierFlags: [])
         app.typeKey("0", modifierFlags: .command)
         XCTAssertTrue(miniTimer.waitForExistence(timeout: 3))
-        let end = miniTimer.buttons["End"]
+        let end = miniTimer.buttons.ci("End")
         XCTAssertTrue(end.waitForExistence(timeout: 3))
         let endIsHittable = XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "hittable == true"),
@@ -457,7 +457,7 @@ final class AnchorMacUITests: XCTestCase {
         )
         XCTAssertEqual(XCTWaiter.wait(for: [endIsHittable], timeout: 3), .completed)
         end.click()
-        XCTAssertTrue(miniTimer.staticTexts["Set your anchor"].waitForExistence(timeout: 3))
+        XCTAssertTrue(miniTimer.staticTexts.ci("Set your anchor").waitForExistence(timeout: 3))
     }
 
     @MainActor
@@ -467,28 +467,28 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "mini-timer-schedule")
         app.launch()
 
-        app.buttons["Today"].click()
-        app.buttons["Add the first entry"].click()
-        let title = app.textFields["What will you do?"]
+        app.buttons.ci("Today").click()
+        app.buttons.ci("Add the first entry").click()
+        let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
         title.typeText("Menu-bar launch review")
-        app.buttons["Save"].click()
-        XCTAssertTrue(app.staticTexts["Menu-bar launch review"].waitForExistence(timeout: 4))
+        app.buttons.ci("Save").click()
+        XCTAssertTrue(app.staticTexts.ci("Menu-bar launch review").waitForExistence(timeout: 4))
 
         app.typeKey("0", modifierFlags: .command)
         let miniTimer = app.windows["Mini Timer"]
         XCTAssertTrue(miniTimer.waitForExistence(timeout: 4))
-        XCTAssertTrue(miniTimer.staticTexts["Menu-bar launch review"].waitForExistence(timeout: 3))
-        miniTimer.buttons["Start this block"].click()
-        XCTAssertTrue(miniTimer.buttons["Lock a distraction"].waitForExistence(timeout: 3))
-        miniTimer.buttons["End"].click()
-        app.buttons["Today"].click()
-        let completedActions = app.buttons["Actions for Menu-bar launch review"]
+        XCTAssertTrue(miniTimer.staticTexts.ci("Menu-bar launch review").waitForExistence(timeout: 3))
+        miniTimer.buttons.ci("Start this block").click()
+        XCTAssertTrue(miniTimer.buttons.ci("Lock a distraction").waitForExistence(timeout: 3))
+        miniTimer.buttons.ci("End").click()
+        app.buttons.ci("Today").click()
+        let completedActions = app.buttons.ci("Actions for Menu-bar launch review")
         XCTAssertTrue(completedActions.waitForExistence(timeout: 4))
         completedActions.click()
-        XCTAssertTrue(app.buttons["Edit or move"].waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons["Log actual time…"].exists)
+        XCTAssertTrue(app.buttons.ci("Edit or move").waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons.ci("Log actual time…").exists)
     }
 
     @MainActor
@@ -501,39 +501,39 @@ final class AnchorMacUITests: XCTestCase {
                 .path
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Plan the day. Learn what moved it."].waitForExistence(timeout: 4))
-        app.buttons["Choose what to protect"].click()
-        XCTAssertTrue(app.staticTexts["What tends to take more time than you want?"].waitForExistence(timeout: 4))
-        app.buttons.matching(NSPredicate(format: "label == %@", "Short videos")).firstMatch.click()
-        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Continue with")).firstMatch.click()
-        XCTAssertTrue(app.staticTexts["What do you want that time to make room for?"].waitForExistence(timeout: 4))
-        app.buttons.matching(NSPredicate(format: "label == %@", "More creativity")).firstMatch.click()
-        app.buttons["Show me how Anchor protects it"].click()
+        XCTAssertTrue(app.staticTexts.ci("Plan the day. Learn what moved it.").waitForExistence(timeout: 4))
+        app.buttons.ci("Choose what to protect").click()
+        XCTAssertTrue(app.staticTexts.ci("What tends to take more time than you want?").waitForExistence(timeout: 4))
+        app.buttons.matching(NSPredicate(format: "label ==[c] %@", "Short videos")).firstMatch.click()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Continue with")).firstMatch.click()
+        XCTAssertTrue(app.staticTexts.ci("What do you want that time to make room for?").waitForExistence(timeout: 4))
+        app.buttons.matching(NSPredicate(format: "label ==[c] %@", "More creativity")).firstMatch.click()
+        app.buttons.ci("Show me how Anchor protects it").click()
 
-        XCTAssertTrue(app.staticTexts["Turn that time into something concrete."].waitForExistence(timeout: 4))
-        app.buttons["Shape these habits"].click()
-        XCTAssertTrue(app.staticTexts["Choose when each habit is available."].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("Turn that time into something concrete.").waitForExistence(timeout: 4))
+        app.buttons.ci("Shape these habits").click()
+        XCTAssertTrue(app.staticTexts.ci("Choose when each habit is available.").waitForExistence(timeout: 4))
 
-        let monday = app.buttons["Monday"]
+        let monday = app.buttons.ci("Monday")
         XCTAssertTrue(monday.waitForExistence(timeout: 2))
         XCTAssertEqual(monday.value as? String, "Selected")
         monday.click()
         XCTAssertEqual(monday.value as? String, "Not selected")
 
-        app.buttons["Save habits and continue"].click()
+        app.buttons.ci("Save habits and continue").click()
 
-        XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("One account for your Significant Hobbies.").waitForExistence(timeout: 4))
         #if ANCHOR_LOCAL_ONLY
-        XCTAssertFalse(app.buttons["anchor.hub.sign-in-apple"].exists)
-        XCTAssertFalse(app.buttons["anchor.hub.sign-in-google"].exists)
+        XCTAssertFalse(app.buttons.ci("anchor.hub.sign-in-apple").exists)
+        XCTAssertFalse(app.buttons.ci("anchor.hub.sign-in-google").exists)
         XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
         #else
-        XCTAssertTrue(app.buttons["anchor.hub.sign-in-apple"].exists)
-        XCTAssertTrue(app.buttons["anchor.hub.sign-in-google"].exists)
+        XCTAssertTrue(app.buttons.ci("anchor.hub.sign-in-apple").exists)
+        XCTAssertTrue(app.buttons.ci("anchor.hub.sign-in-google").exists)
         #endif
-        app.buttons["anchor.onboarding.hub-continue-locally"].click()
+        app.buttons.ci("anchor.onboarding.hub-continue-locally").click()
 
-        XCTAssertTrue(app.staticTexts["Protect one thing."].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("Protect one thing.").waitForExistence(timeout: 4))
 
         let goal = app.textFields.firstMatch
         XCTAssertTrue(goal.waitForExistence(timeout: 2))
@@ -541,11 +541,11 @@ final class AnchorMacUITests: XCTestCase {
         goal.typeKey("a", modifierFlags: .command)
         goal.typeKey(.delete, modifierFlags: [])
         goal.typeText("Draft the launch note")
-        app.buttons["Try the park-and-return loop"].click()
+        app.buttons.ci("Try the park-and-return loop").click()
 
-        XCTAssertTrue(app.staticTexts["Draft the launch note"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("Draft the launch note").waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts["anchor.onboarding.platform-guidance"]
+            app.staticTexts.ci("anchor.onboarding.platform-guidance")
                 .waitForExistence(timeout: 2)
         )
     }
@@ -561,8 +561,8 @@ final class AnchorMacUITests: XCTestCase {
         app.launchArguments += ["-anchor.product-tour.seen.v4", "NO"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Plan the day. Learn what moved it."].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Return to Anchor"].exists)
+        XCTAssertTrue(app.staticTexts.ci("Plan the day. Learn what moved it.").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.ci("Return to Anchor").exists)
     }
 
     @MainActor
@@ -583,7 +583,7 @@ final class AnchorMacUITests: XCTestCase {
         )
         return
         #else
-        let google = app.buttons["anchor.hub.sign-in-google"]
+        let google = app.buttons.ci("anchor.hub.sign-in-google")
         XCTAssertTrue(google.waitForExistence(timeout: 5))
         google.click()
         XCTAssertTrue(
@@ -593,7 +593,7 @@ final class AnchorMacUITests: XCTestCase {
         // The AuthenticationServices sheet is remote-hosted inside Anchor's
         // accessibility tree. Prefer its explicit Cancel action; Escape is the
         // keyboard fallback when the host does not expose that action.
-        let cancel = app.buttons["Cancel"].firstMatch
+        let cancel = app.buttons.ci("Cancel").firstMatch
         if cancel.waitForExistence(timeout: 5) {
             cancel.click()
         } else {
@@ -601,7 +601,7 @@ final class AnchorMacUITests: XCTestCase {
         }
 
         XCTAssertTrue(google.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["One account for your Significant Hobbies."].exists)
+        XCTAssertTrue(app.staticTexts.ci("One account for your Significant Hobbies.").exists)
         XCTAssertEqual(app.state, .runningForeground)
         #endif
     }
@@ -616,27 +616,27 @@ final class AnchorMacUITests: XCTestCase {
                 .path
         app.launch()
 
-        app.buttons["Settings"].click()
+        app.buttons.ci("Settings").click()
 
-        XCTAssertTrue(app.staticTexts["Significant Hobbies Hub"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("Significant Hobbies Hub").waitForExistence(timeout: 4))
         #if ANCHOR_LOCAL_ONLY
         XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
-        XCTAssertFalse(app.buttons["anchor.hub.sign-in-apple"].exists)
-        XCTAssertFalse(app.buttons["anchor.hub.sign-in-google"].exists)
+        XCTAssertFalse(app.buttons.ci("anchor.hub.sign-in-apple").exists)
+        XCTAssertFalse(app.buttons.ci("anchor.hub.sign-in-google").exists)
         #else
-        XCTAssertTrue(app.staticTexts["Bring Anchor into your Hub"].exists)
+        XCTAssertTrue(app.staticTexts.ci("Bring Anchor into your Hub").exists)
         #endif
-        XCTAssertTrue(app.radioButtons["System"].exists)
-        XCTAssertTrue(app.radioButtons["Light"].exists)
-        XCTAssertTrue(app.radioButtons["Dark"].exists)
-        app.radioButtons["Dark"].click()
+        XCTAssertTrue(app.radioButtons.ci("System").exists)
+        XCTAssertTrue(app.radioButtons.ci("Light").exists)
+        XCTAssertTrue(app.radioButtons.ci("Dark").exists)
+        app.radioButtons.ci("Dark").click()
         XCTAssertTrue(
-            app.staticTexts["Uses the charcoal focus canvas on this device."]
+            app.staticTexts.ci("Uses the charcoal focus canvas on this device.")
                 .waitForExistence(timeout: 2)
         )
-        XCTAssertTrue(app.staticTexts["This build stores appearance on this device only"].exists)
-        XCTAssertFalse(app.staticTexts["Talk to your data"].exists)
-        XCTAssertTrue(app.staticTexts["Local library"].exists)
+        XCTAssertTrue(app.staticTexts.ci("This build stores appearance on this device only").exists)
+        XCTAssertFalse(app.staticTexts.ci("Talk to your data").exists)
+        XCTAssertTrue(app.staticTexts.ci("Local library").exists)
     }
 
     @MainActor
@@ -646,58 +646,58 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "timetable")
         app.launch()
 
-        app.buttons["Today"].click()
-        app.buttons["Add the first entry"].click()
-        let title = app.textFields["What will you do?"]
+        app.buttons.ci("Today").click()
+        app.buttons.ci("Add the first entry").click()
+        let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
         title.typeText("Timetable acceptance")
-        app.buttons["Save"].click()
+        app.buttons.ci("Save").click()
 
-        XCTAssertTrue(app.staticTexts["Timetable acceptance"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.ci("Timetable acceptance").waitForExistence(timeout: 4))
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-timetable-grid")
 
         // Customize — the timetable's own options plus the door to usual week.
-        app.buttons["anchor.today.customize"].click()
+        app.buttons.ci("anchor.today.customize").click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.start-hour"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.lived-trace"].exists)
-        app.buttons["anchor.timetable.routines"].click()
-        XCTAssertTrue(app.staticTexts["Your usual week"].waitForExistence(timeout: 3))
-        app.buttons["anchor.routines.done"].click()
-        app.buttons["anchor.timetable.options-done"].click()
+        app.buttons.ci("anchor.timetable.routines").click()
+        XCTAssertTrue(app.staticTexts.ci("Your usual week").waitForExistence(timeout: 3))
+        app.buttons.ci("anchor.routines.done").click()
+        app.buttons.ci("anchor.timetable.options-done").click()
 
         // Quick log — "still happening" captures an open entry without a timer.
-        app.buttons["anchor.today.log-time"].click()
-        let logTitle = app.textFields["anchor.log.title"]
+        app.buttons.ci("anchor.today.log-time").click()
+        let logTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(logTitle.waitForExistence(timeout: 3))
         logTitle.click()
         logTitle.typeText("In-flight entry")
-        app.buttons["anchor.log.save"].click()
-        XCTAssertTrue(app.staticTexts["In-flight entry"].waitForExistence(timeout: 4))
+        app.buttons.ci("anchor.log.save").click()
+        XCTAssertTrue(app.staticTexts.ci("In-flight entry").waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "1 now"))
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "1 now"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
 
         // Finishing the open entry records its real span.
-        let inFlightActions = app.buttons["Actions for In-flight entry"]
+        let inFlightActions = app.buttons.ci("Actions for In-flight entry")
         XCTAssertTrue(inFlightActions.waitForExistence(timeout: 3))
         inFlightActions.click()
-        let finish = app.buttons["Finish now"]
+        let finish = app.buttons.ci("Finish now")
         XCTAssertTrue(finish.waitForExistence(timeout: 3))
         finish.click()
 
         // Retroactive log — toggling "Still happening" off records a past span.
-        app.buttons["anchor.today.log-time"].click()
-        let retroTitle = app.textFields["anchor.log.title"]
+        app.buttons.ci("anchor.today.log-time").click()
+        let retroTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(retroTitle.waitForExistence(timeout: 3))
         retroTitle.click()
         retroTitle.typeText("Logged earlier")
         // The timing section sits at the bottom of the sheet's scroll view —
         // the checkbox reports a frame there while still clipped, and a plain
         // click lands on dead space. Scroll the sheet down first.
-        let ongoingToggle = app.checkBoxes["anchor.log.still-happening"]
+        let ongoingToggle = app.checkBoxes.ci("anchor.log.still-happening")
         XCTAssertTrue(ongoingToggle.waitForExistence(timeout: 2))
         let sheetScroll = app.scrollViews
             .containing(.checkBox, identifier: "anchor.log.still-happening")
@@ -707,24 +707,24 @@ final class AnchorMacUITests: XCTestCase {
         // The "Ended" picker only exists once "Still happening" is off — a
         // missed click would silently save the entry as still in progress.
         XCTAssertTrue(app.datePickers["anchor.log.end"].waitForExistence(timeout: 3))
-        app.buttons["anchor.log.save"].click()
-        XCTAssertTrue(app.staticTexts["Logged earlier"].waitForExistence(timeout: 4))
+        app.buttons.ci("anchor.log.save").click()
+        XCTAssertTrue(app.staticTexts.ci("Logged earlier").waitForExistence(timeout: 4))
         XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "2 finished"))
+            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "2 finished"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
         keepScreenshot(app, named: "anchor-timetable-logged")
 
         // Logged entries count as observed time — no "untimed" in the review.
-        app.buttons["History"].click()
+        app.buttons.ci("History").click()
         let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
         XCTAssertTrue(comparison.waitForExistence(timeout: 3))
         XCTAssertFalse(String(describing: comparison.value).contains("untimed"))
 
         app.terminate()
         app.launch()
-        app.buttons["Today"].click()
-        XCTAssertTrue(app.staticTexts["Logged earlier"].waitForExistence(timeout: 4))
+        app.buttons.ci("Today").click()
+        XCTAssertTrue(app.staticTexts.ci("Logged earlier").waitForExistence(timeout: 4))
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 3))
     }
 
@@ -753,7 +753,7 @@ final class AnchorMacUITests: XCTestCase {
     private func element(containing text: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(
             NSPredicate(
-                format: "label CONTAINS %@ OR value CONTAINS %@",
+                format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@",
                 text,
                 text
             )

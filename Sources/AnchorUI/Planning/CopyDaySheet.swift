@@ -26,11 +26,11 @@ struct CopyDaySheet: View {
                     .foregroundStyle(.secondary)
                 if let error { Text(error).foregroundStyle(.red) }
             }
-            .navigationTitle("Copy day")
+            .navigationTitle("copy day")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Copy entries") {
+                    Button("copy entries") {
                         error = copy(destination)
                         if error == nil { dismiss() }
                     }

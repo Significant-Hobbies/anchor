@@ -39,28 +39,28 @@ public struct FocusScreen: View {
                     if !showsAdHocComposer {
                         Spacer()
                         FocusPreludeStage(
-                            eyebrow: "Focus",
+                            eyebrow: "focus",
                             title: "Begin with one clear thing",
                             message: "No block is waiting for you. Name what matters now, and Anchor will hold everything else at the edge."
                         ) {
                             #if os(macOS)
                             HStack(spacing: Space.sm) {
-                                Button("Start focusing") {
+                                Button("start focusing") {
                                     withAnimation(Motion.gentle) { showsAdHocComposer = true }
                                 }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                                     .accessibilityIdentifier("anchor.focus.start-unplanned")
-                                Button("Add to schedule") { showsBlockEditor = true }
+                                Button("add to schedule") { showsBlockEditor = true }
                                     .buttonStyle(QuietButtonStyle(expands: false))
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             #else
-                            Button("Start focusing") {
+                            Button("start focusing") {
                                 withAnimation(Motion.gentle) { showsAdHocComposer = true }
                             }
                                 .buttonStyle(PrimaryButtonStyle())
                                 .accessibilityIdentifier("anchor.focus.start-unplanned")
-                            Button("Add to schedule") { showsBlockEditor = true }
+                            Button("add to schedule") { showsBlockEditor = true }
                                 .buttonStyle(QuietButtonStyle())
                             #endif
                         }
@@ -129,18 +129,18 @@ public struct FocusScreen: View {
                     message: "\(block.plannedStart.formatted(date: .omitted, time: .shortened)) · \(Format.duration(Double(block.plannedSeconds))). Everything else can wait at the edge."
                 ) {
                     VStack(spacing: Space.sm) {
-                        Button(isChangingActivity ? "Start actual activity" : "Start this block") {
+                        Button(isChangingActivity ? "start actual activity" : "start this block") {
                             start(block)
                         }
                         .buttonStyle(PrimaryButtonStyle())
                         .disabled(isChangingActivity && actualIntent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                        Button(isChangingActivity ? "Use the scheduled block" : "I’m doing something else") {
+                        Button(isChangingActivity ? "use the scheduled block" : "i’m doing something else") {
                             withAnimation(Motion.snappy) { isChangingActivity.toggle() }
                             actualIntent = ""
                         }
                         .buttonStyle(QuietButtonStyle())
-                        Button("Start an unplanned block") {
+                        Button("start an unplanned block") {
                             withAnimation(Motion.gentle) { showsAdHocComposer = true }
                         }
                         .buttonStyle(QuietButtonStyle())
@@ -156,7 +156,7 @@ public struct FocusScreen: View {
                 if isChangingActivity {
                     Card(padding: Space.lg) {
                         VStack(alignment: .leading, spacing: Space.sm) {
-                            Text("What are you actually doing?")
+                            Text("what are you actually doing?")
                                 .font(.headline)
                                 .foregroundStyle(theme.textPrimary)
                             TextField("Name the actual activity", text: $actualIntent, axis: .vertical)
@@ -500,7 +500,7 @@ public struct RootView: View {
                         .toolbar {
                             ToolbarItem(placement: .primaryAction) {
                                 Button { navigation.showSettings() } label: {
-                                    Label("Settings", systemImage: "gearshape")
+                                    Label("settings", systemImage: "gearshape")
                                 }
                                 .accessibilityIdentifier("anchor.toolbar.settings")
                                 .help("Open Settings")
@@ -508,11 +508,12 @@ public struct RootView: View {
                         }
                         .navigationDestination(isPresented: $navigation.showsSettings) {
                             SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding, remindersCoordinator: remindersCoordinator, calendarCoordinator: calendarCoordinator)
-                                .navigationTitle("Settings")
+                                .navigationTitle("settings")
                                 .toolbar(.hidden, for: .tabBar)
                         }
                 }
-                .tabItem { Label(item.label, systemImage: item.symbolName) }
+                .tabItem { Label(item.label.lowercased(), systemImage: item.symbolName)
+                    .accessibilityLabel(item.label) }
                 .tag(item)
             }
         }

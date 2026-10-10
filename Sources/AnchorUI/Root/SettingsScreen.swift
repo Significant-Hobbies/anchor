@@ -491,7 +491,7 @@ private struct ProjectBillingRow: View {
     }
 
     private var saveButton: some View {
-        Button("Save rate", action: commit)
+        Button("save rate", action: commit)
             .buttonStyle(QuietButtonStyle(expands: false))
             .accessibilityLabel("Save rate for \(project.name)")
     }
