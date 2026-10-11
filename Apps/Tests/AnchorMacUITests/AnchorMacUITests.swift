@@ -85,10 +85,10 @@ final class AnchorMacUITests: XCTestCase {
         // Don't gate on isHittable — a fresh card can sit at the scroll fold
         // while scroll-to-now settles; click() scrolls it into view itself.
         actions.click()
-        XCTAssertTrue(app.buttons.ci("Start now").waitForExistence(timeout: 3))
-        XCTAssertTrue(app.buttons.ci("Edit or move").exists)
-        XCTAssertTrue(app.buttons.ci("Explain a change").exists)
-        let finish = app.buttons.ci("Finished without timing")
+        XCTAssertTrue(app.descendants(matching: .any).ci("Start now").waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any).ci("Edit or move").exists)
+        XCTAssertTrue(app.descendants(matching: .any).ci("Explain a change").exists)
+        let finish = app.descendants(matching: .any).ci("Finished without timing")
         XCTAssertTrue(finish.waitForExistence(timeout: 2))
         finish.click()
         XCTAssertTrue(
@@ -487,8 +487,8 @@ final class AnchorMacUITests: XCTestCase {
         let completedActions = app.buttons.ci("Actions for Menu-bar launch review")
         XCTAssertTrue(completedActions.waitForExistence(timeout: 4))
         completedActions.click()
-        XCTAssertTrue(app.buttons.ci("Edit or move").waitForExistence(timeout: 3))
-        XCTAssertFalse(app.buttons.ci("Log actual time…").exists)
+        XCTAssertTrue(app.descendants(matching: .any).ci("Edit or move").waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertFalse(app.descendants(matching: .any).ci("Log actual time…").exists)
     }
 
     @MainActor
