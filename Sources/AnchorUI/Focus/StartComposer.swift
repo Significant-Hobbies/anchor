@@ -125,9 +125,11 @@ public struct StartComposer: View {
             .padding(Space.lg)
             .frame(maxWidth: 620)
             .frame(maxWidth: .infinity)
+            #if os(macOS)
             // Centre in the window rather than hugging the top, so a large Mac
             // window doesn't leave the composer stranded above a field of empty.
             .containerRelativeFrame(.vertical, alignment: .center)
+            #endif
         }
         .scrollDismissesKeyboard(.interactively)
         #if os(iOS)
