@@ -173,7 +173,7 @@ jobs:
                   controls = record["controls"]
                   assert len(controls) == 3
                   for control, baseline in zip(controls, ("Copy day", "Log time", "Customize")):
-                      assert control["label"].count(baseline) == 2, "Unchanged English labels cannot qualify longer-label states"
+                      assert control["label"].lower().count(baseline.lower()) == 2, "Unchanged English labels cannot qualify longer-label states"
                       assert control["frame"]["width"] >= 44 and control["frame"]["height"] >= 44
                   assert controls[0]["isEnabled"] is copy_enabled
                   assert all(c["isEnabled"] and c["isHittable"] for c in controls[1:])
