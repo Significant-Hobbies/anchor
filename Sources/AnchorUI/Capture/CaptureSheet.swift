@@ -109,7 +109,7 @@ public struct CaptureSheet: View {
                         .focused($fieldFocused)
                         .onSubmit(park)
                     if fieldFocused {
-                        Button("Done") { fieldFocused = false }
+                        Button("done") { fieldFocused = false }
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(theme.accent)
                     }
@@ -161,7 +161,7 @@ public struct CaptureSheet: View {
                     Button {
                         if controller.pauseFromCapture(note: note, kind: chosenKind, tagIDStrings: selectedTagIDs) { dismiss() }
                     } label: {
-                        Label("Pause — come back later", systemImage: "pause.fill")
+                        Label("pause — come back later", systemImage: "pause.fill")
                     }
                     .buttonStyle(QuietButtonStyle())
                     .accessibilityIdentifier("anchor.capture.pause")
@@ -175,7 +175,7 @@ public struct CaptureSheet: View {
 
                 // Asking on every resume only works if saying "nothing" is
                 // instant. Escape does the same thing.
-                Button(isReturningFromPause ? "Nothing — just a break" : "Cancel") {
+                Button(isReturningFromPause ? "nothing — just a break" : "cancel") {
                     controller.dismissCapture()
                     dismiss()
                 }
@@ -191,7 +191,7 @@ public struct CaptureSheet: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Done") { fieldFocused = false }
+                Button("done") { fieldFocused = false }
             }
         }
         .onAppear { fieldFocused = true }
@@ -242,7 +242,7 @@ public struct CaptureSheet: View {
                 .frame(maxWidth: .infinity)
             }
 
-            Button("Back to work") { dismiss() }
+            Button("back to work") { dismiss() }
                 .buttonStyle(PrimaryButtonStyle())
                 .keyboardShortcut(.return, modifiers: [])
         }

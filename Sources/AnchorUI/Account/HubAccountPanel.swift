@@ -56,10 +56,10 @@ public struct HubAccountPanel: View {
             isPresented: $showsDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Delete account permanently", role: .destructive) {
+            Button("delete account permanently", role: .destructive) {
                 deleteConnectedAccount()
             }
-            Button("Cancel", role: .cancel) {}
+            Button("cancel", role: .cancel) {}
         } message: {
             Text("This deletes your Hub account and its synced summaries. Your Anchor planner, history, and distraction notes on this device and in iCloud stay intact.")
         }
@@ -70,7 +70,7 @@ public struct HubAccountPanel: View {
                 set: { if !$0 { accountDeletionError = nil } }
             )
         ) {
-            Button("OK", role: .cancel) { accountDeletionError = nil }
+            Button("ok", role: .cancel) { accountDeletionError = nil }
         } message: {
             Text(accountDeletionError ?? "Please try again.")
         }
@@ -136,7 +136,7 @@ public struct HubAccountPanel: View {
             }
         } else {
             Label(
-                "Hub accounts are unavailable in this build. Anchor still works fully on this device.",
+                "hub accounts are unavailable in this build. anchor still works fully on this device.",
                 systemImage: "iphone.and.arrow.forward"
             )
             .font(.caption.weight(.medium))
@@ -159,7 +159,7 @@ public struct HubAccountPanel: View {
             if platform.needsHistoryApproval {
                 Text("Approve unowned focus history and this account's waiting changes for the account above. History already owned by another account stays separate. Distraction notes stay private.")
                     .font(.caption).foregroundStyle(theme.textSecondary)
-                Button("Approve history for this account") {
+                Button("approve history for this account") {
                     Task {
                         if await platform.approveHubHistory() { await platform.synchronize() }
                     }
@@ -199,20 +199,20 @@ public struct HubAccountPanel: View {
 
     @ViewBuilder
     private func connectedActions(_ platform: AnchorPlatformSync) -> some View {
-        Button(platform.isSyncing ? "Syncing…" : "Sync now") {
+        Button(platform.isSyncing ? "syncing…" : "sync now") {
             Task { await platform.synchronize(announcing: true) }
         }
         .buttonStyle(QuietButtonStyle(expands: false))
         .disabled(platform.isSyncing)
         .accessibilityIdentifier("anchor.hub.sync")
 
-        Button("Sign out") {
+        Button("sign out") {
             Task { await platform.disconnect() }
         }
         .buttonStyle(QuietButtonStyle(expands: false))
         .accessibilityIdentifier("anchor.hub.sign-out")
 
-        Button("Delete account", role: .destructive) {
+        Button("delete account", role: .destructive) {
             showsDeleteConfirmation = true
         }
         .buttonStyle(QuietButtonStyle(expands: false))

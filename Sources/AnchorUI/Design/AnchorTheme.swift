@@ -1,6 +1,9 @@
 import AnchorCore
 import SwiftData
 import SwiftUI
+#if !os(watchOS) && canImport(SaaSMakerUI)
+import SaaSMakerUI
+#endif
 
 /// Anchor's visual language.
 ///
@@ -82,6 +85,47 @@ public struct AnchorTheme: Sendable, Equatable {
         isDark: false
     )
 
+    #if !os(watchOS) && canImport(SaaSMakerUI)
+    /// Paper/ink mechanics, with Anchor's exact day/night and origin semantics.
+    /// No inherited text casing: labels can contain private, user-authored data.
+    public var smPalette: SMPalette {
+        var palette = (isDark ? SMPalette.ink : .paper)
+            .brand(accent, foreground: onAccent, soft: accentSoft)
+        palette.background = canvas
+        palette.foreground = textPrimary
+        palette.surface = surfaceRaised
+        palette.card = surface
+        palette.primary = accent
+        palette.primaryForeground = onAccent
+        palette.secondary = surfaceRaised
+        palette.muted = surfaceRaised
+        palette.mutedForeground = textSecondary
+        palette.accent = surfaceRaised
+        palette.border = hairline
+        palette.hairline = hairline
+        palette.input = hairline
+        palette.accentInk = accent
+        palette.toneInk = accentDeep
+        palette.destructive = negative
+        palette.success = positive
+        palette.warning = caution
+        palette.radius = Radius.lg - 4 // SMCard adds four points.
+        palette.displayFont = "Figtree"
+        palette.accentFont = "Figtree"
+        palette.textFont = "Geist"
+        palette.sansFont = "Geist"
+        palette.displayWeight = 600
+        palette.displayTracking = 0
+        palette.displaySerif = false
+        palette.accentSerif = false
+        palette.accentItalic = false
+        palette.textSerif = false
+        palette.displayLowercase = false
+        palette.uiLowercase = false
+        return palette
+    }
+    #endif
+
     /// The ring's sweep: deep at the start, luminous at the finish. Multi-stop so
     /// the arc has somewhere to travel rather than reading as one flat colour.
     public var focusGradient: AngularGradient {
@@ -160,7 +204,12 @@ public struct AnchorThemeProvider: ViewModifier {
     @Environment(\.colorScheme) private var scheme
 
     public func body(content: Content) -> some View {
+        #if !os(watchOS) && canImport(SaaSMakerUI)
+        content.smTheme(AnchorTheme.resolve(scheme).smPalette)
+            .environment(\.anchorTheme, .resolve(scheme))
+        #else
         content.environment(\.anchorTheme, .resolve(scheme))
+        #endif
     }
 }
 
@@ -185,9 +234,16 @@ public struct AnchorAppearanceProvider: ViewModifier {
     }
 
     public func body(content: Content) -> some View {
+        #if !os(watchOS) && canImport(SaaSMakerUI)
+        content
+            .smTheme(AnchorTheme.resolve(resolvedScheme).smPalette)
+            .environment(\.anchorTheme, .resolve(resolvedScheme))
+            .preferredColorScheme(appearance.preferredColorScheme)
+        #else
         content
             .environment(\.anchorTheme, .resolve(resolvedScheme))
             .preferredColorScheme(appearance.preferredColorScheme)
+        #endif
     }
 }
 

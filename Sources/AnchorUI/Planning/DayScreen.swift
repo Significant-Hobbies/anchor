@@ -77,7 +77,7 @@ struct PlanScreen: View {
                         HStack(spacing: Space.lg) {
                             emptyDayCopy
                             Spacer(minLength: Space.lg)
-                            Button("Add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                            Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
                                 .buttonStyle(PrimaryButtonStyle(expands: false))
                         }
                         #else
@@ -85,12 +85,12 @@ struct PlanScreen: View {
                             HStack(spacing: Space.lg) {
                                 emptyDayCopy
                                 Spacer(minLength: Space.lg)
-                                Button("Add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                             }
                             VStack(alignment: .leading, spacing: Space.md) {
                                 emptyDayCopy
-                                Button("Add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
                                 .buttonStyle(PrimaryButtonStyle())
                             }
                         }
@@ -121,7 +121,7 @@ struct PlanScreen: View {
         }
         .safeAreaInset(edge: .bottom) {
             if !blocks.isEmpty {
-                Button("Add an entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                Button("add an entry") { editorSeed = EditorSeed(start: suggestedStart) }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Space.lg)
                     .padding(.vertical, Space.xs)
@@ -236,7 +236,7 @@ struct PlanScreen: View {
         VStack(alignment: .leading, spacing: Space.xs) {
             HStack(spacing: Space.sm) {
                 DatePicker("Day", selection: $today, displayedComponents: .date)
-                Button("Today") { today = Date() }
+                Button("today") { today = Date() }
                     .buttonStyle(.borderless)
                     .accessibilityLabel("Go to today")
             }
@@ -264,20 +264,20 @@ struct PlanScreen: View {
     }
 
     private var copyDayButton: some View {
-        Button("Copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
+        Button("copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
             .disabled(blocks.isEmpty)
             .accessibilityIdentifier("anchor.today.copy-day")
     }
 
     private var logTimeButton: some View {
-        Button("Log time", systemImage: "clock.arrow.circlepath") {
+        Button("log time", systemImage: "clock.arrow.circlepath") {
             showsLogSheet = true
         }
         .accessibilityIdentifier("anchor.today.log-time")
     }
 
     private var customizeButton: some View {
-        Button("Customize", systemImage: "slider.horizontal.3") {
+        Button("customize", systemImage: "slider.horizontal.3") {
             showsCustomize = true
         }
         .accessibilityIdentifier("anchor.today.customize")
@@ -299,7 +299,7 @@ struct PlanScreen: View {
 
     private var emptyDayCopy: some View {
         VStack(alignment: .leading, spacing: Space.xxs) {
-            Text("Give the day one anchor")
+            Text("give the day one anchor")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
             Text("Start with the thing worth protecting. Commitments, rest, and recurring routines can take their place around it.")
@@ -516,10 +516,10 @@ struct TimetableOptionsSheet: View {
                 .frame(maxWidth: .infinity)
             }
             .background(theme.canvas)
-            .navigationTitle("Customize Today")
+            .navigationTitle("customize today")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("done") { dismiss() }
                         .accessibilityIdentifier("anchor.timetable.options-done")
                 }
             }
@@ -679,14 +679,14 @@ struct PlanBlockEditor: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.lg) {
                 if block?.templateID != nil {
-                    Label("This changes today only. Your usual week stays intact.", systemImage: "calendar.badge.clock")
+                    Label("this changes today only. your usual week stays intact.", systemImage: "calendar.badge.clock")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(theme.textSecondary)
                         .padding(Space.sm)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
                 } else if block?.externalEventKey != nil {
-                    Label("Imported from Google Calendar. Editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
+                    Label("imported from google calendar. editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(theme.textSecondary)
                         .padding(Space.sm)
@@ -718,7 +718,7 @@ struct PlanBlockEditor: View {
                         ProjectPicker(selectedID: $selectedProjectID)
 
                         if isBehaviorHabit {
-                            Label("Habit", systemImage: "leaf")
+                            Label("habit", systemImage: "leaf")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(theme.accent)
                         } else {
@@ -812,9 +812,9 @@ struct PlanBlockEditor: View {
             .background(theme.canvas)
             .navigationTitle(placingHabit != nil ? "Place habit" : (isBehaviorHabit ? (template == nil ? "New habit" : "Edit habit") : (template != nil ? "Edit usual week" : (block == nil ? (repeats ? "New usual-week item" : "New block") : "Edit block"))))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button("save", action: save)
                         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (repeats && weekdays.isEmpty))
                 }
             }
@@ -1002,7 +1002,7 @@ struct RoutineManager: View {
                 }
                 Section(selectedWeekday.label) {
                 if selectedTemplates.isEmpty {
-                    Label("Nothing usual yet — add the first item for this day.", systemImage: "calendar.badge.plus")
+                    Label("nothing usual yet — add the first item for this day.", systemImage: "calendar.badge.plus")
                         .foregroundStyle(theme.textSecondary)
                 }
                 ForEach(selectedTemplates) { template in
@@ -1020,33 +1020,33 @@ struct RoutineManager: View {
                     }
                     .buttonStyle(.plain)
                     .swipeActions {
-                        Button("Stop repeating", role: .destructive) { archive(template) }
+                        Button("stop repeating", role: .destructive) { archive(template) }
                     }
                     .contextMenu {
-                        Button("Edit future days") { editingTemplate = template }
-                        Button("Stop repeating", role: .destructive) { archive(template) }
+                        Button("edit future days") { editingTemplate = template }
+                        Button("stop repeating", role: .destructive) { archive(template) }
                     }
                 }
                 }
             }
-            .navigationTitle("Your usual week")
+            .navigationTitle("your usual week")
             .toolbar {
                 #if !os(macOS)
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Add to \(selectedWeekday.label)", systemImage: "plus") { showsNewTemplate = true }
+                    Button("add to \(selectedWeekday.label)", systemImage: "plus") { showsNewTemplate = true }
                 }
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("done") { dismiss() } }
                 #endif
             }
             #if os(macOS)
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: Space.sm) {
-                    Button("Add to \(selectedWeekday.label)", systemImage: "plus") {
+                    Button("add to \(selectedWeekday.label)", systemImage: "plus") {
                         showsNewTemplate = true
                     }
                     .buttonStyle(PrimaryButtonStyle(expands: false))
                     Spacer()
-                    Button("Done") { dismiss() }
+                    Button("done") { dismiss() }
                         .buttonStyle(QuietButtonStyle(expands: false))
                         .accessibilityIdentifier("anchor.routines.done")
                 }
@@ -1166,11 +1166,11 @@ struct DivergenceEditor: View {
                 .frame(maxWidth: .infinity)
             }
             .background(theme.canvas)
-            .navigationTitle("Explain the gap")
+            .navigationTitle("explain the gap")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button("save") {
                         guard let selected else { return }
                         if onSave(selected, note.trimmingCharacters(in: .whitespacesAndNewlines)) {
                             saveError = nil
@@ -1227,7 +1227,7 @@ struct DayReviewScreen: View {
             VStack(alignment: .leading, spacing: Space.lg) {
                 DoodleScene(
                     "HistoryDoodle",
-                    eyebrow: "History",
+                    eyebrow: "history",
                     title: "Read the real day",
                     message: "Compare what you drew with what happened. Keep the lesson, not the score.",
                     compact: true
@@ -1433,7 +1433,7 @@ private struct ReviewGapRow: View {
                     .font(.subheadline)
                     .foregroundStyle(theme.textSecondary)
                 if gap.cause == .unknown {
-                    Button("Explain this gap", action: onExplain)
+                    Button("explain this gap", action: onExplain)
                         .buttonStyle(QuietButtonStyle(expands: false))
                 }
             }

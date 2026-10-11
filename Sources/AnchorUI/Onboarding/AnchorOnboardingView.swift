@@ -107,7 +107,7 @@ public struct AnchorOnboardingView: View {
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
-                Button("Done") { focusedField = nil }
+                Button("done") { focusedField = nil }
             }
         }
         .onAppear {
@@ -134,7 +134,7 @@ public struct AnchorOnboardingView: View {
                 .accessibilityLabel("A person balances time that slips away against time deliberately chosen for movement and growth.")
 
             VStack(spacing: Space.xs) {
-                Text("Plan the day. Learn what moved it.")
+                Text("plan the day. learn what moved it.")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
@@ -152,9 +152,9 @@ public struct AnchorOnboardingView: View {
                 }
             }
 
-            Button("Choose what to protect") { moveUnified(to: .patterns) }
+            Button("choose what to protect") { moveUnified(to: .patterns) }
                 .buttonStyle(PrimaryButtonStyle())
-            Button(isExistingOwnerOrientation ? "Return to Anchor" : "I’ll explore first") { onOpenApp() }
+            Button(isExistingOwnerOrientation ? "return to anchor" : "i’ll explore first") { onOpenApp() }
                 .buttonStyle(QuietButtonStyle())
             Text("About two minutes · everything is editable later")
                 .font(.footnote)
@@ -166,7 +166,7 @@ public struct AnchorOnboardingView: View {
         VStack(spacing: Space.lg) {
             onboardingProgress("1 OF 6 · OPTIONAL")
             VStack(spacing: Space.xs) {
-                Text("What tends to take more time than you want?")
+                Text("what tends to take more time than you want?")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
@@ -195,11 +195,11 @@ public struct AnchorOnboardingView: View {
 
             VStack(spacing: Space.sm) {
                 profileSaveFailure
-                Button(selectedPatterns.isEmpty ? "Continue without choosing" : "Continue with \(selectedPatterns.count) selected") {
+                Button(selectedPatterns.isEmpty ? "continue without choosing" : "continue with \(selectedPatterns.count) selected") {
                     if persistProfile() { moveUnified(to: .directions) }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                Button("Back") { moveUnified(to: .welcome) }
+                Button("back") { moveUnified(to: .welcome) }
                     .buttonStyle(QuietButtonStyle())
             }
         }
@@ -209,7 +209,7 @@ public struct AnchorOnboardingView: View {
         VStack(spacing: Space.lg) {
             onboardingProgress("2 OF 6 · OPTIONAL")
             VStack(spacing: Space.xs) {
-                Text("What do you want that time to make room for?")
+                Text("what do you want that time to make room for?")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
@@ -238,14 +238,14 @@ public struct AnchorOnboardingView: View {
 
             VStack(spacing: Space.sm) {
                 profileSaveFailure
-                Button(desiredDirections.isEmpty ? "Continue without choosing" : "Show me how Anchor protects it") {
+                Button(desiredDirections.isEmpty ? "continue without choosing" : "show me how anchor protects it") {
                     if persistProfile() {
                         prepareHabitDrafts()
                         moveUnified(to: .replacements)
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                Button("Back") { moveUnified(to: .patterns) }
+                Button("back") { moveUnified(to: .patterns) }
                     .buttonStyle(QuietButtonStyle())
             }
         }
@@ -255,7 +255,7 @@ public struct AnchorOnboardingView: View {
         VStack(spacing: Space.lg) {
             onboardingProgress("3 OF 6 · SUGGESTIONS")
             VStack(spacing: Space.xs) {
-                Text("Turn that time into something concrete.")
+                Text("turn that time into something concrete.")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
@@ -306,11 +306,11 @@ public struct AnchorOnboardingView: View {
             }
 
             VStack(spacing: Space.sm) {
-                Button(habitDrafts.contains(where: \.isSelected) ? "Shape these habits" : "Continue without habits") {
+                Button(habitDrafts.contains(where: \.isSelected) ? "shape these habits" : "continue without habits") {
                     moveUnified(to: .schedule)
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                Button("Back") { moveUnified(to: .directions) }
+                Button("back") { moveUnified(to: .directions) }
                     .buttonStyle(QuietButtonStyle())
             }
         }
@@ -320,7 +320,7 @@ public struct AnchorOnboardingView: View {
         VStack(spacing: Space.lg) {
             onboardingProgress("4 OF 6 · YOUR WEEK")
             VStack(spacing: Space.xs) {
-                Text("Choose when each habit is available.")
+                Text("choose when each habit is available.")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
@@ -373,12 +373,12 @@ public struct AnchorOnboardingView: View {
 
             VStack(spacing: Space.sm) {
                 profileSaveFailure
-                Button("Save habits and continue") {
+                Button("save habits and continue") {
                     if persistHabitSchedule() { moveUnified(to: .account) }
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(habitDrafts.contains { $0.isSelected && ($0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || $0.weekdays.isEmpty) })
-                Button("Back") { moveUnified(to: .replacements) }
+                Button("back") { moveUnified(to: .replacements) }
                     .buttonStyle(QuietButtonStyle())
             }
         }
@@ -447,7 +447,7 @@ public struct AnchorOnboardingView: View {
                 .accessibilityLabel("A hand-drawn day moves through a connected sequence of plans.")
 
             VStack(spacing: Space.xs) {
-                Text("One account for your Significant Hobbies.")
+                Text("one account for your significant hobbies.")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                     .multilineTextAlignment(.center)
@@ -468,14 +468,14 @@ public struct AnchorOnboardingView: View {
             }
 
             if platform?.account?.isSignedIn == true {
-                Button("Continue to interruption practice") {
+                Button("continue to interruption practice") {
                     moveUnified(to: .rehearsal)
                 }
                 .buttonStyle(PrimaryButtonStyle(expands: false))
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("anchor.onboarding.hub-continue-connected")
             } else {
-                Button("Continue locally") {
+                Button("continue locally") {
                     moveUnified(to: .rehearsal)
                 }
                 .buttonStyle(QuietButtonStyle(expands: false))
@@ -488,7 +488,7 @@ public struct AnchorOnboardingView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button("Back") { moveUnified(to: .schedule) }
+            Button("back") { moveUnified(to: .schedule) }
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .frame(maxWidth: .infinity)
         }
@@ -504,7 +504,7 @@ public struct AnchorOnboardingView: View {
                 .frame(maxWidth: .infinity)
                 .accessibilityLabel("A hand-drawn figure anchors a focus clock and parks a ringing interruption.")
             VStack(spacing: Space.xs) {
-                Text("Protect one thing.")
+                Text("protect one thing.")
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                 Text("Anchor keeps your goal visible, parks what pulls at you, and gives the work back.")
@@ -524,16 +524,16 @@ public struct AnchorOnboardingView: View {
                         .focused($focusedField, equals: .goal)
                         .lineLimit(1...3)
                     Divider().overlay(theme.hairline)
-                    Label("Distraction notes stay on this device.", systemImage: "lock.shield")
+                    Label("distraction notes stay on this device.", systemImage: "lock.shield")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(theme.textSecondary)
                 }
             }
-            Button("Try the park-and-return loop") { beginRehearsal() }
+            Button("try the park-and-return loop") { beginRehearsal() }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(trimmedGoal.isEmpty)
                 .keyboardShortcut(.return, modifiers: .command)
-            Button(isExistingOwnerOrientation ? "Return to Anchor" : "Open Anchor first") { onOpenApp() }
+            Button(isExistingOwnerOrientation ? "return to anchor" : "open anchor first") { onOpenApp() }
                 .buttonStyle(QuietButtonStyle())
             Text("This is a labelled rehearsal. It creates no session, history, analytics, export, or synced copy.")
                 .font(.footnote)
@@ -559,7 +559,7 @@ public struct AnchorOnboardingView: View {
             Text("Imagine something else asks for your attention.")
                 .font(.body)
                 .foregroundStyle(theme.textSecondary)
-            Button("Something pulled me") {
+            Button("something pulled me") {
                 rehearsal.openCapture()
                 persist(step: .capture)
                 focusedField = .thought
@@ -567,7 +567,7 @@ public struct AnchorOnboardingView: View {
             .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut("l", modifiers: [.command, .shift])
             platformCaptureHint
-            Button("Leave rehearsal") { onOpenApp() }
+            Button("leave rehearsal") { onOpenApp() }
                 .buttonStyle(QuietButtonStyle())
         }
     }
@@ -579,7 +579,7 @@ public struct AnchorOnboardingView: View {
                 Image(systemName: "lock.open.fill")
                     .font(.title2)
                     .foregroundStyle(theme.color(for: .wanderingThought))
-                Text("What’s pulling at you?")
+                Text("what’s pulling at you?")
                     .font(.title.weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
                 Text("Name it once. Then return to \(rehearsal.goal).")
@@ -594,14 +594,14 @@ public struct AnchorOnboardingView: View {
                     .focused($focusedField, equals: .thought)
                     .lineLimit(1...4)
             }
-            Label("Practice text is discarded after this screen.", systemImage: "lock.shield")
+            Label("practice text is discarded after this screen.", systemImage: "lock.shield")
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(theme.textSecondary)
-            Button("Park it — return to focus") { parkRehearsal() }
+            Button("park it — return to focus") { parkRehearsal() }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(trimmedThought.isEmpty)
                 .keyboardShortcut(.return, modifiers: [])
-            Button("Leave rehearsal") { onOpenApp() }
+            Button("leave rehearsal") { onOpenApp() }
                 .buttonStyle(QuietButtonStyle())
         }
     }
@@ -615,7 +615,7 @@ public struct AnchorOnboardingView: View {
                     .font(.system(size: 34, weight: .medium))
                     .foregroundStyle(theme.accent)
             }
-            Text("Thought parked.")
+            Text("thought parked.")
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
             Card(padding: Space.lg) {
@@ -634,10 +634,10 @@ public struct AnchorOnboardingView: View {
             }
 
             VStack(alignment: .leading, spacing: Space.sm) {
-                Label("Apple Intelligence groups locally when available; built-in rules work without it.", systemImage: "apple.intelligence")
-                Label("iCloud keeps your Anchor data available on your Mac, iPhone, and Apple Watch.", systemImage: "icloud")
-                Label("Significant Hobbies Hub is optional and receives only finished session summaries — never distraction notes.", systemImage: "person.crop.circle.badge.checkmark")
-                Label("Apple Watch is a remote for start, pause, and capture — no second setup flow.", systemImage: "applewatch")
+                Label("apple intelligence groups locally when available; built-in rules work without it.", systemImage: "apple.intelligence")
+                Label("icloud keeps your anchor data available on your mac, iphone, and apple watch.", systemImage: "icloud")
+                Label("significant hobbies hub is optional and receives only finished session summaries — never distraction notes.", systemImage: "person.crop.circle.badge.checkmark")
+                Label("apple watch is a remote for start, pause, and capture — no second setup flow.", systemImage: "applewatch")
             }
             .font(.footnote)
             .foregroundStyle(theme.textSecondary)
@@ -650,12 +650,12 @@ public struct AnchorOnboardingView: View {
                     .font(.footnote)
                     .foregroundStyle(theme.textSecondary)
                     .multilineTextAlignment(.center)
-                Button("Open my Focus") { complete() }
+                Button("open my focus") { complete() }
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.return, modifiers: .command)
-                Button(isExistingOwnerOrientation ? "Return without starting" : "Open Anchor without starting") { onOpenApp() }
+                Button(isExistingOwnerOrientation ? "return without starting" : "open anchor without starting") { onOpenApp() }
                     .buttonStyle(QuietButtonStyle())
-                Button("Practice once more") {
+                Button("practice once more") {
                     thought = ""
                     rehearsal.practiceAgain()
                     persist(step: .focusing)

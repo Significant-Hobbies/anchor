@@ -116,7 +116,7 @@ private struct VisualCatalogRenderer {
                 AnyView(
                     content()
                         .modelContainer(container)
-                        .environment(\.anchorTheme, .dark)
+                        .anchorTheme()
                         .environment(\.horizontalSizeClass, horizontalSizeClass)
                         .environment(\.anchorWorkspaceMaxWidth, min(width, 960))
                         .environment(\.anchorPlatformSync, platform)

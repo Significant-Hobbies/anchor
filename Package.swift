@@ -21,6 +21,7 @@ let package = Package(
             url: "https://github.com/Significant-Hobbies/significanthobbies.git",
             revision: "ebfc2387acf643bbb63e07c7a8e41fbc586cdca2"
         ),
+        .package(url: "https://github.com/sass-maker/ui-library", from: "0.1.14"),
     ],
     targets: [
         .target(
@@ -32,7 +33,11 @@ let package = Package(
         ),
         .target(
             name: "AnchorUI",
-            dependencies: ["AnchorCore"],
+            dependencies: [
+                "AnchorCore",
+                // iOS and macOS only: the watch app keeps AnchorTheme.
+                .product(name: "SaaSMakerUI", package: "ui-library", condition: .when(platforms: [.iOS, .macOS])),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .executableTarget(

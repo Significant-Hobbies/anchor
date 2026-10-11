@@ -47,7 +47,7 @@ public struct HabitsScreen: View {
             VStack(alignment: .leading, spacing: Space.lg) {
                 DoodleScene(
                     "HabitsDoodle",
-                    eyebrow: "Habits",
+                    eyebrow: "habits",
                     title: "Habits",
                     message: "Every habit you keep, and the time it belongs at."
                 )
@@ -82,7 +82,7 @@ public struct HabitsScreen: View {
                 }
 
                 HStack(spacing: Space.xs) {
-                    Button("Add a habit", systemImage: "plus") {
+                    Button("add a habit", systemImage: "plus") {
                         showsNewHabit = true
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -91,7 +91,7 @@ public struct HabitsScreen: View {
                     Spacer(minLength: 0)
 
                     Button { showsProfile = true } label: {
-                        Label("Patterns and replacements", systemImage: "arrow.triangle.branch")
+                        Label("patterns and replacements", systemImage: "arrow.triangle.branch")
                     }
                     .buttonStyle(QuietButtonStyle(expands: false))
                     .accessibilityIdentifier("anchor.habits.behavior-profile")
@@ -106,7 +106,7 @@ public struct HabitsScreen: View {
                             HStack(spacing: Space.sm) {
                                 Image(systemName: "archivebox")
                                     .foregroundStyle(theme.textTertiary)
-                                Text("Archived")
+                                Text("archived")
                                     .font(.headline)
                                     .foregroundStyle(theme.textPrimary)
                                 Text("\(archivedTemplates.count)")
@@ -145,7 +145,7 @@ public struct HabitsScreen: View {
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("Inspect \(template.title)")
                                     .accessibilityIdentifier("anchor.habits.archived.\(template.id.uuidString)")
-                                    Button("Restore") { restore(template) }
+                                    Button("restore") { restore(template) }
                                         .buttonStyle(QuietButtonStyle(expands: false))
                                 }
                                 .padding(Space.md)
@@ -222,8 +222,8 @@ public struct HabitsScreen: View {
                 }
                 Spacer(minLength: Space.sm)
                 Menu {
-                    Button("Archive habit", systemImage: "archivebox") { archive(template) }
-                    Button("Edit habit", systemImage: "pencil") { editingTemplate = template }
+                    Button("archive habit", systemImage: "archivebox") { archive(template) }
+                    Button("edit habit", systemImage: "pencil") { editingTemplate = template }
                 } label: {
                     Image(systemName: "ellipsis")
                         .frame(width: 32, height: 32)
@@ -275,14 +275,14 @@ public struct HabitsScreen: View {
     private func habitActions(_ template: ScheduleTemplate) -> some View {
         let done = isCompleted(template)
         return FlowRow(spacing: Space.xs) {
-            Button(done ? "Undo check-off" : "Done", systemImage: done ? "arrow.uturn.backward" : "checkmark") {
+            Button(done ? "undo check-off" : "done", systemImage: done ? "arrow.uturn.backward" : "checkmark") {
                 setCompleted(!done, template: template)
             }
             .buttonStyle(QuietButtonStyle(expands: false))
             .disabled(completedBlock(template) != nil)
             .accessibilityHint(done ? "Tap to undo today's check-off" : "Record without scheduling a time")
             .accessibilityIdentifier("anchor.habits.complete")
-            Button("Schedule", systemImage: "calendar.badge.plus") { schedulingTemplate = template }
+            Button("schedule", systemImage: "calendar.badge.plus") { schedulingTemplate = template }
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .disabled(!template.applies(to: Date()))
         }
@@ -342,7 +342,7 @@ private struct HabitUpgradeSheet: View {
                 VStack(alignment: .leading, spacing: Space.lg) {
                     DoodleScene(
                         "HabitsDoodle",
-                        eyebrow: "RHYTHM",
+                        eyebrow: "rhythm",
                         title: "Change only what helps",
                         message: "Make this available on one more day, or leave it exactly as it is.",
                         compact: true
@@ -354,7 +354,7 @@ private struct HabitUpgradeSheet: View {
                     }
                     if !availableDays.isEmpty {
                         VStack(alignment: .leading, spacing: Space.sm) {
-                            Text("Make it available one more day")
+                            Text("make it available one more day")
                                 .font(.headline)
                                 .foregroundStyle(theme.textPrimary)
                             FlowRow(spacing: Space.xs) {
@@ -378,9 +378,9 @@ private struct HabitUpgradeSheet: View {
                 .frame(maxWidth: .infinity)
             }
             .background(theme.canvas)
-            .navigationTitle("Adjust \(template.title)")
+            .navigationTitle("adjust \(template.title)")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Not now") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("not now") { dismiss() } }
             }
         }
         #if os(macOS)

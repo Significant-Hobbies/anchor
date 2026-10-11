@@ -350,7 +350,7 @@ public struct AnalyticsScreen: View {
                 } else {
                     let availability = TaggingService.availability
                     if availability.isAvailable {
-                        Button("Summarise this period") {
+                        Button("summarise this period") {
                             Task { await summarise(records) }
                         }
                         .buttonStyle(QuietButtonStyle(expands: false))

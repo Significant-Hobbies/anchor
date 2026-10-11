@@ -30,7 +30,7 @@ public struct CalendarSettings: View {
                         title: "Google Calendar",
                         detail: "Imports timed events as commitment blocks for today and the next seven days. Read-only — nothing is sent back."
                     ) {
-                        Button(coordinator.isConnecting ? "Connecting…" : "Connect account") {
+                        Button(coordinator.isConnecting ? "connecting…" : "connect account") {
                             Task { await coordinator.connect() }
                         }
                         .buttonStyle(QuietButtonStyle(expands: false))
@@ -83,13 +83,13 @@ public struct CalendarSettings: View {
                 }
                 Spacer(minLength: Space.sm)
                 Menu {
-                    Button("Refresh calendars", systemImage: "arrow.clockwise") {
+                    Button("refresh calendars", systemImage: "arrow.clockwise") {
                         Task { await coordinator.refreshCalendars(accountID: account.id) }
                     }
-                    Button("Sync now", systemImage: "arrow.triangle.2.circlepath") {
+                    Button("sync now", systemImage: "arrow.triangle.2.circlepath") {
                         Task { await coordinator.sync(context: context, blocks: planBlocks) }
                     }
-                    Button("Disconnect", role: .destructive) {
+                    Button("disconnect", role: .destructive) {
                         Task {
                             await coordinator.disconnect(
                                 accountID: account.id,

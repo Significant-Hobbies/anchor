@@ -335,10 +335,10 @@ struct DistractionEditSheet: View {
             }
             if let saveError { Text(saveError).font(.caption) }
             HStack(spacing: Space.xs) {
-                Button("Cancel") { dismiss() }
+                Button("cancel") { dismiss() }
                     .buttonStyle(QuietButtonStyle())
                     .keyboardShortcut(.cancelAction)
-                Button("Save") { save() }
+                Button("save") { save() }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -418,10 +418,10 @@ struct SessionEditSheet: View {
                 SavedTagPicker(selectedIDs: $tagIDs)
 
                 HStack(spacing: Space.xs) {
-                    Button("Cancel") { dismiss() }
+                    Button("cancel") { dismiss() }
                         .buttonStyle(QuietButtonStyle())
                         .keyboardShortcut(.cancelAction)
-                    Button("Save") { save() }
+                    Button("save") { save() }
                         .buttonStyle(PrimaryButtonStyle())
                 }
             }

@@ -34,10 +34,10 @@ struct MetadataLibraryEditor: View {
                 phoneContent
                 #endif
             }
-            .navigationTitle("Projects & tags")
+            .navigationTitle("projects & tags")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: saveAndDismiss)
+                    Button("done", action: saveAndDismiss)
                         .disabled(hasInvalidNames)
                 }
             }
@@ -52,7 +52,7 @@ struct MetadataLibraryEditor: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
                 VStack(alignment: .leading, spacing: Space.xs) {
-                    Label("Reusable context", systemImage: "folder.badge.gearshape")
+                    Label("reusable context", systemImage: "folder.badge.gearshape")
                         .font(.system(.title2, design: .rounded).weight(.semibold))
                         .foregroundStyle(theme.textPrimary)
                     Text("Projects connect focus time to a larger outcome. Tags add lightweight context across focus, history, and exports.")
@@ -228,7 +228,7 @@ struct MetadataLibraryEditor: View {
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier(identifier)
                 .onSubmit(save)
-            Button("Add", systemImage: "plus", action: save)
+            Button("add", systemImage: "plus", action: save)
                 .accessibilityIdentifier(buttonIdentifier)
                 .disabled(text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 #if os(macOS)
@@ -242,7 +242,7 @@ struct MetadataLibraryEditor: View {
             Label(name, systemImage: symbol)
                 .foregroundStyle(theme.textSecondary)
             Spacer()
-            Button("Restore", action: restore)
+            Button("restore", action: restore)
                 .buttonStyle(QuietButtonStyle(expands: false))
         }
     }
@@ -384,7 +384,7 @@ private struct ProjectLibraryRow: View {
                 .onSubmit(save)
                 .accessibilityIdentifier("anchor.metadata.project.\(project.id.uuidString)")
             Spacer(minLength: Space.sm)
-            Button("Archive", systemImage: "archivebox", action: archive)
+            Button("archive", systemImage: "archivebox", action: archive)
                 .labelStyle(.iconOnly)
                 .foregroundStyle(theme.textTertiary)
                 .accessibilityLabel("Archive \(project.name)")
@@ -407,7 +407,7 @@ private struct TagLibraryRow: View {
                 .onSubmit(save)
                 .accessibilityIdentifier("anchor.metadata.tag.\(tag.id.uuidString)")
             Spacer(minLength: Space.sm)
-            Button("Archive", systemImage: "archivebox", action: archive)
+            Button("archive", systemImage: "archivebox", action: archive)
                 .labelStyle(.iconOnly)
                 .foregroundStyle(theme.textTertiary)
                 .accessibilityLabel("Archive \(tag.name)")

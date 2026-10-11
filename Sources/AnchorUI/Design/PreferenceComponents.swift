@@ -1,4 +1,7 @@
 import SwiftUI
+#if !os(watchOS) && canImport(SaaSMakerUI)
+import SaaSMakerUI
+#endif
 
 /// State-free settings primitives. They intentionally know nothing about
 /// AnchorCore, persistence, accounts, or navigation, so the mechanics can move
@@ -23,9 +26,14 @@ public struct PreferenceGroup<Content: View>: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             VStack(alignment: .leading, spacing: 2) {
+                #if !os(watchOS) && canImport(SaaSMakerUI)
+                SMSectionHeader(title.lowercased(), size: 17)
+                    .accessibilityLabel(title)
+                #else
                 Text(title)
                     .font(.system(.headline, design: .rounded).weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
+                #endif
                 if let subtitle {
                     Text(subtitle)
                         .font(.caption)
@@ -35,6 +43,9 @@ public struct PreferenceGroup<Content: View>: View {
             }
             .padding(.horizontal, Space.xxs)
 
+            #if !os(watchOS) && canImport(SaaSMakerUI)
+            SMCard(padding: 0) { VStack(spacing: 0) { content } }
+            #else
             VStack(spacing: 0) { content }
                 .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
                 .overlay(
@@ -46,6 +57,7 @@ public struct PreferenceGroup<Content: View>: View {
                     radius: 16,
                     y: 6
                 )
+            #endif
         }
     }
 }
@@ -152,6 +164,7 @@ public struct PreferenceDivider: View {
 
 private struct PreferenceRowContent<Trailing: View>: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let systemImage: String
     let title: String
     let detail: String
@@ -159,7 +172,10 @@ private struct PreferenceRowContent<Trailing: View>: View {
     let trailing: Trailing
 
     var body: some View {
-        HStack(alignment: .center, spacing: Space.sm) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.sm))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: Space.sm))
+        layout {
             Image(systemName: systemImage)
                 .font(.body.weight(.medium))
                 .foregroundStyle(tint ?? theme.textSecondary)
@@ -167,15 +183,17 @@ private struct PreferenceRowContent<Trailing: View>: View {
                 .background((tint ?? theme.textSecondary).opacity(0.10), in: .circle)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(title.lowercased())
+                    .accessibilityLabel(title)
                     .font(.body.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(theme.textPrimary)
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: Space.sm)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: Space.sm) }
             trailing
         }
         .padding(.horizontal, Space.md)

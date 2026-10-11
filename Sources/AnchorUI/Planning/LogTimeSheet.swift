@@ -136,9 +136,9 @@ struct LogTimeSheet: View {
             .background(theme.canvas)
             .navigationTitle(block == nil ? "Log time" : "Log actual time")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Log", action: save)
+                    Button("log", action: save)
                         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .accessibilityIdentifier("anchor.log.save")
                 }

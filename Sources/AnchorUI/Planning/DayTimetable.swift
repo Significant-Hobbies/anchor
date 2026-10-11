@@ -443,7 +443,7 @@ private struct TimetableBlockCard: View {
             Text(block.flexibility.label)
             if block.templateID != nil {
                 Text("·")
-                Label("Recurring", systemImage: "repeat")
+                Label("recurring", systemImage: "repeat")
             }
             if let direction = block.lifeDirection {
                 Text("·")
@@ -458,27 +458,27 @@ private struct TimetableBlockCard: View {
     @ViewBuilder
     private var actionChoices: some View {
         if entry.linkedSession?.isActive == true {
-            Button("Open timer") { choose(onOpenFocus) }
+            Button("open timer") { choose(onOpenFocus) }
         } else {
             switch block.state {
             case .planned:
                 if !entry.hasDifferentActiveSession {
-                    Button("Start now") { choose(onStart) }
+                    Button("start now") { choose(onStart) }
                 }
-                Button("Edit or move") { choose(onEdit) }
-                Button("Finished without timing") { choose(onComplete) }
+                Button("edit or move") { choose(onEdit) }
+                Button("finished without timing") { choose(onComplete) }
             case .inProgress:
-                Button("Finish now") { choose(onComplete) }
+                Button("finish now") { choose(onComplete) }
             case .completed, .skipped, .moved:
-                Button("Edit or move") { choose(onEdit) }
+                Button("edit or move") { choose(onEdit) }
             }
             // Linked sessions own actual timing; reconciliation would replace
             // any manual timestamps entered here on the next refresh.
             if block.sessionID == nil {
-                Button("Log actual time…") { choose(onLogActual) }
+                Button("log actual time…") { choose(onLogActual) }
             }
         }
-        Button("Explain a change") { choose(onExplain) }
+        Button("explain a change") { choose(onExplain) }
     }
 
     private func choose(_ action: () -> Void) {
