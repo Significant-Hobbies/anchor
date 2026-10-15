@@ -81,21 +81,9 @@ public struct HabitsScreen: View {
                     }
                 }
 
-                HStack(spacing: Space.xs) {
-                    Button("add a habit", systemImage: "plus") {
-                        showsNewHabit = true
-                    }
-                    .buttonStyle(PrimaryButtonStyle())
-                    .accessibilityIdentifier("anchor.habits.add")
-
-                    Spacer(minLength: 0)
-
-                    Button { showsProfile = true } label: {
-                        Label("patterns and replacements", systemImage: "arrow.triangle.branch")
-                    }
-                    .buttonStyle(QuietButtonStyle(expands: false))
-                    .accessibilityIdentifier("anchor.habits.behavior-profile")
-                    .accessibilityValue(profileSummary)
+                ViewThatFits(in: .horizontal) {
+                    habitActions(stacked: false)
+                    habitActions(stacked: true)
                 }
 
                 if !archivedTemplates.isEmpty {
@@ -181,6 +169,27 @@ public struct HabitsScreen: View {
         let directions = profiles.first?.desiredDirections.count ?? 0
         if patterns == 0 && directions == 0 { return "Choose what tends to pull you and what you want that time to become." }
         return "\(patterns) pattern\(patterns == 1 ? "" : "s") · \(directions) direction\(directions == 1 ? "" : "s")"
+    }
+
+    private func habitActions(stacked: Bool) -> some View {
+        let layout = stacked
+            ? AnyLayout(VStackLayout(spacing: Space.xs))
+            : AnyLayout(HStackLayout(spacing: Space.xs))
+        return layout {
+            Button("add a habit", systemImage: "plus") {
+                showsNewHabit = true
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .accessibilityIdentifier("anchor.habits.add")
+
+            Button { showsProfile = true } label: {
+                Label("patterns and replacements", systemImage: "arrow.triangle.branch")
+            }
+            .buttonStyle(QuietButtonStyle(expands: stacked))
+            .fixedSize(horizontal: !stacked, vertical: false)
+            .accessibilityIdentifier("anchor.habits.behavior-profile")
+            .accessibilityValue(profileSummary)
+        }
     }
 
     private func habitTiming(_ template: ScheduleTemplate) -> String {
