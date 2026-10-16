@@ -88,6 +88,10 @@ final class AnchorIOSUITests: XCTestCase {
         note.typeText("Check the build status")
         app.buttons.ci("Done").tap()
         app.buttons.ci("anchor.capture.pause").tap()
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons.ci("Focus").tap()
+        XCTAssertTrue(app.staticTexts.ci("Finish the release").waitForExistence(timeout: 4))
         let resume = app.buttons.ci("Resume")
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
         resume.tap()
@@ -99,6 +103,12 @@ final class AnchorIOSUITests: XCTestCase {
         app.tabBars.buttons.ci("History").tap()
         app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons.ci("History").tap()
+        app.buttons.ci("Interruptions").tap()
+        XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
+        keepScreenshot(app, named: "anchor-focus-history-after-relaunch")
     }
 
     func testInterruptionFirstOnboardingStartsARealSession() {
@@ -487,7 +497,16 @@ final class AnchorIOSUITests: XCTestCase {
 
         let habits = app.tabBars.buttons.ci("Habits")
         XCTAssertTrue(habits.waitForExistence(timeout: 5))
-        habits.tap()
+        // The first cold simulator launch can expose the tab bar before it
+        // accepts selection. Confirm navigation before querying its contents.
+        for _ in 0..<2 {
+            habits.tap()
+            let selected = XCTNSPredicateExpectation(
+                predicate: NSPredicate { _, _ in habits.isSelected }, object: nil
+            )
+            if XCTWaiter.wait(for: [selected], timeout: 5) == .completed { break }
+        }
+        XCTAssertTrue(habits.isSelected, "Habits must be selected before opening its profile editor")
         let editor = app.buttons.ci("anchor.habits.behavior-profile")
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         editor.tap()

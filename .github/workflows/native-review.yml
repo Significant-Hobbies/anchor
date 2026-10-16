@@ -2,6 +2,11 @@ name: Anchor native review
 
 on:
   workflow_dispatch:
+    inputs:
+      ios_only:
+        description: Run only iPhone simulator qualification; skip Mac and Watch
+        type: boolean
+        default: false
 
 concurrency:
   group: anchor-native-review-${{ github.ref }}
@@ -23,6 +28,7 @@ jobs:
         run: command -v xcodegen >/dev/null || brew install xcodegen
 
       - name: Verify shared package
+        if: ${{ !inputs.ios_only }}
         run: |
           swift test --filter TimetableLayoutTests
           swift test
@@ -34,12 +40,14 @@ jobs:
         run: xcodegen generate
 
       - name: Render every primary surface offscreen
+        if: ${{ !inputs.ios_only }}
         env:
           CATALOG_OUTPUT: ${{ runner.temp }}/anchor-visual-catalog
         run: scripts/render-visual-catalog.sh "$CATALOG_OUTPUT"
 
       - name: Run complete macOS UI suite
         id: mac-ui
+        if: ${{ !inputs.ios_only }}
         continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 macos test \
@@ -231,6 +239,7 @@ jobs:
 
       - name: Build watch companion
         id: watch-build
+        if: ${{ !inputs.ios_only }}
         continue-on-error: true
         run: |
           xcodebuild \
@@ -243,6 +252,8 @@ jobs:
 
       - name: Collect native evidence
         if: always()
+        env:
+          IOS_ONLY: ${{ inputs.ios_only }}
         run: |
           evidence_root="$RUNNER_TEMP/anchor-native-evidence"
           workspace_root="$HOME/Library/Developer/XcodeBuildMCP/workspaces"
@@ -259,9 +270,11 @@ jobs:
                 ditto "$evidence_dir" "$evidence_root/$workspace_name/$evidence_kind"
               done
           fi
-          # Require retained results from Mac, standard iPhone, and 390-point runs.
+          # iPhone-only runs retain the standard and 390-point simulator results.
           result_count="$(find "$evidence_root" -type d -name '*.xcresult' -prune | wc -l | tr -d ' ')"
-          test "$result_count" -ge 3
+          required_results=3
+          if [ "$IOS_ONLY" = true ]; then required_results=2; fi
+          test "$result_count" -ge "$required_results"
 
       - name: Upload page catalog and native evidence
         if: always()
@@ -277,14 +290,17 @@ jobs:
       - name: Enforce every native gate
         if: always()
         env:
+          IOS_ONLY: ${{ inputs.ios_only }}
           MAC_UI_OUTCOME: ${{ steps.mac-ui.outcome }}
           IOS_UI_OUTCOME: ${{ steps.ios-ui.outcome }}
           IOS_UI_390_OUTCOME: ${{ steps.ios-ui-390.outcome }}
           IOS_RENDER_390_OUTCOME: ${{ steps.ios-render-390.outcome }}
           WATCH_BUILD_OUTCOME: ${{ steps.watch-build.outcome }}
         run: |
-          test "$MAC_UI_OUTCOME" = success
+          if [ "$IOS_ONLY" != true ]; then
+            test "$MAC_UI_OUTCOME" = success
+            test "$WATCH_BUILD_OUTCOME" = success
+          fi
           test "$IOS_UI_OUTCOME" = success
           test "$IOS_UI_390_OUTCOME" = success
           test "$IOS_RENDER_390_OUTCOME" = success
-          test "$WATCH_BUILD_OUTCOME" = success
