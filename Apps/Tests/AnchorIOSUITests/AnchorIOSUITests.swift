@@ -88,6 +88,10 @@ final class AnchorIOSUITests: XCTestCase {
         note.typeText("Check the build status")
         app.buttons.ci("Done").tap()
         app.buttons.ci("anchor.capture.pause").tap()
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons.ci("Focus").tap()
+        XCTAssertTrue(app.staticTexts.ci("Finish the release").waitForExistence(timeout: 4))
         let resume = app.buttons.ci("Resume")
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
         resume.tap()
@@ -99,6 +103,12 @@ final class AnchorIOSUITests: XCTestCase {
         app.tabBars.buttons.ci("History").tap()
         app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
+        app.terminate()
+        app.launch()
+        app.tabBars.buttons.ci("History").tap()
+        app.buttons.ci("Interruptions").tap()
+        XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
+        keepScreenshot(app, named: "anchor-focus-history-after-relaunch")
     }
 
     func testInterruptionFirstOnboardingStartsARealSession() {
