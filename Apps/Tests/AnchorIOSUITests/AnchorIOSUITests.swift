@@ -499,7 +499,14 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(habits.waitForExistence(timeout: 5))
         habits.tap()
         let editor = app.buttons.ci("anchor.habits.behavior-profile")
+        // The profile actions follow the habit content in a scroll view.
+        // Reveal them on compact phones before querying the editor button.
+        for _ in 0..<4 {
+            if editor.exists && editor.isHittable { break }
+            app.swipeUp()
+        }
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCTAssertTrue(editor.isHittable)
         editor.tap()
 
         let shortVideos = app.buttons.ci("Short videos")
@@ -521,6 +528,10 @@ final class AnchorIOSUITests: XCTestCase {
         let reloadedHabits = app.tabBars.buttons.ci("Habits")
         XCTAssertTrue(reloadedHabits.waitForExistence(timeout: 5))
         reloadedHabits.tap()
+        for _ in 0..<4 {
+            if editor.exists && editor.isHittable { break }
+            app.swipeUp()
+        }
         XCTAssertTrue(editor.waitForExistence(timeout: 4))
         XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
     }
