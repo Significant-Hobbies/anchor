@@ -188,6 +188,107 @@ public extension ModelContext {
     }
 }
 
+/// Counts stored planning and focus records without materializing record
+/// objects or reading their private text fields.
+public struct ContentFreeDailyMeasurementSnapshot: Sendable, Codable, Equatable {
+    public struct Day: Sendable, Codable, Equatable {
+        public let date: Date
+        public let sessionCount: Int
+        public let completedSessionCount: Int
+        public let plannedBlockCount: Int
+        public let completedBlockCount: Int
+        public let divergenceCount: Int
+
+        public var hasRecords: Bool {
+            sessionCount > 0 || plannedBlockCount > 0 || divergenceCount > 0
+        }
+    }
+
+    public let requestedDayCount: Int
+    public let days: [Day]
+
+    public var daysWithRecords: Int { days.filter(\.hasRecords).count }
+    public var emptyDays: Int { requestedDayCount - daysWithRecords }
+}
+
+public enum ContentFreeDailyMeasurementError: LocalizedError {
+    case invalidDayCount
+    case readUnavailable
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidDayCount:
+            "The daily count window must be between 1 and 31 days."
+        case .readUnavailable:
+            "The content-free daily count summary is unavailable; no record details were read."
+        }
+    }
+}
+
+public extension ModelContext {
+    /// Returns per-day record counts for a bounded recent window. `fetchCount`
+    /// predicates inspect only timestamps and state; no record snapshots,
+    /// identifiers, titles, notes, or suggestion text are produced.
+    func contentFreeDailyMeasurementCounts(
+        days: Int,
+        endingAt: Date = Date(),
+        calendar: Calendar = .current
+    ) throws -> ContentFreeDailyMeasurementSnapshot {
+        guard (1...31).contains(days) else {
+            throw ContentFreeDailyMeasurementError.invalidDayCount
+        }
+
+        let today = calendar.startOfDay(for: endingAt)
+        var dailyCounts: [ContentFreeDailyMeasurementSnapshot.Day] = []
+        let completedPlanState = PlanBlockState.completed.rawValue
+        let finishedSessionState = SessionState.finished.rawValue
+        let completedSessionReason = SessionEndReason.completed.rawValue
+
+        do {
+            for offset in stride(from: days - 1, through: 0, by: -1) {
+                guard let date = calendar.date(byAdding: .day, value: -offset, to: today),
+                      let dayEnd = calendar.date(byAdding: .day, value: 1, to: date) else {
+                    throw ContentFreeDailyMeasurementError.readUnavailable
+                }
+
+                let planWindow = #Predicate<PlanBlock> {
+                    $0.plannedStart >= date && $0.plannedStart < dayEnd
+                }
+                let completedPlanWindow = #Predicate<PlanBlock> {
+                    $0.plannedStart >= date && $0.plannedStart < dayEnd
+                        && $0.stateRaw == completedPlanState
+                }
+                let sessionWindow = #Predicate<FocusSession> {
+                    $0.startedAt >= date && $0.startedAt < dayEnd
+                }
+                let completedSessionWindow = #Predicate<FocusSession> {
+                    $0.startedAt >= date && $0.startedAt < dayEnd
+                        && $0.stateRaw == finishedSessionState
+                        && $0.endReasonRaw == completedSessionReason
+                }
+                let divergenceWindow = #Predicate<DivergenceEvent> {
+                    $0.occurredAt >= date && $0.occurredAt < dayEnd
+                }
+
+                dailyCounts.append(ContentFreeDailyMeasurementSnapshot.Day(
+                    date: date,
+                    sessionCount: try fetchCount(FetchDescriptor(predicate: sessionWindow)),
+                    completedSessionCount: try fetchCount(FetchDescriptor(predicate: completedSessionWindow)),
+                    plannedBlockCount: try fetchCount(FetchDescriptor(predicate: planWindow)),
+                    completedBlockCount: try fetchCount(FetchDescriptor(predicate: completedPlanWindow)),
+                    divergenceCount: try fetchCount(FetchDescriptor(predicate: divergenceWindow))
+                ))
+            }
+        } catch let error as ContentFreeDailyMeasurementError {
+            throw error
+        } catch {
+            throw ContentFreeDailyMeasurementError.readUnavailable
+        }
+
+        return ContentFreeDailyMeasurementSnapshot(requestedDayCount: days, days: dailyCounts)
+    }
+}
+
 /// Pure reconciliation between what was planned, what Anchor observed, and what
 /// the owner explicitly said changed. No adherence score is calculated.
 public struct DayReviewEngine: Sendable {
