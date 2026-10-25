@@ -69,7 +69,16 @@ jobs:
             --scheme "Anchor (macOS)" \
             --configuration DebugLocal \
             --derived-data-path "$RUNNER_TEMP/DerivedData-Mac-UI" \
-            --output json
+            --output json > "$RUNNER_TEMP/anchor-mac-test.json"
+          python3 - <<'PY'
+          import json, os
+          record = json.loads(open(os.environ["RUNNER_TEMP"] + "/anchor-mac-test.json").read())
+          assert record["didError"] is False, record.get("error")
+          summary = record["data"]["summary"]
+          counts = summary["counts"]
+          assert summary["status"] == "SUCCEEDED"
+          assert counts["failed"] == 0 and counts["passed"] > 0
+          PY
 
       - name: Run focused Today block-action macOS UI journeys
         id: mac-ui-focused
@@ -128,7 +137,16 @@ jobs:
               ]
           }))
           PYJSON
-          )" --output json
+          )" --output json > "$RUNNER_TEMP/anchor-ios-test.json"
+          python3 - <<'PY'
+          import json, os
+          record = json.loads(open(os.environ["RUNNER_TEMP"] + "/anchor-ios-test.json").read())
+          assert record["didError"] is False, record.get("error")
+          summary = record["data"]["summary"]
+          counts = summary["counts"]
+          assert summary["status"] == "SUCCEEDED"
+          assert counts["failed"] == 0 and counts["passed"] > 0
+          PY
 
       - name: Verify Today controls on an actual 390-point iPhone
         id: ios-ui-390
@@ -316,6 +334,11 @@ jobs:
           if [ -f "$RUNNER_TEMP/anchor-mac-focused-test.json" ]; then
             cp "$RUNNER_TEMP/anchor-mac-focused-test.json" "$evidence_root/anchor-mac-focused-test.json"
           fi
+          for test_json in anchor-mac-test.json anchor-ios-test.json; do
+            if [ -f "$RUNNER_TEMP/$test_json" ]; then
+              cp "$RUNNER_TEMP/$test_json" "$evidence_root/$test_json"
+            fi
+          done
           if [ -d "$workspace_root" ]; then
             find "$workspace_root" -type d \( -name logs -o -name result-bundles \) -prune -print0 |
               while IFS= read -r -d '' evidence_dir; do
