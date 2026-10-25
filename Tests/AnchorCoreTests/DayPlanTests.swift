@@ -73,6 +73,99 @@ struct DayPlanTests {
         #expect(blocks.first?.lifeDirection == .movement)
     }
 
+    @Test("Content-free daily counts expose only dates and record totals")
+    func contentFreeDailyMeasurementCounts() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let firstDay = calendar.startOfDay(for: Fixture.day0)
+        let secondDay = calendar.date(byAdding: .day, value: 1, to: firstDay)!
+        let thirdDay = calendar.date(byAdding: .day, value: 2, to: firstDay)!
+
+        let completedBlock = PlanBlock(
+            title: "PRIVATE_BLOCK_TITLE",
+            details: "PRIVATE_BLOCK_DETAILS",
+            plannedStart: firstDay,
+            plannedSeconds: 1_200
+        )
+        completedBlock.state = .completed
+        let skippedBlock = PlanBlock(
+            title: "PRIVATE_SKIPPED_BLOCK_TITLE",
+            details: "PRIVATE_SKIPPED_BLOCK_DETAILS",
+            plannedStart: firstDay.addingTimeInterval(3_600),
+            plannedSeconds: 600
+        )
+        skippedBlock.state = .skipped
+
+        let completedSession = FocusSession(
+            goal: nil,
+            intent: "PRIVATE_SESSION_INTENT",
+            notes: "PRIVATE_SESSION_NOTE",
+            plannedSeconds: 1_200,
+            startedAt: firstDay
+        )
+        completedSession.state = .finished
+        completedSession.endReason = .completed
+        let activeSession = FocusSession(
+            goal: nil,
+            intent: "PRIVATE_ACTIVE_INTENT",
+            notes: "PRIVATE_ACTIVE_NOTE",
+            plannedSeconds: 600,
+            startedAt: secondDay
+        )
+        let divergence = DivergenceEvent(
+            blockID: completedBlock.id,
+            occurredAt: firstDay,
+            kind: .deliberateReplan,
+            note: "PRIVATE_DIVERGENCE_NOTE"
+        )
+
+        [completedBlock, skippedBlock].forEach(context.insert)
+        [completedSession, activeSession].forEach(context.insert)
+        context.insert(divergence)
+        try context.save()
+
+        let snapshot = try context.contentFreeDailyMeasurementCounts(
+            days: 3,
+            endingAt: thirdDay,
+            calendar: calendar
+        )
+
+        #expect(snapshot.requestedDayCount == 3)
+        #expect(snapshot.daysWithRecords == 2)
+        #expect(snapshot.emptyDays == 1)
+        #expect(snapshot.days.map(\.date) == [firstDay, secondDay, thirdDay])
+        #expect(snapshot.days[0].startedSessionCount == 1)
+        #expect(snapshot.days[0].completedSessionCount == 1)
+        #expect(snapshot.days[0].plannedBlockCount == 2)
+        #expect(snapshot.days[0].completedBlockCount == 1)
+        #expect(snapshot.days[0].divergenceCount == 1)
+        #expect(snapshot.days[1].startedSessionCount == 1)
+        #expect(snapshot.days[1].completedSessionCount == 0)
+        #expect(snapshot.days[1].plannedBlockCount == 0)
+        #expect(snapshot.days[1].divergenceCount == 0)
+        #expect(snapshot.days[2].hasRecords == false)
+
+        let encoded = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)
+        #expect(!encoded.contains("PRIVATE_"))
+        #expect(!encoded.contains("\"id\""))
+        #expect(!encoded.contains("\"title\""))
+        #expect(!encoded.contains("\"details\""))
+        #expect(!encoded.contains("\"notes\""))
+    }
+
+    @Test("Content-free daily counts reject unbounded windows")
+    func contentFreeDailyMeasurementWindowIsBounded() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+
+        #expect(throws: ContentFreeDailyMeasurementError.self) {
+            try context.contentFreeDailyMeasurementCounts(days: 0, endingAt: Fixture.day0, calendar: calendar)
+        }
+        #expect(throws: ContentFreeDailyMeasurementError.self) {
+            try context.contentFreeDailyMeasurementCounts(days: 32, endingAt: Fixture.day0, calendar: calendar)
+        }
+    }
+
     @Test("Editing a routine reconciles only future unstarted occurrences")
     func editingTemplateReconcilesFutureBlocks() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)

@@ -216,6 +216,37 @@ final class AnchorQueryService {
         ]
     }
 
+    func dailyMeasurementCounts(days: Int) throws -> [String: JSONValue] {
+        let snapshot = try context.contentFreeDailyMeasurementCounts(days: days)
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withFullDate]
+        dateFormatter.timeZone = Calendar.current.timeZone
+
+        return [
+            "scope": .string("Stored records visible to the current Anchor data store; device-calendar days."),
+            "requestedDays": .int(snapshot.requestedDayCount),
+            "windowStart": .string(dateFormatter.string(from: snapshot.days[0].date)),
+            "windowEnd": .string(dateFormatter.string(from: snapshot.days[snapshot.days.count - 1].date)),
+            "daysWithRecords": .int(snapshot.daysWithRecords),
+            "emptyDays": .int(snapshot.emptyDays),
+            "nextDayAdjustmentTracking": .string("not_recorded"),
+            "coverageNote": .string(
+                "Empty days mean no matching stored records were found; they do not prove no plan or app use. Next-day adjustments are not stored."
+            ),
+            "days": .array(snapshot.days.map { day in
+                .object([
+                    "date": .string(dateFormatter.string(from: day.date)),
+                    "startedSessions": .int(day.startedSessionCount),
+                    "completedSessions": .int(day.completedSessionCount),
+                    "plannedBlocks": .int(day.plannedBlockCount),
+                    "completedBlocks": .int(day.completedBlockCount),
+                    "divergences": .int(day.divergenceCount),
+                    "hasRecords": .bool(day.hasRecords),
+                ])
+            }),
+        ]
+    }
+
     func searchDistractions(query: String, limit: Int) throws -> [JSONValue] {
         let needle = query.lowercased()
         return try records(sinceDays: nil)
@@ -337,6 +368,11 @@ struct MCPServer {
             ["days_ago": intProperty("Zero for today, one for yesterday. Defaults to zero.")]
         ),
         tool(
+            "daily_measurement_counts",
+            "Content-free counts of sessions started (including in-progress), completed sessions, planned/completed blocks, and divergences over a bounded recent window. Returns no titles, notes, suggestions, or identifiers; empty days do not prove non-use, and next-day adjustments are not recorded.",
+            ["days": intProperty("Recent calendar days to include. Defaults to 10; allowed range is 1–31.")]
+        ),
+        tool(
             "search_distractions",
             "Find captured distractions matching a word or phrase.",
             [
@@ -444,6 +480,8 @@ struct MCPServer {
                 payload = .object(try service.machinePresence(sinceDays: sinceDays))
             case "daily_review":
                 payload = .object(try service.dailyReview(daysAgo: arguments?["days_ago"]?.intValue ?? 0))
+            case "daily_measurement_counts":
+                payload = .object(try service.dailyMeasurementCounts(days: arguments?["days"]?.intValue ?? 10))
             case "search_distractions":
                 guard let query = arguments?["query"]?.stringValue, !query.isEmpty else {
                     return toolResult(id: id, text: "search_distractions needs a query.", isError: true)

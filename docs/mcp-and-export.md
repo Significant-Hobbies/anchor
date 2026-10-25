@@ -31,9 +31,16 @@ can provide a signed, app-mediated bridge to its protected store.
 | `work_patterns` | Project, tag, billing and distraction-timing breakdowns |
 | `machine_presence` | Aggregate active, tracked and untracked computer time |
 | `daily_review` | One day's planned and timed-observed time, untimed completion count, largest gaps, causal evidence, and suggestions — never an adherence score |
+| `daily_measurement_counts` | Content-free daily counts of started and completed sessions, planned and completed blocks, and divergences; includes the date window and explicit gaps, with no record text or IDs |
 | `export_workbook` | Writes an `.xlsx` to a path you give it |
 
 History tools take an optional `since_days`; `daily_review` takes `days_ago`.
+`daily_measurement_counts` takes `days` (default 10, bounded to 1–31). Its
+`startedSessions` count includes in-progress sessions; `completedSessions`
+counts only finished sessions completed normally. Empty days mean no matching
+stored records were found and do not prove that the app was unused. Next-day
+plan adjustments are not stored. Dates use the current device timezone and ISO
+calendar form.
 Everything except `export_workbook` is read-only; the server never mutates your
 history.
 
