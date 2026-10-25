@@ -218,10 +218,9 @@ final class AnchorQueryService {
 
     func dailyMeasurementCounts(days: Int) throws -> [String: JSONValue] {
         let snapshot = try context.contentFreeDailyMeasurementCounts(days: days)
-        let dateFormatter = DateFormatter()
-        dateFormatter.calendar = Calendar.current
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withFullDate]
         dateFormatter.timeZone = Calendar.current.timeZone
-        dateFormatter.dateFormat = "yyyy-MM-dd"
 
         return [
             "scope": .string("Stored records visible to the current Anchor data store; device-calendar days."),
@@ -237,7 +236,7 @@ final class AnchorQueryService {
             "days": .array(snapshot.days.map { day in
                 .object([
                     "date": .string(dateFormatter.string(from: day.date)),
-                    "sessions": .int(day.sessionCount),
+                    "startedSessions": .int(day.startedSessionCount),
                     "completedSessions": .int(day.completedSessionCount),
                     "plannedBlocks": .int(day.plannedBlockCount),
                     "completedBlocks": .int(day.completedBlockCount),
@@ -370,7 +369,7 @@ struct MCPServer {
         ),
         tool(
             "daily_measurement_counts",
-            "Content-free counts of sessions, completed sessions, planned/completed blocks, and divergences over a bounded recent window. Returns no titles, notes, suggestions, or identifiers; empty days do not prove non-use, and next-day adjustments are not recorded.",
+            "Content-free counts of sessions started (including in-progress), completed sessions, planned/completed blocks, and divergences over a bounded recent window. Returns no titles, notes, suggestions, or identifiers; empty days do not prove non-use, and next-day adjustments are not recorded.",
             ["days": intProperty("Recent calendar days to include. Defaults to 10; allowed range is 1–31.")]
         ),
         tool(

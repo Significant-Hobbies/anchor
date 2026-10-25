@@ -193,14 +193,14 @@ public extension ModelContext {
 public struct ContentFreeDailyMeasurementSnapshot: Sendable, Codable, Equatable {
     public struct Day: Sendable, Codable, Equatable {
         public let date: Date
-        public let sessionCount: Int
+        public let startedSessionCount: Int
         public let completedSessionCount: Int
         public let plannedBlockCount: Int
         public let completedBlockCount: Int
         public let divergenceCount: Int
 
         public var hasRecords: Bool {
-            sessionCount > 0 || plannedBlockCount > 0 || divergenceCount > 0
+            startedSessionCount > 0 || plannedBlockCount > 0 || divergenceCount > 0
         }
     }
 
@@ -272,7 +272,7 @@ public extension ModelContext {
 
                 dailyCounts.append(ContentFreeDailyMeasurementSnapshot.Day(
                     date: date,
-                    sessionCount: try fetchCount(FetchDescriptor(predicate: sessionWindow)),
+                    startedSessionCount: try fetchCount(FetchDescriptor(predicate: sessionWindow)),
                     completedSessionCount: try fetchCount(FetchDescriptor(predicate: completedSessionWindow)),
                     plannedBlockCount: try fetchCount(FetchDescriptor(predicate: planWindow)),
                     completedBlockCount: try fetchCount(FetchDescriptor(predicate: completedPlanWindow)),
