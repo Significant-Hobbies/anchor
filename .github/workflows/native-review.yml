@@ -104,14 +104,14 @@ jobs:
           import json, os
           record = json.loads(open(os.environ["RUNNER_TEMP"] + "/anchor-mac-focused-test.json").read())
           expected = {
-              "AnchorMacUITests/AnchorMacUITests/testMiniTimerStartsTheScheduledBlockWithoutRetypingIt",
-              "AnchorMacUITests/AnchorMacUITests/testTodayCreatesCompletesReviewsAndPersistsABlock",
+              "testMiniTimerStartsTheScheduledBlockWithoutRetypingIt",
+              "testTodayCreatesCompletesReviewsAndPersistsABlock",
           }
           assert record["didError"] is False, record.get("error")
           data = record["data"]
           assert data["summary"]["status"] == "SUCCEEDED"
           assert data["summary"]["counts"] == {"passed": 2, "failed": 0, "skipped": 0}
-          assert {case["test"] for case in data["testCases"] if case["status"] == "passed"} == expected
+          assert {case["test"].removesuffix("()") for case in data["testCases"] if case["status"] == "passed"} == expected
           PY
 
       # The width-specific method runs in the required 390-point step below.
