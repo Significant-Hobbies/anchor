@@ -82,8 +82,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.ci("Mac schedule acceptance").waitForExistence(timeout: 4))
         let actions = app.descendants(matching: .any)["anchor.today.block-actions"].firstMatch
         XCTAssertTrue(actions.waitForExistence(timeout: 3))
-        // Don't gate on isHittable — a fresh card can sit at the scroll fold
-        // while scroll-to-now settles; click() scrolls it into view itself.
+        scrollIntoVisibleTimetable(actions, in: app.scrollViews.firstMatch)
         actions.click()
         XCTAssertTrue(app.descendants(matching: .any).ci("Start now").waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any).ci("Edit or move").exists)
@@ -483,9 +482,17 @@ final class AnchorMacUITests: XCTestCase {
         miniTimer.buttons.ci("Start this block").click()
         XCTAssertTrue(miniTimer.buttons.ci("Lock a distraction").waitForExistence(timeout: 3))
         miniTimer.buttons.ci("End").click()
+        app.typeKey("0", modifierFlags: .command)
+        if miniTimer.exists {
+            let closeWindow = miniTimer.buttons["_XCUI:CloseWindow"]
+            XCTAssertTrue(closeWindow.waitForExistence(timeout: 3))
+            closeWindow.click()
+        }
+        XCTAssertTrue(miniTimer.waitForNonExistence(timeout: 3), "The compact window must close before using Today.")
         app.buttons.ci("Today").click()
         let completedActions = app.buttons.ci("Actions for Menu-bar launch review")
         XCTAssertTrue(completedActions.waitForExistence(timeout: 4))
+        scrollIntoVisibleTimetable(completedActions, in: app.scrollViews.firstMatch)
         completedActions.click()
         XCTAssertTrue(app.descendants(matching: .any).ci("Edit or move").waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertFalse(app.descendants(matching: .any).ci("Log actual time…").exists)
@@ -733,6 +740,29 @@ final class AnchorMacUITests: XCTestCase {
             .appendingPathComponent("anchor-mac-\(name)-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    @MainActor
+    private func scrollIntoVisibleTimetable(_ target: XCUIElement, in scrollView: XCUIElement) {
+        XCTAssertTrue(scrollView.waitForExistence(timeout: 3), "The Today scroll viewport must exist.")
+        for _ in 0..<6 {
+            let viewport = scrollView.frame.insetBy(dx: 1, dy: 1)
+            let frame = target.frame
+            if viewport.contains(frame), target.isHittable { return }
+            if frame.minY < viewport.minY {
+                scrollView.swipeDown()
+            } else if frame.maxY > viewport.maxY {
+                scrollView.swipeUp()
+            } else {
+                break
+            }
+        }
+
+        let viewport = scrollView.frame.insetBy(dx: 1, dy: 1)
+        XCTAssertTrue(
+            viewport.contains(target.frame) && target.isHittable,
+            "The block action must be fully inside the Today scroll viewport and hittable before opening its popover."
+        )
     }
 
     private func isolatedStore(named name: String) -> String {

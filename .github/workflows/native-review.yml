@@ -7,9 +7,13 @@ on:
         description: Run only iPhone simulator qualification; skip Mac and Watch
         type: boolean
         default: false
+      focused_mac_ui:
+        description: Run only the two Today block-action macOS UI journeys; mutually exclusive with iOS only
+        type: boolean
+        default: false
 
 concurrency:
-  group: anchor-native-review-${{ github.ref }}
+  group: anchor-native-review-${{ github.ref }}-${{ inputs.ios_only }}-${{ inputs.focused_mac_ui }}
   cancel-in-progress: true
 
 jobs:
@@ -21,6 +25,16 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
     steps:
+      - name: Validate requested scope
+        env:
+          IOS_ONLY: ${{ inputs.ios_only }}
+          FOCUSED_MAC_UI: ${{ inputs.focused_mac_ui }}
+        run: |
+          if [ "$IOS_ONLY" = true ] && [ "$FOCUSED_MAC_UI" = true ]; then
+            echo "focused_mac_ui and ios_only cannot both be enabled" >&2
+            exit 2
+          fi
+
       - name: Check out Anchor
         uses: actions/checkout@v5
 
@@ -28,7 +42,7 @@ jobs:
         run: command -v xcodegen >/dev/null || brew install xcodegen
 
       - name: Verify shared package
-        if: ${{ !inputs.ios_only }}
+        if: ${{ !inputs.ios_only && !inputs.focused_mac_ui }}
         run: |
           swift test --filter TimetableLayoutTests
           swift test
@@ -40,14 +54,14 @@ jobs:
         run: xcodegen generate
 
       - name: Render every primary surface offscreen
-        if: ${{ !inputs.ios_only }}
+        if: ${{ !inputs.ios_only && !inputs.focused_mac_ui }}
         env:
           CATALOG_OUTPUT: ${{ runner.temp }}/anchor-visual-catalog
         run: scripts/render-visual-catalog.sh "$CATALOG_OUTPUT"
 
       - name: Run complete macOS UI suite
         id: mac-ui
-        if: ${{ !inputs.ios_only }}
+        if: ${{ !inputs.ios_only && !inputs.focused_mac_ui }}
         continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 macos test \
@@ -55,12 +69,56 @@ jobs:
             --scheme "Anchor (macOS)" \
             --configuration DebugLocal \
             --derived-data-path "$RUNNER_TEMP/DerivedData-Mac-UI" \
-            --output json
+            --output json > "$RUNNER_TEMP/anchor-mac-test.json"
+          python3 - <<'PY'
+          import json, os
+          record = json.loads(open(os.environ["RUNNER_TEMP"] + "/anchor-mac-test.json").read())
+          assert record["didError"] is False, record.get("error")
+          summary = record["data"]["summary"]
+          counts = summary["counts"]
+          assert summary["status"] == "SUCCEEDED"
+          assert counts["failed"] == 0 and counts["passed"] > 0
+          PY
+
+      - name: Run focused Today block-action macOS UI journeys
+        id: mac-ui-focused
+        if: ${{ !inputs.ios_only && inputs.focused_mac_ui }}
+        continue-on-error: true
+        run: |
+          npx -y xcodebuildmcp@2.7.0 macos test \
+            --json "$(python3 - <<'PYJSON'
+          import json, os
+          print(json.dumps({
+              "projectPath": "Apps/Anchor.xcodeproj",
+              "scheme": "Anchor (macOS)",
+              "configuration": "DebugLocal",
+              "derivedDataPath": os.environ["RUNNER_TEMP"] + "/DerivedData-Mac-UI-Focused",
+              "extraArgs": [
+                  "-only-testing:AnchorMacUITests/AnchorMacUITests/testMiniTimerStartsTheScheduledBlockWithoutRetypingIt",
+                  "-only-testing:AnchorMacUITests/AnchorMacUITests/testTodayCreatesCompletesReviewsAndPersistsABlock"
+              ]
+          }))
+          PYJSON
+          )" --output json > "$RUNNER_TEMP/anchor-mac-focused-test.json"
+          python3 - <<'PY'
+          import json, os
+          record = json.loads(open(os.environ["RUNNER_TEMP"] + "/anchor-mac-focused-test.json").read())
+          expected = {
+              "testMiniTimerStartsTheScheduledBlockWithoutRetypingIt",
+              "testTodayCreatesCompletesReviewsAndPersistsABlock",
+          }
+          assert record["didError"] is False, record.get("error")
+          data = record["data"]
+          assert data["summary"]["status"] == "SUCCEEDED"
+          assert data["summary"]["counts"] == {"passed": 2, "failed": 0, "skipped": 0}
+          assert {case["test"].removesuffix("()") for case in data["testCases"] if case["status"] == "passed"} == expected
+          PY
 
       # The width-specific method runs in the required 390-point step below.
       # Every pre-existing iPhone test, including generic compact controls, stays here.
       - name: Run iPhone UI suite on iPhone 17 Pro
         id: ios-ui
+        if: ${{ !inputs.focused_mac_ui }}
         continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 simulator test \
@@ -79,10 +137,20 @@ jobs:
               ]
           }))
           PYJSON
-          )" --output json
+          )" --output json > "$RUNNER_TEMP/anchor-ios-test.json"
+          python3 - <<'PY'
+          import json, os
+          record = json.loads(open(os.environ["RUNNER_TEMP"] + "/anchor-ios-test.json").read())
+          assert record["didError"] is False, record.get("error")
+          summary = record["data"]["summary"]
+          counts = summary["counts"]
+          assert summary["status"] == "SUCCEEDED"
+          assert counts["failed"] == 0 and counts["passed"] > 0
+          PY
 
       - name: Verify Today controls on an actual 390-point iPhone
         id: ios-ui-390
+        if: ${{ !inputs.focused_mac_ui }}
         continue-on-error: true
         run: |
           npx -y xcodebuildmcp@2.7.0 simulator test \
@@ -106,7 +174,7 @@ jobs:
 
       - name: Capture the qualified 390-point Today surface
         id: ios-render-390
-        if: steps.ios-ui-390.outcome == 'success'
+        if: ${{ !inputs.focused_mac_ui && steps.ios-ui-390.outcome == 'success' }}
         continue-on-error: true
         run: |
           python3 - <<'PYPROOF'
@@ -239,7 +307,7 @@ jobs:
 
       - name: Build watch companion
         id: watch-build
-        if: ${{ !inputs.ios_only }}
+        if: ${{ !inputs.ios_only && !inputs.focused_mac_ui }}
         continue-on-error: true
         run: |
           xcodebuild \
@@ -254,6 +322,7 @@ jobs:
         if: always()
         env:
           IOS_ONLY: ${{ inputs.ios_only }}
+          FOCUSED_MAC_UI: ${{ inputs.focused_mac_ui }}
         run: |
           evidence_root="$RUNNER_TEMP/anchor-native-evidence"
           workspace_root="$HOME/Library/Developer/XcodeBuildMCP/workspaces"
@@ -262,6 +331,14 @@ jobs:
           if [ -f "$RUNNER_TEMP/anchor-ios390-test.json" ]; then
             cp "$RUNNER_TEMP/anchor-ios390-test.json" "$evidence_root/anchor-ios390-test.json"
           fi
+          if [ -f "$RUNNER_TEMP/anchor-mac-focused-test.json" ]; then
+            cp "$RUNNER_TEMP/anchor-mac-focused-test.json" "$evidence_root/anchor-mac-focused-test.json"
+          fi
+          for test_json in anchor-mac-test.json anchor-ios-test.json; do
+            if [ -f "$RUNNER_TEMP/$test_json" ]; then
+              cp "$RUNNER_TEMP/$test_json" "$evidence_root/$test_json"
+            fi
+          done
           if [ -d "$workspace_root" ]; then
             find "$workspace_root" -type d \( -name logs -o -name result-bundles \) -prune -print0 |
               while IFS= read -r -d '' evidence_dir; do
@@ -274,6 +351,7 @@ jobs:
           result_count="$(find "$evidence_root" -type d -name '*.xcresult' -prune | wc -l | tr -d ' ')"
           required_results=3
           if [ "$IOS_ONLY" = true ]; then required_results=2; fi
+          if [ "$FOCUSED_MAC_UI" = true ]; then required_results=1; fi
           test "$result_count" -ge "$required_results"
 
       - name: Upload page catalog and native evidence
@@ -291,16 +369,24 @@ jobs:
         if: always()
         env:
           IOS_ONLY: ${{ inputs.ios_only }}
+          FOCUSED_MAC_UI: ${{ inputs.focused_mac_ui }}
           MAC_UI_OUTCOME: ${{ steps.mac-ui.outcome }}
+          MAC_UI_FOCUSED_OUTCOME: ${{ steps.mac-ui-focused.outcome }}
           IOS_UI_OUTCOME: ${{ steps.ios-ui.outcome }}
           IOS_UI_390_OUTCOME: ${{ steps.ios-ui-390.outcome }}
           IOS_RENDER_390_OUTCOME: ${{ steps.ios-render-390.outcome }}
           WATCH_BUILD_OUTCOME: ${{ steps.watch-build.outcome }}
         run: |
           if [ "$IOS_ONLY" != true ]; then
-            test "$MAC_UI_OUTCOME" = success
-            test "$WATCH_BUILD_OUTCOME" = success
+            if [ "$FOCUSED_MAC_UI" = true ]; then
+              test "$MAC_UI_FOCUSED_OUTCOME" = success
+            else
+              test "$MAC_UI_OUTCOME" = success
+              test "$WATCH_BUILD_OUTCOME" = success
+            fi
           fi
-          test "$IOS_UI_OUTCOME" = success
-          test "$IOS_UI_390_OUTCOME" = success
-          test "$IOS_RENDER_390_OUTCOME" = success
+          if [ "$FOCUSED_MAC_UI" != true ]; then
+            test "$IOS_UI_OUTCOME" = success
+            test "$IOS_UI_390_OUTCOME" = success
+            test "$IOS_RENDER_390_OUTCOME" = success
+          fi
