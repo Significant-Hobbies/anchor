@@ -1,0 +1,17 @@
+{
+  "name": "agentcommand-b5cbfab8-044e-4b32-88ef-5e8bb82daa8d",
+  "payload": {
+    "recordType": "agentCommand",
+    "id": "b5cbfab8-044e-4b32-88ef-5e8bb82daa8d",
+    "requestId": "swift-fixture-pause",
+    "action": "pause_focus",
+    "targetDeviceId": "a1000000-0000-4000-8000-000000000001",
+    "issuedAt": "2026-11-07T21:01:10.124Z",
+    "expiresAt": "2026-11-07T21:06:10.124Z",
+    "expectedSessionID": "B2000000-0000-4000-8000-000000000002",
+    "status": "pending",
+    "args": {},
+    "result": null,
+    "error": null
+  }
+}

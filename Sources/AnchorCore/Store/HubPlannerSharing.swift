@@ -8,6 +8,7 @@ struct HubPlannerSharingStore {
         var owner: String
         var enabled: Bool
         var names: Set<String>
+        var enabledAt: Date?
     }
     let fileURL: URL
     init(directory: URL) { fileURL = directory.appending(path: "anchor-hub-planner-sharing.json") }
@@ -22,7 +23,8 @@ struct HubPlannerSharingStore {
         let previous = try load()
         guard previous == nil || previous?.owner == owner else { throw HubHistoryOwnershipError.differentAccount }
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let state = State(owner: owner, enabled: enabled, names: (previous?.names ?? []).union(names))
+        let enabledAt = enabled ? (previous?.enabled == true ? previous?.enabledAt ?? Date() : Date()) : previous?.enabledAt
+        let state = State(owner: owner, enabled: enabled, names: (previous?.names ?? []).union(names), enabledAt: enabledAt)
         try JSONEncoder().encode(state).write(to: fileURL, options: .atomic)
     }
 }

@@ -113,7 +113,7 @@ public struct HubAccountPanel: View {
                 symbol: "checkmark.circle"
             )
             boundaryRow(
-                "Distraction notes and learned keywords stay on this device. Calendar and reminder connections stay private.",
+                "Distraction notes and learned keywords stay on this device. Calendar and reminder credentials and external integration IDs are never shared with the Hub or connected assistants.",
                 symbol: "lock.shield"
             )
         }
@@ -156,6 +156,9 @@ public struct HubAccountPanel: View {
             if let notice = platform.ownershipNotice {
                 Text(notice).font(.caption).foregroundStyle(theme.caution)
             }
+            if let notice = platform.plannerApprovalNotice {
+                Text(notice).font(.caption).foregroundStyle(theme.caution)
+            }
             if platform.needsHistoryApproval {
                 Text("Approve unowned focus history and this account's waiting changes for the account above. History already owned by another account stays separate. Distraction notes stay private.")
                     .font(.caption).foregroundStyle(theme.textSecondary)
@@ -172,7 +175,7 @@ public struct HubAccountPanel: View {
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text("Share planner with connected assistants")
                     .font(.body.weight(.semibold))
-                Text("Allow this account’s connected assistants to access and update approved goals, projects, tags, schedule, habits and preferences, and request focus actions while Anchor is active. New items you create here share automatically; imported iCloud items need approval.")
+                Text("Allow this account’s connected assistants to access and update approved goals, projects, tags, schedule, habits and preferences, and request focus actions while Anchor is active. Sharing includes calendar and reminder event titles and details in your schedule. New items saved on this device, including imported events, share automatically; iCloud items from other devices need approval.")
                     .font(.caption).foregroundStyle(theme.textSecondary)
                 Button(platform.isPlannerSharingEnabled ? "stop planner sharing" : "approve planner sharing for this account") {
                     Task {
@@ -334,6 +337,7 @@ public struct HubAccountPanel: View {
         if platform.isSyncing { return "Syncing now" }
         if platform.receipt.failure != nil { return "Needs attention" }
         if platform.pendingCount > 0 { return "Waiting to sync" }
+        if platform.receipt.lastSuccessfulAt == nil { return "Not synced yet" }
         return "Up to date"
     }
 

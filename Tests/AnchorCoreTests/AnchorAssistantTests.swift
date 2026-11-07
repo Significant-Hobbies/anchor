@@ -124,7 +124,9 @@ struct AnchorAssistantTests {
         let fixture = try SyncFixture(); defer { fixture.cleanUp() }
         #expect(try AnchorMirror.apply(records, in: fixture.context, account: "A", plannerNames: Set(records.map(\.name))))
         #expect(try fixture.context.fetch(FetchDescriptor<Goal>()).first?.title == "Build")
-        #expect(try fixture.context.fetch(FetchDescriptor<PlanBlock>()).first?.plannedSeconds == 1800)
+        let block = try #require(try fixture.context.fetch(FetchDescriptor<PlanBlock>()).first)
+        #expect(block.plannedSeconds == 1800)
+        #expect(abs(block.plannedStart.timeIntervalSince1970.truncatingRemainder(dividingBy: 1) - 0.123) < 0.0001)
         #expect(try fixture.context.fetch(FetchDescriptor<ScheduleTemplate>()).first?.weekdayMask == 31)
         #expect(try fixture.context.fetch(FetchDescriptor<AnchorPreferences>()).first?.appearanceRaw == "dark")
     }
@@ -248,6 +250,177 @@ struct AnchorAssistantTests {
         defer { _ = flock(descriptor, LOCK_UN) }
         #expect(throws: (any Error).self) { try store.ingest([record(command(.start))], owner: "A", deviceID: "device") }
         #expect(try store.load(owner: "A").commands.isEmpty)
+    }
+
+    @Test("Irrelevant commands skip before decoding and unsupported targeted records quarantine without content")
+    func tolerantCommandIngest() throws {
+        let fixture = try SyncFixture(); defer { fixture.cleanUp() }
+        let store = AnchorAgentCommandStore(directory: fixture.directory)
+        let unknown = UUID()
+        func malformed(_ id: UUID, target: String, status: String = "pending") throws -> MirrorRecord {
+            let payload: [String: Any] = ["recordType": "agentCommand", "id": id.uuidString,
+                                         "targetDeviceId": target, "status": status, "action": "future_action",
+                                         "args": ["note": "PRIVATE REJECTED CONTENT"]]
+            return MirrorRecord(name: "agentcommand-" + id.uuidString.lowercased(), modifiedAt: .now,
+                                payload: try JSONSerialization.data(withJSONObject: payload), hubOwnerID: "A")
+        }
+        let tombstone = MirrorRecord(name: "agentcommand-" + UUID().uuidString.lowercased(), modifiedAt: .now, payload: nil, hubOwnerID: "A")
+        try store.ingest([tombstone, malformed(UUID(), target: "other-device"), malformed(UUID(), target: "device", status: "applied"),
+                          malformed(unknown, target: "device")], owner: "A", deviceID: "device")
+        let state = try store.load(owner: "A")
+        #expect(state.commands.isEmpty)
+        #expect(state.quarantinedIDs == [unknown.uuidString: "unsupportedOrMalformed"])
+        #expect(!String(decoding: try Data(contentsOf: store.fileURL), as: UTF8.self).contains("PRIVATE REJECTED"))
+    }
+
+    func enqueue(_ record: MirrorRecord, fixture: SyncFixture, cursor: Int) async throws {
+        let timestamp = ISO8601DateFormatter().string(from: .now.addingTimeInterval(60))
+        let change: [String: Any] = ["cursor": cursor, "changeId": UUID().uuidString, "domain": "anchor", "id": record.name,
+                                   "operation": record.payload == nil ? "delete" : "upsert", "version": cursor,
+                                   "occurredAt": timestamp, "recordedAt": timestamp, "originDeviceId": "other-device",
+                                   "record": try record.payload.map { try JSONSerialization.jsonObject(with: $0) } ?? NSNull()]
+        try await fixture.server.enqueueRemote(String(decoding: JSONSerialization.data(withJSONObject: change), as: UTF8.self))
+    }
+
+    @Test("CloudKit-first planner collisions and unsupported commands do not block history or unrelated planner refresh")
+    func cloudKitFirstAndMalformedCommand() async throws {
+        let fixture = try SyncFixture(); defer { fixture.cleanUp() }
+        let allowed = Goal(title: "Approved before")
+        fixture.context.insert(allowed)
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        #expect(await fixture.sync.setPlannerSharingEnabled(true))
+        let otherContext = ModelContext(fixture.container)
+        let collided = Goal(title: "CloudKit first"); otherContext.insert(collided); try otherContext.save()
+        fixture.sync.refreshImportedModels()
+        let heldCollision = try #require(try fixture.context.fetch(FetchDescriptor<Goal>()).first { $0.id == collided.id })
+        var allowedPayload = GoalPayload(allowed); allowedPayload.title = "Approved after"
+        var collidedPayload = GoalPayload(collided); collidedPayload.title = "Remote title after approval"
+        try await enqueue(MirrorRecord(name: AnchorMirrorNaming.Kind.goal.name(for: allowed.id), modifiedAt: .now,
+                                       payload: AnchorAgentCommand.encoder.encode(allowedPayload)), fixture: fixture, cursor: 2)
+        try await enqueue(MirrorRecord(name: AnchorMirrorNaming.Kind.goal.name(for: collided.id), modifiedAt: .now,
+                                       payload: AnchorAgentCommand.encoder.encode(collidedPayload)), fixture: fixture, cursor: 3)
+        let history = FocusSession(goal: nil, intent: "Other device completed", plannedSeconds: 60)
+        history.state = .finished; history.runningSince = nil; history.bankedSeconds = 60; history.endedAt = .now; history.endReason = .completed
+        try await enqueue(MirrorRecord(name: AnchorMirrorNaming.Kind.focusSession.name(for: history.id), modifiedAt: .now,
+                                       payload: AnchorAgentCommand.encoder.encode(FocusSessionPayload(history))), fixture: fixture, cursor: 4)
+        let badID = UUID()
+        let bad: [String: Any] = ["recordType": "agentCommand", "id": badID.uuidString, "action": "future_action", "status": "pending", "targetDeviceId": "synthetic-device"]
+        try await enqueue(MirrorRecord(name: "agentcommand-" + badID.uuidString.lowercased(), modifiedAt: .now,
+                                       payload: JSONSerialization.data(withJSONObject: bad)), fixture: fixture, cursor: 5)
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.failure == nil)
+        #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
+        #expect(allowed.title == "Approved after")
+        #expect(heldCollision.title == "CloudKit first")
+        #expect(fixture.sync.plannerApprovalNotice != nil)
+        #expect(fixture.sync.ownershipNotice == nil)
+        #expect(!fixture.sync.needsHistoryApproval)
+        #expect(try fixture.context.fetch(FetchDescriptor<FocusSession>()).contains { $0.id == history.id })
+        #expect(try AnchorAgentCommandStore(directory: fixture.directory).load(owner: "stable-A").quarantinedIDs?[badID.uuidString] != nil)
+        #expect(await fixture.sync.setPlannerSharingEnabled(true))
+        await fixture.sync.synchronize()
+        #expect(heldCollision.title == "Remote title after approval")
+        #expect(await fixture.server.pulls.last?.cursor == 0)
+    }
+
+    @Test("A completed owned session arriving before CloudKit converges ends the held controller session")
+    func completedSessionConvergence() async throws {
+        let fixture = try SyncFixture(); defer { fixture.cleanUp() }
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        let controller = FocusController(context: fixture.context, hubOwner: { "stable-A" })
+        fixture.sync.attachFocusController(controller)
+        let session = try #require(controller.start(goal: nil, intent: "Two-device focus", minutes: 25))
+        var finished = FocusSessionPayload(session)
+        finished.stateRaw = "finished"; finished.runningSince = nil; finished.endedAt = .now; finished.bankedSeconds = 1500; finished.endReasonRaw = "completed"
+        try await enqueue(MirrorRecord(name: AnchorMirrorNaming.Kind.focusSession.name(for: session.id), modifiedAt: .now,
+                                       payload: AnchorAgentCommand.encoder.encode(finished)), fixture: fixture, cursor: 2)
+        await fixture.sync.synchronize()
+        #expect(fixture.sync.receipt.failure == nil)
+        #expect(session.state == .finished)
+        #expect(!controller.hasSession)
+    }
+
+    @Test("Emit a real native device wire fixture for backend interoperability")
+    func nativeDeviceFixture() throws {
+        guard let path = ProcessInfo.processInfo.environment["ANCHOR_NATIVE_DEVICE_FIXTURE_PATH"] else { return }
+        let id = UUID(uuidString: "A1000000-0000-4000-8000-000000000001")!
+        let session = FocusSession(id: UUID(uuidString: "B2000000-0000-4000-8000-000000000002")!, goal: nil, intent: "Synthetic native focus", plannedSeconds: 1500,
+                                   startedAt: ISO8601DateFormatter().date(from: "2026-11-08T10:00:00Z")!)
+        let observed = ISO8601DateFormatter().date(from: "2026-11-08T10:05:00Z")!
+        let device = AnchorAgentDevice(id: id, deviceId: id.uuidString.lowercased(), platform: "macOS", updatedAt: observed,
+                                      observedAt: observed, session: .init(session), activeSessionID: session.id, state: "running", capturePresented: false)
+        let data = try AnchorAgentCommand.encoder.encode(device)
+        let output: [String: Any] = ["name": "agentdevice-" + id.uuidString.lowercased(), "payload": try JSONSerialization.jsonObject(with: data)]
+        try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys]).write(to: URL(fileURLWithPath: path))
+    }
+
+    @Test("Stopping and re-enabling planner consent cannot resurrect queued focus actions")
+    func consentEpochRejectsOldPending() async throws {
+        let fixture = try SyncFixture(); defer { fixture.cleanUp() }
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        #expect(await fixture.sync.setPlannerSharingEnabled(true))
+        let consentStore = HubPlannerSharingStore(directory: fixture.directory)
+        let firstEpoch = try #require(try consentStore.load()?.enabledAt)
+        let store = AnchorAgentCommandStore(directory: fixture.directory)
+        let old = command(.start)
+        // Queue before disabling, but do not execute it.
+        try store.ingest([record(old, owner: "stable-A")], owner: "stable-A", deviceID: "device")
+        #expect(await fixture.sync.setPlannerSharingEnabled(false))
+        #expect(await fixture.sync.setPlannerSharingEnabled(true))
+        let nextEpoch = try #require(try consentStore.load()?.enabledAt)
+        #expect(nextEpoch > firstEpoch)
+        let controller = FocusController(context: fixture.context, hubOwner: { "stable-A" })
+        #expect(nextEpoch > old.issuedAt)
+        try store.reconcile(owner: "stable-A", deviceID: "device", controller: controller, context: fixture.context,
+                            approvedPlannerNames: [], consentEnabledAt: nextEpoch)
+        #expect(try store.load(owner: "stable-A").commands[old.id.uuidString]?.status == .failed)
+        #expect(!controller.hasSession)
+        let fresh = command(.start, now: nextEpoch.addingTimeInterval(0.01))
+        try store.ingest([record(fresh, owner: "stable-A")], owner: "stable-A", deviceID: "device")
+        try store.reconcile(owner: "stable-A", deviceID: "device", controller: controller, context: fixture.context,
+                            approvedPlannerNames: [], consentEnabledAt: nextEpoch)
+        #expect(try store.load(owner: "stable-A").commands[fresh.id.uuidString]?.status == .applied)
+        #expect(controller.hasSession)
+        // Terminal failure and replay protection survive another toggle.
+        #expect(await fixture.sync.setPlannerSharingEnabled(false))
+        #expect(await fixture.sync.setPlannerSharingEnabled(true))
+        try store.ingest([record(old, owner: "stable-A")], owner: "stable-A", deviceID: "device")
+        #expect(try store.load(owner: "stable-A").commands[old.id.uuidString]?.status == .failed)
+    }
+
+    @Test("Valid uppercase UUID command targets route to the stable lowercase native device ID")
+    func uppercaseDeviceTarget() throws {
+        let fixture = try SyncFixture(); defer { fixture.cleanUp() }
+        let deviceID = "a1000000-0000-4000-8000-000000000001"
+        let store = AnchorAgentCommandStore(directory: fixture.directory)
+        let start = command(.start, device: deviceID.uppercased())
+        try store.ingest([record(start)], owner: "A", deviceID: deviceID)
+        let controller = FocusController(context: fixture.context, hubOwner: { "A" })
+        try store.reconcile(owner: "A", deviceID: deviceID, controller: controller, context: fixture.context, approvedPlannerNames: [])
+        #expect(try store.load(owner: "A").commands[start.id.uuidString]?.status == .applied)
+        #expect(controller.hasSession)
+        let other = command(.start, device: "SYNTHETIC-DEVICE")
+        try store.ingest([record(other)], owner: "A", deviceID: "synthetic-device")
+        #expect(try store.load(owner: "A").commands[other.id.uuidString] == nil)
+    }
+
+    @Test("Actual Worker command timestamps with milliseconds decode without losing epoch ordering")
+    func backendCommandMilliseconds() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appending(path: "Fixtures/WorkerAgentCommand.json")
+        let root = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let payload = try #require(root["payload"] as? [String: Any])
+        let issuedAt = try #require(payload["issuedAt"] as? String)
+        #expect(issuedAt.contains("."))
+        let record = MirrorRecord(name: try #require(root["name"] as? String), modifiedAt: .now,
+                                  payload: try JSONSerialization.data(withJSONObject: payload), hubOwnerID: "A")
+        let value = try AnchorAgentCommand.decode(record)
+        let reencoded = try AnchorAgentCommand.encoder.encode(value)
+        #expect(try AnchorAgentCommand.decoder.decode(AnchorAgentCommand.self, from: reencoded).issuedAt == value.issuedAt)
+        #expect(value.expiresAt > value.issuedAt)
+        #expect(value.action == .pause)
     }
 
     @Test("A failed focus save reports failure and a durable claim prevents replay")

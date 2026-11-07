@@ -1002,7 +1002,6 @@ enum AnchorMirror {
                 throw AnchorMirrorSyncError.invalidRecord
             }
             if let existing = index.sessions[id.uuidString] {
-                guard !existing.isActive else { throw AnchorMirrorSyncError.invalidRecord }
                 if let owner = existing.hubAccountID {
                     guard owner == account else { throw AnchorMirrorSyncError.invalidRecord }
                 } else {

@@ -59,6 +59,7 @@ public final class AnchorPlatformSync {
     public private(set) var isSyncing = false
     public private(set) var pendingCount = 0
     public private(set) var ownershipNotice: String?
+    public private(set) var plannerApprovalNotice: String?
     public private(set) var receipt = HubSyncReceipt()
 
     public convenience init(
@@ -281,9 +282,11 @@ public final class AnchorPlatformSync {
             guard isCurrent(userID, attempt: attempt) else { return false }
             try plannerSharingStore.save(owner: userID, enabled: enabled, names: names)
             plannerConsentRevision += 1
+            plannerApprovalNotice = nil
             ownershipNotice = nil
             return true
         } catch {
+            guard isCurrent(userID, attempt: attempt) else { return false }
             ownershipNotice = error.localizedDescription
             return false
         }
@@ -315,7 +318,7 @@ public final class AnchorPlatformSync {
         }
         guard !names.isEmpty else { return }
         do { try plannerSharingStore.save(owner: userID, enabled: true, names: names) }
-        catch { ownershipNotice = "New planner items remain local because their account affiliation could not be saved. Approve them again after checking available storage." }
+        catch { plannerApprovalNotice = "New planner items remain local because their account affiliation could not be saved. Approve them again after checking available storage." }
     }
 
     private func localPlannerNames() throws -> Set<String> {
@@ -418,7 +421,7 @@ public final class AnchorPlatformSync {
                 try await validateSyncPass()
                 focusController.synchronizeActiveSessionFromStore()
                 try commandStore.reconcile(owner: pinned.userID, deviceID: deviceId, controller: focusController,
-                                           context: context, approvedPlannerNames: sharing.names)
+                                           context: context, approvedPlannerNames: sharing.names, consentEnabledAt: sharing.enabledAt ?? .distantFuture)
             }
         } catch {
             guard isCurrent(attempt) else { return }
@@ -534,10 +537,15 @@ public final class AnchorPlatformSync {
         if let sharing = try plannerSharingStore.load(), sharing.enabled, sharing.owner == account.userID {
             let incoming = Set(records.compactMap { AnchorMirrorNaming.kind(of: $0.name)?.isPlanner == true ? $0.name : nil })
             let collisions = try localPlannerNames().intersection(incoming).subtracting(sharing.names)
-            guard collisions.isEmpty else { throw HubHistoryOwnershipError.approvalRequired }
-            plannerNames = sharing.names.union(incoming)
+            if !collisions.isEmpty {
+                plannerApprovalNotice = "Some iCloud planner items need approval for this account. History and other approved changes continue syncing."
+            }
+            plannerNames = sharing.names.union(incoming.subtracting(collisions))
         }
         let changed = try AnchorMirror.apply(records, in: isolated, account: account.userID, plannerNames: plannerNames)
+        // Refresh committed UI models even if later bookkeeping or command
+        // receipt storage fails; those failures cannot undo the durable import.
+        defer { if changed { refreshImportedModels() } }
         // The immutable owner file already pins this inventory to one account.
         // Only durably imported IDs become deletion-eligible on later passes.
         if !plannerNames.isEmpty {
@@ -546,10 +554,6 @@ public final class AnchorPlatformSync {
         if let sharing = try plannerSharingStore.load(), sharing.enabled, sharing.owner == account.userID {
             try commandStore.ingest(records, owner: account.userID, deviceID: deviceId)
         }
-        guard changed else { return }
-        // A held main-context model does not see the isolated commit; a fresh
-        // fetch refreshes it in place without resetting user edits.
-        refreshImportedModels()
     }
 
     func refreshImportedModels() {
@@ -565,6 +569,7 @@ public final class AnchorPlatformSync {
         _ = try? context.fetch(FetchDescriptor<BehaviorProfile>())
         _ = try? context.fetch(FetchDescriptor<AnchorPreferences>())
         _ = try? context.fetch(FetchDescriptor<DivergenceEvent>())
+        focusController?.synchronizeActiveSessionFromStore()
     }
 
     private func validateSyncPass() async throws {
@@ -658,6 +663,7 @@ public final class AnchorPlatformSync {
         activeUserID = userID
         generation = UUID()
         ownershipNotice = nil
+        plannerApprovalNotice = nil
         isSyncing = false
         pendingCount = 0
         // Legacy unscoped receipts/files are retained, never adopted by the

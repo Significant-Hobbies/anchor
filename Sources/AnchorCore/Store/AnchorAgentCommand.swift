@@ -76,7 +76,17 @@ struct AnchorAgentCommand: Codable, Equatable {
         try c.encode(error, forKey: .error)
     }
 
-    static var encoder: JSONEncoder { let value = JSONEncoder(); value.dateEncodingStrategy = .iso8601; value.outputFormatting = [.sortedKeys]; return value }
+    static var encoder: JSONEncoder {
+        let value = JSONEncoder()
+        value.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            try container.encode(formatter.string(from: date))
+        }
+        value.outputFormatting = [.sortedKeys]
+        return value
+    }
     static var decoder: JSONDecoder {
         let value = JSONDecoder()
         value.dateDecodingStrategy = .custom { decoder in
@@ -183,7 +193,12 @@ struct AnchorAgentDevice: Encodable {
 /// Terminal failure is written BEFORE side effects. If the process crashes, retry
 /// reports indeterminate failure instead of executing an action a second time.
 struct AnchorAgentCommandStore {
-    struct State: Codable { var owner: String; var commands: [String: AnchorAgentCommand] = [:] }
+    struct State: Codable {
+        var owner: String
+        var commands: [String: AnchorAgentCommand] = [:]
+        /// Fixed reason codes keyed by validated UUID only. Never retain rejected payloads.
+        var quarantinedIDs: [String: String]?
+    }
     let fileURL: URL
     init(directory: URL) { fileURL = directory.appending(path: "anchor-agent-command-receipts.json") }
     func load(owner: String) throws -> State {
@@ -205,6 +220,10 @@ struct AnchorAgentCommandStore {
         defer { _ = flock(descriptor, LOCK_UN) }
         return try body()
     }
+    private static func matchesDevice(_ left: String, _ right: String) -> Bool {
+        if let leftID = UUID(uuidString: left), let rightID = UUID(uuidString: right) { return leftID == rightID }
+        return left == right
+    }
     func ingest(_ records: [MirrorRecord], owner: String, deviceID: String) throws {
         try withExclusiveAccess { try ingestUnlocked(records, owner: owner, deviceID: deviceID) }
     }
@@ -212,11 +231,25 @@ struct AnchorAgentCommandStore {
         var state = try load(owner: owner)
         for record in records where record.name.hasPrefix("agentcommand-") {
             if let recordOwner = record.hubOwnerID, recordOwner != owner { throw HubHistoryOwnershipError.differentAccount }
-            var command = try AnchorAgentCommand.decode(record)
+            // Tombstones and records for another/native-newer device are not
+            // executable work here. Probe routing before strict action decoding.
+            guard let payload = record.payload else { continue }
+            let json = (try? JSONSerialization.jsonObject(with: payload)) as? [String: Any]
+            guard let target = json?["targetDeviceId"] as? String, Self.matchesDevice(target, deviceID),
+                  json?["status"] as? String == "pending" else { continue }
+            var command: AnchorAgentCommand
+            do { command = try AnchorAgentCommand.decode(record) }
+            catch {
+                if let id = UUID(uuidString: String(record.name.dropFirst("agentcommand-".count))) {
+                    state.quarantinedIDs = state.quarantinedIDs ?? [:]
+                    state.quarantinedIDs?[id.uuidString] = "unsupportedOrMalformed"
+                }
+                continue
+            }
+            command.targetDeviceId = deviceID
             command.result = nil
             command.error = nil
-            guard command.targetDeviceId == deviceID, command.status == .pending,
-                  state.commands[command.id.uuidString] == nil else { continue }
+            guard state.commands[command.id.uuidString] == nil else { continue }
             // requestId is also idempotent within this account/device.
             if state.commands.values.contains(where: { $0.requestId == command.requestId }) {
                 command.status = .failed
@@ -234,18 +267,18 @@ struct AnchorAgentCommandStore {
 
     @MainActor
     func reconcile(owner: String, deviceID: String, controller: FocusController, context: ModelContext,
-                   approvedPlannerNames: Set<String>, now: Date = .now) throws {
+                   approvedPlannerNames: Set<String>, consentEnabledAt: Date? = nil, now: Date = .now) throws {
         try withExclusiveAccess {
             try reconcileUnlocked(owner: owner, deviceID: deviceID, controller: controller, context: context,
-                                  approvedPlannerNames: approvedPlannerNames, now: now)
+                                  approvedPlannerNames: approvedPlannerNames, consentEnabledAt: consentEnabledAt, now: now)
         }
     }
     @MainActor
     private func reconcileUnlocked(owner: String, deviceID: String, controller: FocusController, context: ModelContext,
-                                   approvedPlannerNames: Set<String>, now: Date) throws {
+                                   approvedPlannerNames: Set<String>, consentEnabledAt: Date?, now: Date) throws {
         var state = try load(owner: owner)
         for original in state.commands.values.sorted(by: { $0.issuedAt < $1.issuedAt }) where original.status == .pending {
-            guard original.targetDeviceId == deviceID else { continue }
+            guard Self.matchesDevice(original.targetDeviceId, deviceID) else { continue }
             var command = original
             command.status = .failed
             command.error = "Execution was interrupted or could not be durably confirmed; this request will not be replayed."
@@ -254,6 +287,7 @@ struct AnchorAgentCommandStore {
             var plannerDidBeginMutation = false
             do {
                 guard command.expiresAt > now, command.issuedAt <= now.addingTimeInterval(30) else { throw CommandFailure.expired }
+                if let consentEnabledAt, command.issuedAt < consentEnabledAt { throw CommandFailure.consent }
                 guard !context.hasChanges else { throw CommandFailure.unsaved }
                 var affectedRecordIDs: [UUID]?
                 if command.action.isPlanner {
@@ -336,6 +370,7 @@ struct AnchorAgentCommandStore {
     }
     private enum CommandFailure: String, Error {
         case expired = "The command expired or was issued in the future."
+        case consent = "The command was issued before the current planner-sharing approval."
         case unsaved = "Local edits are waiting to be saved."
         case state = "The expected focus session or state no longer matches."
         case reference = "A referenced planner item is missing or has not been approved for this account."

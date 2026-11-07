@@ -69,7 +69,7 @@ struct HubAccountVisualFixtureTests {
             "renderPlatform": "macOS rendering of the shared SwiftUI HubAccountPanel; not an iOS simulator screenshot",
             "view": "HubAccountPanel presentation settings",
             "identity": "Synthetic URLProtocol identity and in-memory bearer token; no Keychain or external network",
-            "sourceRevision": "cfebb3e",
+            "sourceRevision": ProcessInfo.processInfo.environment["ANCHOR_ASSISTANT_SOURCE_REVISION"] ?? "unrecorded",
             "pages": pages,
         ]
         try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
