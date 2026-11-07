@@ -13,6 +13,8 @@ enum AnchorMirrorNaming {
         case scheduleTemplate, habitCompletion, dayPlanConfirmation
         case planBlock, divergenceEvent
 
+        var isPlanner: Bool { self != .focusSession && self != .distraction && self != .machineActivityDay }
+
         var prefix: String {
             switch self {
             case .goal: "goal-"
@@ -440,16 +442,29 @@ enum AnchorMirror {
         return encoder
     }()
 
-    private static let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
+    private static let plannerEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            let milliseconds = Int64((date.timeIntervalSince1970 * 1_000).rounded())
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            if milliseconds % 1_000 != 0 { formatter.formatOptions.insert(.withFractionalSeconds) }
+            // Whole-second legacy records keep their bytes; MCP millisecond
+            // dates survive native import and the following account projection.
+            try container.encode(formatter.string(from: Date(timeIntervalSince1970: Double(milliseconds) / 1_000)))
+        }
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
     }()
+
+    private static let decoder = AnchorAgentCommand.decoder
 
     private static func record<Payload: Encodable>(
         _ name: String, _ payload: Payload, now: Date
     ) throws -> MirrorRecord {
-        MirrorRecord(name: name, modifiedAt: now, payload: try encoder.encode(payload))
+        let selected = AnchorMirrorNaming.kind(of: name)?.isPlanner == true ? plannerEncoder : encoder
+        return MirrorRecord(name: name, modifiedAt: now, payload: try selected.encode(payload))
     }
 
     /// Every syncable entity plus tombstones for names the ledger still knows.
@@ -461,13 +476,15 @@ enum AnchorMirror {
     /// for a future explicitly-approved migration; production Hub passes must
     /// never use it. With a verified account, the projection narrows to
     /// finished sessions that account owns plus distraction metadata whose
-    /// parent is in that set — foreign, unowned, orphan, active and all other
-    /// model kinds stay native/iCloud-only, and omission never emits a
-    /// tombstone because a broad name ledger cannot prove an owned deletion.
+    /// parent is in that set. Planner records require a separate explicit
+    /// account-affiliated inventory; only those names can emit tombstones.
+    /// Foreign, unowned, orphan and active sessions stay native/iCloud-only.
     static func records(
         in context: ModelContext,
         tombstonesFor knownNames: Set<String>,
         hubAccountID: String? = nil,
+        plannerNames: Set<String> = [],
+        explicitProjectClearSessionIDs: Set<UUID> = [],
         sessionWireName: (UUID) -> String? = { AnchorMirrorNaming.Kind.focusSession.name(for: $0) },
         now: Date = .now
     ) throws -> [MirrorRecord] {
@@ -486,10 +503,16 @@ enum AnchorMirror {
                 // fingerprint stable after the local owner is stamped on it.
                 var payload = FocusSessionPayload(session)
                 payload.hubAccountID = nil
+                var encoded = try encoder.encode(payload)
+                if payload.projectID == nil && (session.hubProjectClearIsExplicit == true || explicitProjectClearSessionIDs.contains(session.id)) {
+                    var fields = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
+                    fields["projectID"] = NSNull()
+                    encoded = try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
+                }
                 records.append(MirrorRecord(
                     name: name,
                     modifiedAt: now,
-                    payload: try encoder.encode(payload),
+                    payload: encoded,
                     appendOnly: true
                 ))
             }
@@ -501,6 +524,21 @@ enum AnchorMirror {
                     modifiedAt: now,
                     payload: try encoder.encode(DistractionPayload(distraction))
                 ))
+            }
+            if !plannerNames.isEmpty {
+                let localRecords = try self.records(in: context, tombstonesFor: [], now: now)
+                for var candidate in localRecords
+                where plannerNames.contains(candidate.name) {
+                    candidate.payload = try candidate.payload.map { try plannerPayload($0, name: candidate.name, importing: false) }
+                    records.append(candidate)
+                }
+                let liveNames = Set(localRecords.map(\.name))
+                for name in plannerNames.subtracting(liveNames) {
+                    records.append(MirrorRecord(name: name, modifiedAt: now, payload: nil))
+                }
+            }
+            for i in records.indices where AnchorMirrorNaming.kind(of: records[i].name)?.isPlanner == true {
+                records[i].hubOwnerID = account
             }
             return records
         }
@@ -584,6 +622,7 @@ enum AnchorMirror {
         _ records: [MirrorRecord],
         in context: ModelContext,
         account trustedAccountID: String? = nil,
+        plannerNames: Set<String> = [],
         save: (ModelContext) throws -> Void = { try $0.save() }
     ) throws -> Bool {
         var index = try Index(context: context)
@@ -591,7 +630,7 @@ enum AnchorMirror {
         var changed = false
 
         if let trustedAccountID {
-            let batch = try prepareHubBatch(records, index: index, account: trustedAccountID)
+            let batch = try prepareHubBatch(records, index: index, account: trustedAccountID, plannerNames: plannerNames)
             changed = try applyHubBatch(
                 batch, index: &index, context: context,
                 deletedDistractions: &deletedDistractionIDs, account: trustedAccountID
@@ -871,13 +910,14 @@ enum AnchorMirror {
 
     // MARK: Hub batch validation
 
-    /// One decoded, ownership-checked change. The Hub projection covers only
-    /// sessions and distraction metadata; every other record kind is
-    /// deliberately outside it and is skipped, never mutated or deleted.
+    /// One decoded, ownership-checked change. Planner mutations additionally
+    /// require the device's explicit account-affiliated inventory.
     private enum HubChange {
-        case session(id: UUID, canonical: FocusSessionPayload?, legacy: LegacySessionSummaryPayload?)
+        case session(id: UUID, canonical: FocusSessionPayload?, legacy: LegacySessionSummaryPayload?, clearProject: Bool)
         case distraction(id: UUID, payload: DistractionPayload)
         case distractionTombstone(id: UUID)
+        case planner(kind: AnchorMirrorNaming.Kind, name: String, payload: Data)
+        case plannerTombstone(kind: AnchorMirrorNaming.Kind, name: String)
     }
 
     /// Decodes and validates the whole batch before any mutation. Owners come
@@ -886,12 +926,14 @@ enum AnchorMirror {
     private static func prepareHubBatch(
         _ records: [MirrorRecord],
         index: Index,
-        account: String
+        account: String,
+        plannerNames: Set<String>
     ) throws -> [HubChange] {
         var changes: [HubChange] = []
         var batchSessions = Set<UUID>()
 
         for record in records {
+            if let owner = record.hubOwnerID, owner != account { throw AnchorMirrorSyncError.invalidRecord }
             guard let payload = record.payload else {
                 // Sessions are append-only history: Hub tombstones for them are
                 // never applied. Distraction tombstones delete only when the
@@ -899,6 +941,9 @@ enum AnchorMirror {
                 if AnchorMirrorNaming.kind(of: record.name) == .distraction,
                    let id = AnchorMirrorNaming.entityID(of: record.name, kind: .distraction) {
                     changes.append(.distractionTombstone(id: id))
+                } else if let kind = AnchorMirrorNaming.kind(of: record.name), kind.isPlanner,
+                          plannerNames.contains(record.name), AnchorMirrorNaming.entityID(of: record.name, kind: kind) != nil {
+                    changes.append(.plannerTombstone(kind: kind, name: record.name))
                 }
                 continue
             }
@@ -911,7 +956,7 @@ enum AnchorMirror {
                         fallbackName: String(record.name.dropFirst(kind.prefix.count)),
                         index: index, account: account
                     )
-                    if case let .session(id, _, _) = change { batchSessions.insert(id) }
+                    if case let .session(id, _, _, _) = change { batchSessions.insert(id) }
                     changes.append(change)
                 case .distraction:
                     let value = try decode(DistractionPayload.self, from: payload)
@@ -921,10 +966,11 @@ enum AnchorMirror {
                     else { throw AnchorMirrorSyncError.invalidRecord }
                     changes.append(.distraction(id: id, payload: value))
                 default:
-                    // The other eleven model kinds have no per-record Hub
-                    // ownership contract yet: outside this projection, never
-                    // mutated and never tombstoned.
-                    continue
+                    guard kind.isPlanner, plannerNames.contains(record.name) else { continue }
+                    let safe = try plannerPayload(payload, name: record.name, importing: true)
+                    // Fully decode before anything in this batch mutates.
+                    try validatePlannerPayload(safe, kind: kind)
+                    changes.append(.planner(kind: kind, name: record.name, payload: safe))
                 }
             } else if let id = UUID(uuidString: record.name) {
                 // Pre-mirror Hub records used the session's bare UUID as the
@@ -934,7 +980,7 @@ enum AnchorMirror {
                     payload: payload, expectedID: id,
                     fallbackName: nil, index: index, account: account
                 )
-                if case let .session(sessionID, _, _) = change { batchSessions.insert(sessionID) }
+                if case let .session(sessionID, _, _, _) = change { batchSessions.insert(sessionID) }
                 changes.append(change)
             }
             // Any other name is foreign to Anchor and ignored.
@@ -970,7 +1016,8 @@ enum AnchorMirror {
             // never a legacy summary — it must not silently fall back.
             guard recordType == "focusSession" else { throw AnchorMirrorSyncError.invalidRecord }
             var value = try decode(FocusSessionPayload.self, from: payload)
-            guard let id = UUID(uuidString: value.id), id == expectedID else {
+            guard value.stateRaw == SessionState.finished.rawValue, value.runningSince == nil,
+                  let id = UUID(uuidString: value.id), id == expectedID else {
                 throw AnchorMirrorSyncError.invalidRecord
             }
             // A supplied owner is untrusted: foreign is forged, nil is stamped
@@ -988,7 +1035,8 @@ enum AnchorMirror {
                 }
             }
             value.hubAccountID = value.hubAccountID ?? account
-            return .session(id: id, canonical: value, legacy: nil)
+            let fields = try JSONSerialization.jsonObject(with: payload) as? [String: Any]
+            return .session(id: id, canonical: value, legacy: nil, clearProject: fields?["projectID"] is NSNull)
         }
         // No record type: only the exact legacy Hub summary shape is eligible.
         let summary = try decode(LegacySessionSummaryPayload.self, from: payload)
@@ -996,7 +1044,7 @@ enum AnchorMirror {
         if let existing = index.sessions[id.uuidString], existing.hubAccountID != account {
             throw AnchorMirrorSyncError.invalidRecord
         }
-        return .session(id: id, canonical: nil, legacy: summary)
+        return .session(id: id, canonical: nil, legacy: summary, clearProject: false)
     }
 
     private static func applyHubBatch(
@@ -1009,7 +1057,23 @@ enum AnchorMirror {
         var changed = false
         for change in batch {
             switch change {
-            case let .session(id, canonical, legacy):
+            case let .plannerTombstone(kind, name):
+                changed = try tombstone(kind: kind, name: name, index: &index, context: context, deletedDistractions: &deletedDistractions) || changed
+            case let .planner(kind, name, payload):
+                // Preserve device-only fields when a shared edit lands.
+                let id = AnchorMirrorNaming.entityID(of: name, kind: kind)!.uuidString
+                let keywords = index.goals[id]?.keywords
+                let external = index.planBlocks[id].map { ($0.reminderExternalIdentifier, $0.reminderLastSyncedAt, $0.externalEventKey) }
+                let note = index.divergenceEvents[id]?.note
+                changed = try upsert(kind: kind, name: name, payload: payload, index: &index, context: context) || changed
+                if let keywords { index.goals[id]?.keywords = keywords }
+                if let external, let block = index.planBlocks[id] {
+                    block.reminderExternalIdentifier = external.0
+                    block.reminderLastSyncedAt = external.1
+                    block.externalEventKey = external.2
+                }
+                if let note { index.divergenceEvents[id]?.note = note }
+            case let .session(id, canonical, legacy, _):
                 if let summary = legacy, index.sessions[id.uuidString] == nil {
                     let session = FocusSession(
                         id: id, goal: nil, intent: summary.title,
@@ -1064,21 +1128,23 @@ enum AnchorMirror {
             }
         }
 
-        // Relationships resolve last, so parents arriving later in the batch
-        // still link. Goals and projects are not Hub-synced: references only
-        // resolve against entities that already exist locally, and an
-        // unresolvable remote reference never clears a local relationship.
+        // Relationships resolve last, including planner parents arriving later
+        // in this batch. Unresolved references preserve local relationships.
         for change in batch {
             switch change {
-            case let .session(id, canonical, _):
+            case let .session(id, canonical, _, clearProject):
                 guard let value = canonical,
                       let session = index.sessions[id.uuidString] else { continue }
                 if let reference = value.goalID.flatMap(UUID.init(uuidString:)),
                    let goal = index.goals[reference.uuidString] {
                     session.goal = goal
                 }
-                if let reference = value.projectID.flatMap(UUID.init(uuidString:)),
-                   let project = index.projects[reference.uuidString] {
+                if clearProject {
+                    if session.project != nil || session.hubProjectClearIsExplicit != true { changed = true }
+                    session.project = nil
+                    session.hubProjectClearIsExplicit = true
+                } else if let reference = value.projectID.flatMap(UUID.init(uuidString:)),
+                          let project = index.projects[reference.uuidString] {
                     session.project = project
                 }
             case let .distraction(id, value):
@@ -1086,11 +1152,52 @@ enum AnchorMirror {
                 distraction.session = value.sessionID
                     .flatMap(UUID.init(uuidString:))
                     .flatMap { index.sessions[$0.uuidString] }
-            case .distractionTombstone:
+            case .distractionTombstone, .planner, .plannerTombstone:
                 continue
             }
         }
         return changed
+    }
+
+    /// Planner payloads share UI data while excluding learned keywords and device links.
+    private static func plannerPayload(_ data: Data, name: String, importing: Bool) throws -> Data {
+        guard let kind = AnchorMirrorNaming.kind(of: name), kind.isPlanner,
+              let id = AnchorMirrorNaming.entityID(of: name, kind: kind),
+              var json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let payloadID = json["id"] as? String, UUID(uuidString: payloadID) == id,
+              json["recordType"] as? String == kind.rawValue else { throw AnchorMirrorSyncError.invalidRecord }
+        json["id"] = id.uuidString
+        let privateFields = ["keywords", "reminderExternalIdentifier", "reminderLastSyncedAt", "externalEventKey"]
+        if importing {
+            for key in privateFields {
+                if key == "keywords" {
+                    guard (json[key] as? [String] ?? []).isEmpty else { throw AnchorMirrorSyncError.invalidRecord }
+                } else if let value = json[key], !(value is NSNull) { throw AnchorMirrorSyncError.invalidRecord }
+            }
+            if kind == .divergenceEvent, !(json["note"] as? String ?? "").isEmpty { throw AnchorMirrorSyncError.invalidRecord }
+        }
+        if kind == .goal { json["keywords"] = [String]() }
+        if kind == .planBlock {
+            for key in privateFields where key != "keywords" { json.removeValue(forKey: key) }
+        }
+        if kind == .divergenceEvent { json["note"] = "" }
+        return try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
+    }
+
+    private static func validatePlannerPayload(_ data: Data, kind: AnchorMirrorNaming.Kind) throws {
+        switch kind {
+        case .goal: _ = try decode(GoalPayload.self, from: data)
+        case .project: _ = try decode(ProjectPayload.self, from: data)
+        case .savedTag: _ = try decode(SavedTagPayload.self, from: data)
+        case .preferences: _ = try decode(PreferencesPayload.self, from: data)
+        case .behaviorProfile: _ = try decode(BehaviorProfilePayload.self, from: data)
+        case .scheduleTemplate: _ = try decode(ScheduleTemplatePayload.self, from: data)
+        case .habitCompletion: _ = try decode(HabitCompletionPayload.self, from: data)
+        case .dayPlanConfirmation: _ = try decode(DayPlanConfirmationPayload.self, from: data)
+        case .planBlock: _ = try decode(PlanBlockPayload.self, from: data)
+        case .divergenceEvent: _ = try decode(DivergenceEventPayload.self, from: data)
+        default: throw AnchorMirrorSyncError.invalidRecord
+        }
     }
 
     // MARK: Field assignment
@@ -1137,7 +1244,7 @@ enum AnchorMirror {
         session.pausedAt = value.pausedAt
         session.intent = value.intent
         session.notes = value.notes
-        session.tagIDStrings = value.tagIDStrings
+        session.tagIDStrings = SavedTag.normalizedStorageIDs(value.tagIDStrings)
         session.hourlyRate = value.hourlyRate
         session.currencyCode = value.currencyCode
         session.computerActiveSeconds = value.computerActiveSeconds

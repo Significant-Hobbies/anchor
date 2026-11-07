@@ -27,5 +27,11 @@ public final class SavedTag {
     }
 
     public var storageID: String { id.uuidString }
+
+    /// Older account records may use lowercase UUIDs; labels compare stable
+    /// storage IDs exactly. Keep non-UUID legacy values unchanged.
+    static func normalizedStorageIDs(_ values: [String]) -> [String] {
+        values.map { UUID(uuidString: $0)?.uuidString ?? $0 }
+    }
     public var isArchived: Bool { archivedAt != nil }
 }

@@ -109,11 +109,11 @@ public struct HubAccountPanel: View {
     private var privacyBoundary: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             boundaryRow(
-                "Hub receives only the finished session’s goal, timing, outcome, and interruption count.",
+                "Finished-session metadata includes goal, timing, outcome, and interruption count. Planner sharing is a separate choice for this account.",
                 symbol: "checkmark.circle"
             )
             boundaryRow(
-                "Distraction notes, schedules, reflections, and behavior choices never enter Hub.",
+                "Distraction notes and learned keywords stay on this device. Calendar and reminder credentials and external integration IDs are never shared with the Hub or connected assistants.",
                 symbol: "lock.shield"
             )
         }
@@ -156,6 +156,9 @@ public struct HubAccountPanel: View {
             if let notice = platform.ownershipNotice {
                 Text(notice).font(.caption).foregroundStyle(theme.caution)
             }
+            if let notice = platform.plannerApprovalNotice {
+                Text(notice).font(.caption).foregroundStyle(theme.caution)
+            }
             if platform.needsHistoryApproval {
                 Text("Approve unowned focus history and this account's waiting changes for the account above. History already owned by another account stays separate. Distraction notes stay private.")
                     .font(.caption).foregroundStyle(theme.textSecondary)
@@ -167,6 +170,32 @@ public struct HubAccountPanel: View {
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .disabled(platform.isSyncing)
                 .accessibilityIdentifier("anchor.hub.approve-history")
+            }
+
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Text("Share planner with connected assistants")
+                    .font(.body.weight(.semibold))
+                Text("Allow this account’s connected assistants to access and update approved goals, projects, tags, schedule, habits and preferences, and request focus actions while Anchor is active. Sharing includes calendar and reminder event titles and details in your schedule. New items saved on this device, including imported events, share automatically; iCloud items from other devices need approval.")
+                    .font(.caption).foregroundStyle(theme.textSecondary)
+                Button(platform.isPlannerSharingEnabled ? "stop planner sharing" : "approve planner sharing for this account") {
+                    Task {
+                        if await platform.setPlannerSharingEnabled(!platform.isPlannerSharingEnabled) {
+                            await platform.synchronize()
+                        }
+                    }
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .disabled(platform.isSyncing || platform.needsHistoryApproval)
+                .accessibilityIdentifier("anchor.hub.planner-sharing")
+                if platform.isPlannerSharingEnabled {
+                    Button("approve imported planner items") {
+                        Task { if await platform.setPlannerSharingEnabled(true) { await platform.synchronize() } }
+                    }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .disabled(platform.isSyncing)
+                }
+                Text("Stopping prevents future planner syncing and focus requests on this device. Copies already shared remain in your account until removed there.")
+                    .font(.caption).foregroundStyle(theme.textSecondary)
             }
 
             if presentation == .settings {
@@ -308,6 +337,7 @@ public struct HubAccountPanel: View {
         if platform.isSyncing { return "Syncing now" }
         if platform.receipt.failure != nil { return "Needs attention" }
         if platform.pendingCount > 0 { return "Waiting to sync" }
+        if platform.receipt.lastSuccessfulAt == nil { return "Not synced yet" }
         return "Up to date"
     }
 

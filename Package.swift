@@ -51,12 +51,15 @@ let package = Package(
                 "AnchorCore",
                 .product(name: "PersonalSyncKit", package: "significanthobbies"),
             ],
-            resources: [.copy("Fixtures/LegacyNotes.store")],
+            resources: [.copy("Fixtures/LegacyNotes.store"), .copy("Fixtures/AssistantBackendRecords.json"), .copy("Fixtures/WorkerAgentCommand.json"), .copy("Fixtures/WorkerHistoryEdit.json")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "AnchorUITests",
-            dependencies: ["AnchorUI"],
+            dependencies: [
+                "AnchorUI",
+                .product(name: "PersonalSyncKit", package: "significanthobbies"),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
