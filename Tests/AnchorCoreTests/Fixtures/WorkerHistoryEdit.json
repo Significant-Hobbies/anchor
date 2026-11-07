@@ -1,0 +1,79 @@
+{
+  "generatedBy": "Actual Worker metadata edit/get; native UUID.uuidString tag matching and explicit null project clear",
+  "initial": [
+    {
+      "name": "project-c3000000-0000-4000-8000-000000000003",
+      "payload": {
+        "recordType": "project",
+        "id": "c3000000-0000-4000-8000-000000000003",
+        "name": "Before project",
+        "notes": "",
+        "createdAt": "2026-11-08T10:00:00Z",
+        "symbolName": "folder",
+        "tintIndex": 1,
+        "hourlyRate": 0,
+        "currencyCode": "USD"
+      }
+    },
+    {
+      "name": "savedtag-d4000000-0000-4000-8000-000000000004",
+      "payload": {
+        "recordType": "savedTag",
+        "id": "d4000000-0000-4000-8000-000000000004",
+        "name": "Visible native tag",
+        "createdAt": "2026-11-08T10:00:00Z",
+        "tintIndex": 1
+      }
+    },
+    {
+      "name": "session-e5000000-0000-4000-8000-000000000005",
+      "payload": {
+        "recordType": "focusSession",
+        "id": "E5000000-0000-4000-8000-000000000005",
+        "startedAt": "2026-11-08T10:00:00Z",
+        "endedAt": "2026-11-08T10:25:00Z",
+        "plannedSeconds": 1500,
+        "bankedSeconds": 1500,
+        "runningSince": null,
+        "stateRaw": "finished",
+        "endReasonRaw": "completed",
+        "pausedAt": null,
+        "intent": "Tagged history",
+        "notes": "",
+        "tagIDStrings": [],
+        "hourlyRate": 0,
+        "currencyCode": "USD",
+        "computerActiveSeconds": 0,
+        "computerAwaySeconds": 0,
+        "projectID": "C3000000-0000-4000-8000-000000000003"
+      }
+    }
+  ],
+  "updated": [
+    {
+      "name": "session-e5000000-0000-4000-8000-000000000005",
+      "payload": {
+        "recordType": "focusSession",
+        "id": "E5000000-0000-4000-8000-000000000005",
+        "startedAt": "2026-11-08T10:00:00Z",
+        "endedAt": "2026-11-08T10:25:00Z",
+        "plannedSeconds": 1500,
+        "bankedSeconds": 1500,
+        "runningSince": null,
+        "stateRaw": "finished",
+        "endReasonRaw": "completed",
+        "pausedAt": null,
+        "intent": "Tagged history",
+        "notes": "",
+        "tagIDStrings": [
+          "D4000000-0000-4000-8000-000000000004"
+        ],
+        "hourlyRate": 0,
+        "currencyCode": "USD",
+        "computerActiveSeconds": 0,
+        "computerAwaySeconds": 0,
+        "projectID": null
+      }
+    }
+  ]
+}

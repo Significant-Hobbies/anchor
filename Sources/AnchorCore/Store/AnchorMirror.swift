@@ -437,6 +437,13 @@ enum AnchorMirrorSyncError: Error, Equatable {
 enum AnchorMirror {
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.sortedKeys]
+        return encoder
+    }()
+
+    private static let plannerEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .custom { date, encoder in
             var container = encoder.singleValueContainer()
             let milliseconds = Int64((date.timeIntervalSince1970 * 1_000).rounded())
@@ -456,7 +463,8 @@ enum AnchorMirror {
     private static func record<Payload: Encodable>(
         _ name: String, _ payload: Payload, now: Date
     ) throws -> MirrorRecord {
-        MirrorRecord(name: name, modifiedAt: now, payload: try encoder.encode(payload))
+        let selected = AnchorMirrorNaming.kind(of: name)?.isPlanner == true ? plannerEncoder : encoder
+        return MirrorRecord(name: name, modifiedAt: now, payload: try selected.encode(payload))
     }
 
     /// Every syncable entity plus tombstones for names the ledger still knows.
@@ -476,6 +484,7 @@ enum AnchorMirror {
         tombstonesFor knownNames: Set<String>,
         hubAccountID: String? = nil,
         plannerNames: Set<String> = [],
+        explicitProjectClearSessionIDs: Set<UUID> = [],
         sessionWireName: (UUID) -> String? = { AnchorMirrorNaming.Kind.focusSession.name(for: $0) },
         now: Date = .now
     ) throws -> [MirrorRecord] {
@@ -494,10 +503,16 @@ enum AnchorMirror {
                 // fingerprint stable after the local owner is stamped on it.
                 var payload = FocusSessionPayload(session)
                 payload.hubAccountID = nil
+                var encoded = try encoder.encode(payload)
+                if payload.projectID == nil && explicitProjectClearSessionIDs.contains(session.id) {
+                    var fields = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
+                    fields["projectID"] = NSNull()
+                    encoded = try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
+                }
                 records.append(MirrorRecord(
                     name: name,
                     modifiedAt: now,
-                    payload: try encoder.encode(payload),
+                    payload: encoded,
                     appendOnly: true
                 ))
             }
@@ -898,7 +913,7 @@ enum AnchorMirror {
     /// One decoded, ownership-checked change. Planner mutations additionally
     /// require the device's explicit account-affiliated inventory.
     private enum HubChange {
-        case session(id: UUID, canonical: FocusSessionPayload?, legacy: LegacySessionSummaryPayload?)
+        case session(id: UUID, canonical: FocusSessionPayload?, legacy: LegacySessionSummaryPayload?, clearProject: Bool)
         case distraction(id: UUID, payload: DistractionPayload)
         case distractionTombstone(id: UUID)
         case planner(kind: AnchorMirrorNaming.Kind, name: String, payload: Data)
@@ -941,7 +956,7 @@ enum AnchorMirror {
                         fallbackName: String(record.name.dropFirst(kind.prefix.count)),
                         index: index, account: account
                     )
-                    if case let .session(id, _, _) = change { batchSessions.insert(id) }
+                    if case let .session(id, _, _, _) = change { batchSessions.insert(id) }
                     changes.append(change)
                 case .distraction:
                     let value = try decode(DistractionPayload.self, from: payload)
@@ -965,7 +980,7 @@ enum AnchorMirror {
                     payload: payload, expectedID: id,
                     fallbackName: nil, index: index, account: account
                 )
-                if case let .session(sessionID, _, _) = change { batchSessions.insert(sessionID) }
+                if case let .session(sessionID, _, _, _) = change { batchSessions.insert(sessionID) }
                 changes.append(change)
             }
             // Any other name is foreign to Anchor and ignored.
@@ -1020,7 +1035,8 @@ enum AnchorMirror {
                 }
             }
             value.hubAccountID = value.hubAccountID ?? account
-            return .session(id: id, canonical: value, legacy: nil)
+            let fields = try JSONSerialization.jsonObject(with: payload) as? [String: Any]
+            return .session(id: id, canonical: value, legacy: nil, clearProject: fields?["projectID"] is NSNull)
         }
         // No record type: only the exact legacy Hub summary shape is eligible.
         let summary = try decode(LegacySessionSummaryPayload.self, from: payload)
@@ -1028,7 +1044,7 @@ enum AnchorMirror {
         if let existing = index.sessions[id.uuidString], existing.hubAccountID != account {
             throw AnchorMirrorSyncError.invalidRecord
         }
-        return .session(id: id, canonical: nil, legacy: summary)
+        return .session(id: id, canonical: nil, legacy: summary, clearProject: false)
     }
 
     private static func applyHubBatch(
@@ -1057,7 +1073,7 @@ enum AnchorMirror {
                     block.externalEventKey = external.2
                 }
                 if let note { index.divergenceEvents[id]?.note = note }
-            case let .session(id, canonical, legacy):
+            case let .session(id, canonical, legacy, _):
                 if let summary = legacy, index.sessions[id.uuidString] == nil {
                     let session = FocusSession(
                         id: id, goal: nil, intent: summary.title,
@@ -1116,15 +1132,17 @@ enum AnchorMirror {
         // in this batch. Unresolved references preserve local relationships.
         for change in batch {
             switch change {
-            case let .session(id, canonical, _):
+            case let .session(id, canonical, _, clearProject):
                 guard let value = canonical,
                       let session = index.sessions[id.uuidString] else { continue }
                 if let reference = value.goalID.flatMap(UUID.init(uuidString:)),
                    let goal = index.goals[reference.uuidString] {
                     session.goal = goal
                 }
-                if let reference = value.projectID.flatMap(UUID.init(uuidString:)),
-                   let project = index.projects[reference.uuidString] {
+                if clearProject {
+                    session.project = nil
+                } else if let reference = value.projectID.flatMap(UUID.init(uuidString:)),
+                          let project = index.projects[reference.uuidString] {
                     session.project = project
                 }
             case let .distraction(id, value):
@@ -1224,7 +1242,7 @@ enum AnchorMirror {
         session.pausedAt = value.pausedAt
         session.intent = value.intent
         session.notes = value.notes
-        session.tagIDStrings = value.tagIDStrings
+        session.tagIDStrings = SavedTag.normalizedStorageIDs(value.tagIDStrings)
         session.hourlyRate = value.hourlyRate
         session.currencyCode = value.currencyCode
         session.computerActiveSeconds = value.computerActiveSeconds

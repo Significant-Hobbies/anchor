@@ -42,6 +42,8 @@ public final class AnchorPlatformSync {
     private var deviceObservedAt = Date()
     private var isDisconnecting = false
     private var saveObserver: NSObjectProtocol?
+    private var saveWillObserver: NSObjectProtocol?
+    private var pendingProjectClears: (owner: String, ids: Set<UUID>)?
     private var saveDebounce: Task<Void, Never>?
     /// The same `SyncVersionStore` instance the Hub transport uses, so wire
     /// names pulled under a legacy bare-UUID alias keep that identity.
@@ -172,13 +174,21 @@ public final class AnchorPlatformSync {
             let key = ModelContext.NotificationKey.insertedIdentifiers
             let raw = notification.userInfo?[key] ?? notification.userInfo?[key.rawValue]
             let identifiers = (raw as? [PersistentIdentifier]) ?? Array(raw as? Set<PersistentIdentifier> ?? [])
-            MainActor.assumeIsolated { self.registerLocalPlannerInsertions(identifiers) }
+            MainActor.assumeIsolated {
+                self.persistLocalProjectClearProvenance()
+                self.registerLocalPlannerInsertions(identifiers)
+            }
             guard observeLocalSaves else { return }
             Task { @MainActor [weak self] in self?.scheduleSynchronizeAfterLocalSave() }
+        }
+        saveWillObserver = NotificationCenter.default.addObserver(forName: ModelContext.willSave, object: nil, queue: nil) { [weak self] notification in
+            guard (notification.object as? ModelContext).map(ObjectIdentifier.init) == contextID, let self else { return }
+            MainActor.assumeIsolated { self.prepareLocalProjectClearProvenance() }
         }
     }
 
     isolated deinit {
+        if let saveWillObserver { NotificationCenter.default.removeObserver(saveWillObserver) }
         if let saveObserver { NotificationCenter.default.removeObserver(saveObserver) }
         saveDebounce?.cancel()
     }
@@ -291,6 +301,30 @@ public final class AnchorPlatformSync {
             return false
         }
     }
+
+    /// Compare actual UI updates with committed storage before save. This is
+    /// explicit edit provenance, not a re-encoding of every old nil-project row.
+    private func prepareLocalProjectClearProvenance() {
+        pendingProjectClears = nil
+        guard sessionSynchronizationEnabled, let owner = try? historyOwnership.owner() else { return }
+        let candidates = context.changedModelsArray.compactMap { $0 as? FocusSession }.filter {
+            $0.hubAccountID == owner && $0.project == nil
+        }
+        guard !candidates.isEmpty else { return }
+        let persisted = ModelContext(context.container)
+        guard let stored = try? persisted.fetch(FetchDescriptor<FocusSession>()) else { return }
+        let linkedIDs = Set(stored.filter { $0.hubAccountID == owner && $0.project != nil }.map(\.id))
+        pendingProjectClears = (owner, Set(candidates.map(\.id)).intersection(linkedIDs))
+    }
+
+    private func persistLocalProjectClearProvenance() {
+        guard let pending = pendingProjectClears else { return }
+        pendingProjectClears = nil
+        do { try plannerSharingStore.markExplicitProjectClears(owner: pending.owner, sessionIDs: pending.ids) }
+        catch { ownershipNotice = "The project edit was saved locally, but its account sync approval could not be saved. Retry after checking available storage." }
+    }
+
+    private static let pendingPlannerNotice = "Some iCloud planner items need approval for this account. History and other approved changes continue syncing."
 
     private func registerLocalPlannerInsertions(_ identifiers: [PersistentIdentifier]) {
         guard sessionSynchronizationEnabled, !isDisconnecting,
@@ -421,7 +455,7 @@ public final class AnchorPlatformSync {
                 try await validateSyncPass()
                 focusController.synchronizeActiveSessionFromStore()
                 try commandStore.reconcile(owner: pinned.userID, deviceID: deviceId, controller: focusController,
-                                           context: context, approvedPlannerNames: sharing.names, consentEnabledAt: sharing.enabledAt ?? .distantFuture)
+                                           context: context, approvedPlannerNames: sharing.names, consentGeneration: sharing.consentGeneration ?? "missing-consent-generation")
             }
         } catch {
             guard isCurrent(attempt) else { return }
@@ -474,8 +508,16 @@ public final class AnchorPlatformSync {
             throw AnchorMirrorSyncError.pendingLocalEdits
         }
         let sharing = try plannerSharingStore.load()
+        if sharing?.owner == owner, let pending = sharing?.pendingPlannerApprovalNames {
+            let unresolved = try pending.intersection(localPlannerNames()).subtracting(sharing!.names)
+            if unresolved != pending { try plannerSharingStore.updatePendingApproval(owner: owner, names: unresolved) }
+            if activeUserID == owner, sharing?.enabled == true {
+                plannerApprovalNotice = unresolved.isEmpty ? nil : Self.pendingPlannerNotice
+            }
+        }
+        let clearIDs = sharing?.owner == owner ? Set((sharing?.explicitProjectClearSessionIDs ?? []).compactMap(UUID.init(uuidString:))) : []
         let plannerNames = sharing?.owner == owner && sharing?.enabled == true ? sharing!.names : []
-        var records = try AnchorMirror.records(in: context, tombstonesFor: [], hubAccountID: owner, plannerNames: plannerNames) { id in
+        var records = try AnchorMirror.records(in: context, tombstonesFor: [], hubAccountID: owner, plannerNames: plannerNames, explicitProjectClearSessionIDs: clearIDs) { id in
             aliases[id] ?? AnchorMirrorNaming.Kind.focusSession.name(for: id)
         }
         if sharing?.owner == owner && sharing?.enabled == true {
@@ -489,7 +531,7 @@ public final class AnchorPlatformSync {
                 let sharedSession = focusController.session.flatMap { $0.hubAccountID == owner ? $0 : nil }
                 var device = AnchorAgentDevice(id: id, deviceId: deviceId, platform: devicePlatform,
                                               updatedAt: deviceObservedAt, observedAt: deviceObservedAt, session: sharedSession.map(AnchorAgentDevice.Session.init), activeSessionID: sharedSession?.id,
-                                              state: sharedSession?.state.rawValue ?? "idle", capturePresented: sharedSession != nil && focusController.isCapturing)
+                                              consentGeneration: sharing?.consentGeneration, state: sharedSession?.state.rawValue ?? "idle", capturePresented: sharedSession != nil && focusController.isCapturing)
                 if focusController.hasSession && sharedSession == nil { device.capabilities = [] }
                 records.append(MirrorRecord(name: "agentdevice-" + id.uuidString.lowercased(), modifiedAt: .now,
                                             payload: try AnchorAgentCommand.encoder.encode(device), hubOwnerID: owner))
@@ -534,18 +576,30 @@ public final class AnchorPlatformSync {
         let isolated = ModelContext(context.container)
         isolated.autosaveEnabled = false
         var plannerNames: Set<String> = []
+        var pendingPlannerNames: Set<String>?
         if let sharing = try plannerSharingStore.load(), sharing.enabled, sharing.owner == account.userID {
             let incoming = Set(records.compactMap { AnchorMirrorNaming.kind(of: $0.name)?.isPlanner == true ? $0.name : nil })
             let collisions = try localPlannerNames().intersection(incoming).subtracting(sharing.names)
-            if !collisions.isEmpty {
-                plannerApprovalNotice = "Some iCloud planner items need approval for this account. History and other approved changes continue syncing."
-            }
+            let retainedPending = try (sharing.pendingPlannerApprovalNames ?? []).intersection(localPlannerNames()).subtracting(sharing.names)
+            pendingPlannerNames = retainedPending.union(collisions)
             plannerNames = sharing.names.union(incoming.subtracting(collisions))
         }
         let changed = try AnchorMirror.apply(records, in: isolated, account: account.userID, plannerNames: plannerNames)
         // Refresh committed UI models even if later bookkeeping or command
         // receipt storage fails; those failures cannot undo the durable import.
         defer { if changed { refreshImportedModels() } }
+        let explicitClears = Set(records.compactMap { record -> UUID? in
+            guard let payload = record.payload,
+                  let fields = (try? JSONSerialization.jsonObject(with: payload)) as? [String: Any],
+                  fields["recordType"] as? String == "focusSession", fields["projectID"] is NSNull,
+                  let id = fields["id"] as? String else { return nil }
+            return UUID(uuidString: id)
+        })
+        try plannerSharingStore.markExplicitProjectClears(owner: account.userID, sessionIDs: explicitClears)
+        if let pendingPlannerNames {
+            try plannerSharingStore.updatePendingApproval(owner: account.userID, names: pendingPlannerNames)
+            plannerApprovalNotice = pendingPlannerNames.isEmpty ? nil : Self.pendingPlannerNotice
+        }
         // The immutable owner file already pins this inventory to one account.
         // Only durably imported IDs become deletion-eligible on later passes.
         if !plannerNames.isEmpty {
@@ -663,7 +717,9 @@ public final class AnchorPlatformSync {
         activeUserID = userID
         generation = UUID()
         ownershipNotice = nil
-        plannerApprovalNotice = nil
+        let sharing = try? plannerSharingStore.load()
+        plannerApprovalNotice = sharing?.owner == userID && sharing?.enabled == true
+            && !(sharing?.pendingPlannerApprovalNames?.isEmpty ?? true) ? Self.pendingPlannerNotice : nil
         isSyncing = false
         pendingCount = 0
         // Legacy unscoped receipts/files are retained, never adopted by the

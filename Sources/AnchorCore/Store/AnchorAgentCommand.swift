@@ -51,6 +51,7 @@ struct AnchorAgentCommand: Codable, Equatable {
     var issuedAt: Date
     var expiresAt: Date
     var expectedSessionID: UUID?
+    var consentGeneration: String?
     var status: Status
     var args: Arguments
     var result: Result?
@@ -58,7 +59,7 @@ struct AnchorAgentCommand: Codable, Equatable {
     var recordName: String { "agentcommand-" + id.uuidString.lowercased() }
 
     enum CodingKeys: String, CodingKey {
-        case recordType, id, requestId, action, targetDeviceId, issuedAt, expiresAt, expectedSessionID, status, args, result, error
+        case recordType, id, requestId, action, targetDeviceId, issuedAt, expiresAt, expectedSessionID, consentGeneration, status, args, result, error
     }
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -70,6 +71,7 @@ struct AnchorAgentCommand: Codable, Equatable {
         try c.encode(issuedAt, forKey: .issuedAt)
         try c.encode(expiresAt, forKey: .expiresAt)
         try c.encode(expectedSessionID, forKey: .expectedSessionID)
+        try c.encodeIfPresent(consentGeneration, forKey: .consentGeneration)
         try c.encode(status, forKey: .status)
         try c.encode(args, forKey: .args)
         try c.encode(result, forKey: .result)
@@ -175,16 +177,18 @@ struct AnchorAgentDevice: Encodable {
     var observedAt: Date
     var session: Session?
     var activeSessionID: UUID?
+    var consentGeneration: String?
     var state: String
     var capturePresented: Bool
     var capabilities = ["start_focus", "pause_focus", "resume_focus", "end_focus", "capture_distraction", "copy_day", "materialize_day", "reconcile_template"]
-    enum CodingKeys: String, CodingKey { case recordType, id, deviceId, platform, updatedAt, observedAt, session, activeSessionID, state, capturePresented, capabilities }
+    enum CodingKeys: String, CodingKey { case recordType, id, deviceId, platform, updatedAt, observedAt, session, activeSessionID, consentGeneration, state, capturePresented, capabilities }
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(recordType, forKey: .recordType); try c.encode(id, forKey: .id)
         try c.encode(deviceId, forKey: .deviceId); try c.encode(platform, forKey: .platform)
         try c.encode(updatedAt, forKey: .updatedAt); try c.encode(observedAt, forKey: .observedAt)
         try c.encode(session, forKey: .session); try c.encode(activeSessionID, forKey: .activeSessionID)
+        try c.encode(consentGeneration, forKey: .consentGeneration)
         try c.encode(state, forKey: .state); try c.encode(capturePresented, forKey: .capturePresented)
         try c.encode(capabilities, forKey: .capabilities)
     }
@@ -267,15 +271,15 @@ struct AnchorAgentCommandStore {
 
     @MainActor
     func reconcile(owner: String, deviceID: String, controller: FocusController, context: ModelContext,
-                   approvedPlannerNames: Set<String>, consentEnabledAt: Date? = nil, now: Date = .now) throws {
+                   approvedPlannerNames: Set<String>, consentGeneration: String, now: Date = .now) throws {
         try withExclusiveAccess {
             try reconcileUnlocked(owner: owner, deviceID: deviceID, controller: controller, context: context,
-                                  approvedPlannerNames: approvedPlannerNames, consentEnabledAt: consentEnabledAt, now: now)
+                                  approvedPlannerNames: approvedPlannerNames, consentGeneration: consentGeneration, now: now)
         }
     }
     @MainActor
     private func reconcileUnlocked(owner: String, deviceID: String, controller: FocusController, context: ModelContext,
-                                   approvedPlannerNames: Set<String>, consentEnabledAt: Date?, now: Date) throws {
+                                   approvedPlannerNames: Set<String>, consentGeneration: String, now: Date) throws {
         var state = try load(owner: owner)
         for original in state.commands.values.sorted(by: { $0.issuedAt < $1.issuedAt }) where original.status == .pending {
             guard Self.matchesDevice(original.targetDeviceId, deviceID) else { continue }
@@ -287,7 +291,8 @@ struct AnchorAgentCommandStore {
             var plannerDidBeginMutation = false
             do {
                 guard command.expiresAt > now, command.issuedAt <= now.addingTimeInterval(30) else { throw CommandFailure.expired }
-                if let consentEnabledAt, command.issuedAt < consentEnabledAt { throw CommandFailure.consent }
+                guard let expectedGeneration = UUID(uuidString: consentGeneration),
+                      command.consentGeneration.flatMap(UUID.init(uuidString:)) == expectedGeneration else { throw CommandFailure.consent }
                 guard !context.hasChanges else { throw CommandFailure.unsaved }
                 var affectedRecordIDs: [UUID]?
                 if command.action.isPlanner {
@@ -335,7 +340,7 @@ struct AnchorAgentCommandStore {
                     guard (command.args.goalID == nil || goal != nil), (command.args.projectID == nil || project != nil),
                           (command.args.planBlockID == nil || block != nil) else { throw CommandFailure.reference }
                     guard controller.start(goal: goal, intent: command.args.intent!, minutes: command.args.minutes!, project: project,
-                                           notes: command.args.notes ?? "", tagIDStrings: command.args.tagIDStrings ?? [], planBlock: block) != nil else { throw CommandFailure.save }
+                                           notes: command.args.notes ?? "", tagIDStrings: SavedTag.normalizedStorageIDs(command.args.tagIDStrings ?? []), planBlock: block) != nil else { throw CommandFailure.save }
                 } else {
                     guard let session = controller.session, session.id == command.expectedSessionID,
                           session.hubAccountID == owner else { throw CommandFailure.state }
@@ -370,7 +375,7 @@ struct AnchorAgentCommandStore {
     }
     private enum CommandFailure: String, Error {
         case expired = "The command expired or was issued in the future."
-        case consent = "The command was issued before the current planner-sharing approval."
+        case consent = "The command belongs to an earlier or missing planner-sharing approval."
         case unsaved = "Local edits are waiting to be saved."
         case state = "The expected focus session or state no longer matches."
         case reference = "A referenced planner item is missing or has not been approved for this account."
