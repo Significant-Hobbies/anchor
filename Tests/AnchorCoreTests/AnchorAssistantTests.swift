@@ -127,6 +127,10 @@ struct AnchorAssistantTests {
         let block = try #require(try fixture.context.fetch(FetchDescriptor<PlanBlock>()).first)
         #expect(block.plannedSeconds == 1800)
         #expect(abs(block.plannedStart.timeIntervalSince1970.truncatingRemainder(dividingBy: 1) - 0.123) < 0.0001)
+        let projected = try AnchorMirror.records(in: fixture.context, tombstonesFor: [], hubAccountID: "A", plannerNames: Set(records.map(\.name)))
+        let projectedBlock = try #require(projected.first { $0.name.hasPrefix("planblock-") }?.payload)
+        let projectedJSON = try #require(try JSONSerialization.jsonObject(with: projectedBlock) as? [String: Any])
+        #expect(projectedJSON["plannedStart"] as? String == "2026-11-08T10:00:00.123Z")
         #expect(try fixture.context.fetch(FetchDescriptor<ScheduleTemplate>()).first?.weekdayMask == 31)
         #expect(try fixture.context.fetch(FetchDescriptor<AnchorPreferences>()).first?.appearanceRaw == "dark")
     }

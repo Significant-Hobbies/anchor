@@ -437,7 +437,16 @@ enum AnchorMirrorSyncError: Error, Equatable {
 enum AnchorMirror {
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            let milliseconds = Int64((date.timeIntervalSince1970 * 1_000).rounded())
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            if milliseconds % 1_000 != 0 { formatter.formatOptions.insert(.withFractionalSeconds) }
+            // Whole-second legacy records keep their bytes; MCP millisecond
+            // dates survive native import and the following account projection.
+            try container.encode(formatter.string(from: Date(timeIntervalSince1970: Double(milliseconds) / 1_000)))
+        }
         encoder.outputFormatting = [.sortedKeys]
         return encoder
     }()
