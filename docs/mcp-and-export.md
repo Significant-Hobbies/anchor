@@ -2,6 +2,48 @@
 
 Two ways out of the app: files you can open, and a server an AI can query.
 
+## Remote account connection (prepared)
+
+The remote connection exposes account-scoped Anchor data and actions through
+SaaS Maker's shared MCP gateway. It uses the existing Significant Hobbies account
+identity and Personal Platform sync service. It adds no model or conversational
+engine to Anchor.
+
+This connection is implemented but not activated or production-qualified.
+The planned branded endpoint is
+`https://anchor-mcp.significanthobbies.com/anchor/mcp`. The host, OAuth resource
+and delegated `anchor.read` / `anchor.write` scopes must be configured and the
+companion services released before that URL is usable. The gateway defaults
+closed until its explicit write-product activation flag enables Anchor.
+
+After activation, add the HTTPS MCP endpoint in ChatGPT using OAuth, or use the
+same endpoint with Codex or another remote MCP client. Codex supports:
+
+```bash
+codex mcp add anchor --url https://anchor-mcp.significanthobbies.com/anchor/mcp
+codex mcp login anchor --scopes anchor.read,anchor.write
+```
+
+Use `anchor.read` alone for a read-only connection. The verified Google identity
+must be linked to the same existing account used by the native app. In Anchor's
+account settings, explicitly enable planner sharing for that account. Review the
+disclosure for imported calendar/reminder titles and details. Distraction notes,
+learned keywords, calendar credentials and integration identifiers stay local.
+
+The tools discover the account, capabilities, shared records, devices and current
+focus snapshots. They create, edit and remove supported planner metadata with
+record versions and stable retry IDs. Bounded history edits preserve timing and
+private notes. Multi-record planner operations and live focus actions execute
+through the native app's existing services on a selected device.
+
+Device commands require Anchor to be active. A queued command is `pending`, not
+completed; inspect its receipt for the actual result. Snapshots include observation
+times and may be stale while the device is offline. Stopping planner sharing
+prevents future syncing and invalidates old pending commands on this device;
+already shared copies remain in the account until removed.
+
+This remote connection is distinct from the local developer server below.
+
 ## MCP server
 
 `anchor-mcp` speaks JSON-RPC 2.0 over stdio — the transport MCP clients expect.
