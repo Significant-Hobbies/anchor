@@ -1,5 +1,6 @@
 #if !os(watchOS)
 import Foundation
+import Darwin
 import PersonalSyncKit
 import SwiftData
 
@@ -195,7 +196,19 @@ struct AnchorAgentCommandStore {
         try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try AnchorAgentCommand.encoder.encode(state).write(to: fileURL, options: .atomic)
     }
+    private func withExclusiveAccess<T>(_ body: () throws -> T) throws -> T {
+        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let descriptor = open(fileURL.appendingPathExtension("lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        guard descriptor >= 0 else { throw CocoaError(.fileWriteUnknown) }
+        defer { close(descriptor) }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw CocoaError(.fileLocking) }
+        defer { _ = flock(descriptor, LOCK_UN) }
+        return try body()
+    }
     func ingest(_ records: [MirrorRecord], owner: String, deviceID: String) throws {
+        try withExclusiveAccess { try ingestUnlocked(records, owner: owner, deviceID: deviceID) }
+    }
+    private func ingestUnlocked(_ records: [MirrorRecord], owner: String, deviceID: String) throws {
         var state = try load(owner: owner)
         for record in records where record.name.hasPrefix("agentcommand-") {
             if let recordOwner = record.hubOwnerID, recordOwner != owner { throw HubHistoryOwnershipError.differentAccount }
@@ -222,6 +235,14 @@ struct AnchorAgentCommandStore {
     @MainActor
     func reconcile(owner: String, deviceID: String, controller: FocusController, context: ModelContext,
                    approvedPlannerNames: Set<String>, now: Date = .now) throws {
+        try withExclusiveAccess {
+            try reconcileUnlocked(owner: owner, deviceID: deviceID, controller: controller, context: context,
+                                  approvedPlannerNames: approvedPlannerNames, now: now)
+        }
+    }
+    @MainActor
+    private func reconcileUnlocked(owner: String, deviceID: String, controller: FocusController, context: ModelContext,
+                                   approvedPlannerNames: Set<String>, now: Date) throws {
         var state = try load(owner: owner)
         for original in state.commands.values.sorted(by: { $0.issuedAt < $1.issuedAt }) where original.status == .pending {
             guard original.targetDeviceId == deviceID else { continue }

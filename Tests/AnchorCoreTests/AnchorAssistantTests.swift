@@ -1,6 +1,7 @@
 #if !os(watchOS)
 @testable import AnchorCore
 import Foundation
+import Darwin
 import PersonalSyncKit
 import SwiftData
 import Testing
@@ -233,6 +234,20 @@ struct AnchorAssistantTests {
         #expect(try store.load(owner: "A").commands[copy.id.uuidString]?.status == .failed)
         #expect(fixture.context.hasChanges)
         #expect(draft.title == "Unsaved draft")
+    }
+
+    @Test("A second process cannot race a durable command claim")
+    func commandFileLock() throws {
+        let fixture = try SyncFixture(); defer { fixture.cleanUp() }
+        try FileManager.default.createDirectory(at: fixture.directory, withIntermediateDirectories: true)
+        let store = AnchorAgentCommandStore(directory: fixture.directory)
+        let descriptor = open(store.fileURL.appendingPathExtension("lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        #expect(descriptor >= 0)
+        defer { close(descriptor) }
+        #expect(flock(descriptor, LOCK_EX | LOCK_NB) == 0)
+        defer { _ = flock(descriptor, LOCK_UN) }
+        #expect(throws: (any Error).self) { try store.ingest([record(command(.start))], owner: "A", deviceID: "device") }
+        #expect(try store.load(owner: "A").commands.isEmpty)
     }
 
     @Test("A failed focus save reports failure and a durable claim prevents replay")

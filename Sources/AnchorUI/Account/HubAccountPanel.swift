@@ -109,7 +109,7 @@ public struct HubAccountPanel: View {
     private var privacyBoundary: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             boundaryRow(
-                "Hub receives finished-session metadata. Planner sharing is a separate choice for this account.",
+                "Finished-session metadata includes goal, timing, outcome, and interruption count. Planner sharing is a separate choice for this account.",
                 symbol: "checkmark.circle"
             )
             boundaryRow(
