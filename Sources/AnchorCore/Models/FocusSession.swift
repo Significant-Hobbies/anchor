@@ -9,6 +9,9 @@ public final class FocusSession {
     public var endedAt: Date?
     /// Travels with the session through iCloud; nil requires explicit Hub approval.
     public var hubAccountID: String?
+    /// Commits with a cleared project relationship. Nil preserves legacy wire
+    /// omission; this recovery marker itself is never part of Hub payloads.
+    public var hubProjectClearIsExplicit: Bool?
 
     // MARK: Timing (mirrors `TimeAccount`, flattened for a primitive schema)
     public var plannedSeconds: Int = 0

@@ -314,14 +314,18 @@ public final class AnchorPlatformSync {
         let persisted = ModelContext(context.container)
         guard let stored = try? persisted.fetch(FetchDescriptor<FocusSession>()) else { return }
         let linkedIDs = Set(stored.filter { $0.hubAccountID == owner && $0.project != nil }.map(\.id))
-        pendingProjectClears = (owner, Set(candidates.map(\.id)).intersection(linkedIDs))
+        let clearedIDs = Set(candidates.map(\.id)).intersection(linkedIDs)
+        for session in candidates where clearedIDs.contains(session.id) {
+            session.hubProjectClearIsExplicit = true
+        }
+        pendingProjectClears = (owner, clearedIDs)
     }
 
     private func persistLocalProjectClearProvenance() {
         guard let pending = pendingProjectClears else { return }
         pendingProjectClears = nil
         do { try plannerSharingStore.markExplicitProjectClears(owner: pending.owner, sessionIDs: pending.ids) }
-        catch { ownershipNotice = "The project edit was saved locally, but its account sync approval could not be saved. Retry after checking available storage." }
+        catch { ownershipNotice = "The project edit and its clear intent were saved locally. Account sync is waiting for its local cache to become writable; retry after checking available storage." }
     }
 
     private static let pendingPlannerNotice = "Some iCloud planner items need approval for this account. History and other approved changes continue syncing."

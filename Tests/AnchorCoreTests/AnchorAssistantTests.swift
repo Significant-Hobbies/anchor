@@ -586,6 +586,87 @@ struct AnchorAssistantTests {
         #expect(try HubPlannerSharingStore(directory: fixture.directory).load()?.explicitProjectClearSessionIDs?.contains(session.id.uuidString) == true)
     }
 
+    @Test("A committed clear survives provenance-cache failure and a new container exports explicit null")
+    func projectClearSurvivesCacheFailureAndRelaunch() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "anchor-clear-cache-failure-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "history.store")
+        let fixture = try SyncFixture(storeURL: storeURL); defer { fixture.cleanUp() }
+        let linked = fixture.addSession("Saved clear")
+        let untouched = fixture.addSession("Unrelated legacy nil")
+        let project = Project(name: "Linked before clear"); fixture.context.insert(project); linked.project = project
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        let cache = HubPlannerSharingStore(directory: fixture.directory)
+        try FileManager.default.createDirectory(at: cache.fileURL, withIntermediateDirectories: true)
+        linked.project = nil
+        try fixture.context.save() // The independent cache write is obstructed.
+        #expect(!fixture.context.hasChanges)
+        #expect(fixture.sync.ownershipNotice != nil)
+        #expect(throws: (any Error).self) { try cache.load() }
+        let persisted = try #require(try ModelContext(fixture.container).fetch(FetchDescriptor<FocusSession>()).first { $0.id == linked.id })
+        #expect(persisted.project == nil && persisted.hubProjectClearIsExplicit == true)
+        // Restore cache storage, then simulate app relaunch with a new store
+        // container and sync object rather than relying on an in-memory retry.
+        try FileManager.default.removeItem(at: cache.fileURL)
+        let reopened = try AnchorStore.makeContainer(kind: .localOnly, url: storeURL)
+        let context = ModelContext(reopened)
+        let sync = AnchorPlatformSync(context: context, identity: fixture.identity, supportDirectory: fixture.directory,
+                                      deviceId: "synthetic-device", receiptStore: fixture.receipts,
+                                      transport: fixture.transport, platformURL: fixture.origin, identityOrigin: fixture.origin,
+                                      observeLocalSaves: false)
+        await sync.account?.restore()
+        await sync.synchronize()
+        #expect(sync.receipt.failure == nil)
+        let mutations = await fixture.server.pushes.flatMap(\.mutations)
+        func fields(_ id: UUID) throws -> [String: Any] {
+            let mutation = try #require(mutations.first { $0.id == AnchorMirrorNaming.Kind.focusSession.name(for: id) })
+            let payload = try #require(mutation.record)
+            return try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(payload)) as? [String: Any])
+        }
+        #expect(try fields(linked.id)["projectID"] is NSNull)
+        #expect(try !fields(untouched.id).keys.contains("projectID"))
+        #expect(try context.fetch(FetchDescriptor<FocusSession>()).first { $0.id == untouched.id }?.hubProjectClearIsExplicit == nil)
+    }
+
+    @Test("A failed underlying session save cannot publish an unsaved clear or its recovery marker")
+    func failedProjectClearTransactionDoesNotPersistMarker() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "anchor-clear-save-failure-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "history.store")
+        let fixture = try SyncFixture(storeURL: storeURL); defer { fixture.cleanUp() }
+        let linked = fixture.addSession("Clear cannot save")
+        let project = Project(name: "Preserved link"); fixture.context.insert(project); linked.project = project
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        let readOnly = ModelConfiguration(schema: AnchorStore.schema, url: storeURL, allowsSave: false, cloudKitDatabase: .none)
+        let blockedContainer = try ModelContainer(for: AnchorStore.schema, configurations: [readOnly])
+        let blocked = ModelContext(blockedContainer); blocked.autosaveEnabled = false
+        let sync = AnchorPlatformSync(context: blocked, identity: fixture.identity, supportDirectory: fixture.directory,
+                                      deviceId: "synthetic-device", receiptStore: fixture.receipts,
+                                      transport: fixture.transport, platformURL: fixture.origin, identityOrigin: fixture.origin,
+                                      observeLocalSaves: false)
+        await sync.account?.restore()
+        let draft = try #require(try blocked.fetch(FetchDescriptor<FocusSession>()).first)
+        draft.project = nil
+        #expect(throws: (any Error).self) { try blocked.save() }
+        #expect(blocked.hasChanges)
+        await sync.synchronize()
+        #expect(await fixture.server.pushes.isEmpty)
+        blocked.rollback()
+        let reopened = try AnchorStore.makeContainer(kind: .localOnly, url: storeURL)
+        let context = ModelContext(reopened)
+        let stored = try #require(try context.fetch(FetchDescriptor<FocusSession>()).first)
+        #expect(stored.project?.id == project.id)
+        #expect(stored.hubProjectClearIsExplicit == nil)
+        #expect(try HubPlannerSharingStore(directory: fixture.directory).load()?.explicitProjectClearSessionIDs?.contains(stored.id.uuidString) != true)
+        let payload = try #require(try AnchorMirror.records(in: context, tombstonesFor: [], hubAccountID: "stable-A").first { $0.name.hasPrefix("session-") }?.payload)
+        let fields = try #require(try JSONSerialization.jsonObject(with: payload) as? [String: Any])
+        #expect(fields["projectID"] as? String == project.id.uuidString)
+    }
+
     @Test("A failed focus save reports failure and a durable claim prevents replay")
     func failedSave() throws {
         struct Failure: Error {}

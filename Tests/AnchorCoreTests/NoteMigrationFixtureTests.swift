@@ -193,6 +193,7 @@ import Testing
         let d = try #require(context.fetch(FetchDescriptor<Distraction>()).first)
         #expect(d.id == id && d.session?.id == sessionID)
         #expect(d.session?.state == .paused && d.session?.bankedSeconds == banked)
+        #expect(d.session?.hubProjectClearIsExplicit == nil)
         #expect(d.privateNote == "Synthetic old-source private note")
         #expect(d.privateKeywords == ["synthetic", "old-source"])
         #expect(d.note.isEmpty && d.keywords.isEmpty)

@@ -504,7 +504,7 @@ enum AnchorMirror {
                 var payload = FocusSessionPayload(session)
                 payload.hubAccountID = nil
                 var encoded = try encoder.encode(payload)
-                if payload.projectID == nil && explicitProjectClearSessionIDs.contains(session.id) {
+                if payload.projectID == nil && (session.hubProjectClearIsExplicit == true || explicitProjectClearSessionIDs.contains(session.id)) {
                     var fields = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
                     fields["projectID"] = NSNull()
                     encoded = try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
@@ -1140,7 +1140,9 @@ enum AnchorMirror {
                     session.goal = goal
                 }
                 if clearProject {
+                    if session.project != nil || session.hubProjectClearIsExplicit != true { changed = true }
                     session.project = nil
+                    session.hubProjectClearIsExplicit = true
                 } else if let reference = value.projectID.flatMap(UUID.init(uuidString:)),
                           let project = index.projects[reference.uuidString] {
                     session.project = project
