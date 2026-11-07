@@ -1,0 +1,67 @@
+{
+  "generatedBy": "Anchor Worker create/get tools",
+  "records": [
+    {
+      "name": "goal-10000000-0000-4000-8000-000000000001",
+      "version": 1,
+      "payload": {
+        "recordType": "goal",
+        "id": "10000000-0000-4000-8000-000000000001",
+        "title": "Build",
+        "notes": "A deliberate day",
+        "createdAt": "2026-11-08T10:00:00Z",
+        "symbolName": "flag",
+        "tintIndex": 1,
+        "keywords": []
+      }
+    },
+    {
+      "name": "planblock-10000000-0000-4000-8000-000000000002",
+      "version": 1,
+      "payload": {
+        "recordType": "planBlock",
+        "id": "10000000-0000-4000-8000-000000000002",
+        "isTemplateOverride": true,
+        "title": "Build",
+        "details": "",
+        "plannedStart": "2026-11-08T10:00:00Z",
+        "plannedSeconds": 1800,
+        "stateRaw": "planned",
+        "kindRaw": "focus",
+        "flexibilityRaw": "flexible",
+        "createdAt": "2026-11-08T10:00:00Z",
+        "updatedAt": "2026-11-08T10:00:00Z"
+      }
+    },
+    {
+      "name": "prefs-10000000-0000-4000-8000-000000000003",
+      "version": 1,
+      "payload": {
+        "recordType": "preferences",
+        "id": "10000000-0000-4000-8000-000000000003",
+        "appearanceRaw": "dark",
+        "updatedAt": "2026-11-08T10:00:00Z"
+      }
+    },
+    {
+      "name": "schedule-10000000-0000-4000-8000-000000000004",
+      "version": 1,
+      "payload": {
+        "recordType": "scheduleTemplate",
+        "id": "10000000-0000-4000-8000-000000000004",
+        "title": "Usual focus",
+        "details": "",
+        "createdAt": "2026-11-08T10:00:00Z",
+        "updatedAt": "2026-11-08T10:00:00Z",
+        "startMinutesFromMidnight": 540,
+        "plannedSeconds": 1800,
+        "weekdayMask": 31,
+        "kindRaw": "focus",
+        "flexibilityRaw": "flexible",
+        "isBehaviorHabit": false,
+        "habitUsesSuggestedTime": true,
+        "habitVersion": 1
+      }
+    }
+  ]
+}

@@ -21,6 +21,10 @@ public final class AnchorPlatformSync {
         name.hasPrefix(AnchorMirrorNaming.Kind.focusSession.prefix) || UUID(uuidString: name) != nil
     }
 
+    private weak var focusController: FocusController?
+    public func attachFocusController(_ controller: FocusController) { focusController = controller }
+    private var commandStore: AnchorAgentCommandStore { AnchorAgentCommandStore(directory: supportDirectory) }
+
     private let context: ModelContext
     private let identity: PersonalIdentityClient?
     private let supportDirectory: URL
@@ -35,6 +39,7 @@ public final class AnchorPlatformSync {
     let runtime: MirrorRuntime?
     private var activeUserID: String?
     private var generation = UUID()
+    private var deviceObservedAt = Date()
     private var isDisconnecting = false
     private var saveObserver: NSObjectProtocol?
     private var saveDebounce: Task<Void, Never>?
@@ -160,6 +165,13 @@ public final class AnchorPlatformSync {
             guard (notification.object as? ModelContext).map(ObjectIdentifier.init) == contextID else { return }
             guard let self else { return }
             self.saveGeneration.withLock { $0 += 1 }
+            // This notification is from our actor-confined UI context's own
+            // save, never a generic store/CloudKit snapshot. Capture provenance
+            // synchronously so an account switch cannot reassign the insertion.
+            let key = ModelContext.NotificationKey.insertedIdentifiers
+            let raw = notification.userInfo?[key] ?? notification.userInfo?[key.rawValue]
+            let identifiers = (raw as? [PersistentIdentifier]) ?? Array(raw as? Set<PersistentIdentifier> ?? [])
+            MainActor.assumeIsolated { self.registerLocalPlannerInsertions(identifiers) }
             guard observeLocalSaves else { return }
             Task { @MainActor [weak self] in self?.scheduleSynchronizeAfterLocalSave() }
         }
@@ -238,6 +250,80 @@ public final class AnchorPlatformSync {
         HubHistoryOwnershipStore(directory: supportDirectory)
     }
 
+    private var plannerSharingStore: HubPlannerSharingStore { HubPlannerSharingStore(directory: supportDirectory) }
+    private var plannerConsentRevision = 0
+    public var isPlannerSharingEnabled: Bool {
+        _ = plannerConsentRevision
+        guard let userID = account?.session?.userId,
+              let state = try? plannerSharingStore.load() else { return false }
+        return state.owner == userID && state.enabled
+    }
+
+    /// Consent is tied to the verified account and the current local planner inventory.
+    /// Future UI insertions affiliate at their actual didSave event. Imported
+    /// iCloud records without provenance still require explicit approval.
+    @discardableResult
+    public func setPlannerSharingEnabled(_ enabled: Bool) async -> Bool {
+        guard sessionSynchronizationEnabled, !isDisconnecting, !isSyncing, let identity else { return false }
+        selectAccount()
+        guard let userID = activeUserID else { return false }
+        let attempt = generation
+        isSyncing = true
+        defer { if isCurrent(userID, attempt: attempt) { isSyncing = false } }
+        do {
+            guard let verified = try await identity.verifiedSyncAccount(), verified.userID == userID,
+                  isCurrent(userID, attempt: attempt), try historyOwnership.owner() == userID else {
+                throw HubHistoryOwnershipError.approvalRequired
+            }
+            guard !context.hasChanges else { throw AnchorMirrorSyncError.pendingLocalEdits }
+            let names = enabled ? try localPlannerNames() : []
+            if enabled { try await runtime?.repullAll() }
+            guard isCurrent(userID, attempt: attempt) else { return false }
+            try plannerSharingStore.save(owner: userID, enabled: enabled, names: names)
+            plannerConsentRevision += 1
+            ownershipNotice = nil
+            return true
+        } catch {
+            ownershipNotice = error.localizedDescription
+            return false
+        }
+    }
+
+    private func registerLocalPlannerInsertions(_ identifiers: [PersistentIdentifier]) {
+        guard sessionSynchronizationEnabled, !isDisconnecting,
+              let userID = account?.session?.userId,
+              (try? historyOwnership.owner()) == userID,
+              let sharing = try? plannerSharingStore.load(), sharing.owner == userID, sharing.enabled else { return }
+        var names: Set<String> = []
+        for identifier in identifiers {
+            let model = context.model(for: identifier)
+            let entry: (AnchorMirrorNaming.Kind, UUID)?
+            switch model {
+            case let value as Goal: entry = (.goal, value.id)
+            case let value as Project: entry = (.project, value.id)
+            case let value as SavedTag: entry = (.savedTag, value.id)
+            case let value as ScheduleTemplate: entry = (.scheduleTemplate, value.id)
+            case let value as HabitCompletion: entry = (.habitCompletion, value.id)
+            case let value as DayPlanConfirmation: entry = (.dayPlanConfirmation, value.id)
+            case let value as PlanBlock: entry = (.planBlock, value.id)
+            case let value as BehaviorProfile: entry = (.behaviorProfile, value.id)
+            case let value as AnchorPreferences: entry = (.preferences, value.id)
+            case let value as DivergenceEvent: entry = (.divergenceEvent, value.id)
+            default: entry = nil
+            }
+            if let entry { names.insert(entry.0.name(for: entry.1)) }
+        }
+        guard !names.isEmpty else { return }
+        do { try plannerSharingStore.save(owner: userID, enabled: true, names: names) }
+        catch { ownershipNotice = "New planner items remain local because their account affiliation could not be saved. Approve them again after checking available storage." }
+    }
+
+    private func localPlannerNames() throws -> Set<String> {
+        Set(try AnchorMirror.records(in: context, tombstonesFor: []).compactMap {
+            AnchorMirrorNaming.kind(of: $0.name)?.isPlanner == true ? $0.name : nil
+        })
+    }
+
     public var needsHistoryApproval: Bool {
         guard let owner = try? historyOwnership.owner() else { return true }
         guard owner == account?.session?.userId else { return false }
@@ -296,6 +382,7 @@ public final class AnchorPlatformSync {
         selectAccount()
         let attempt = generation
         isSyncing = true
+        deviceObservedAt = Date()
         defer {
             syncPass = nil
             if isCurrent(attempt) { isSyncing = false }
@@ -326,6 +413,13 @@ public final class AnchorPlatformSync {
             guard isCurrent(attempt) else { return }
             if outcome.isComplete { try await validateSyncPass() }
             await recordOutcome(outcome)
+            if let pinned, let focusController,
+               let sharing = try plannerSharingStore.load(), sharing.enabled, sharing.owner == pinned.userID {
+                try await validateSyncPass()
+                focusController.synchronizeActiveSessionFromStore()
+                try commandStore.reconcile(owner: pinned.userID, deviceID: deviceId, controller: focusController,
+                                           context: context, approvedPlannerNames: sharing.names)
+            }
         } catch {
             guard isCurrent(attempt) else { return }
             await refreshPendingCount()
@@ -376,9 +470,29 @@ public final class AnchorPlatformSync {
         guard !context.hasChanges, saveGeneration.withLock({ $0 }) == snapshotGeneration else {
             throw AnchorMirrorSyncError.pendingLocalEdits
         }
-        return try AnchorMirror.records(in: context, tombstonesFor: [], hubAccountID: owner) { id in
+        let sharing = try plannerSharingStore.load()
+        let plannerNames = sharing?.owner == owner && sharing?.enabled == true ? sharing!.names : []
+        var records = try AnchorMirror.records(in: context, tombstonesFor: [], hubAccountID: owner, plannerNames: plannerNames) { id in
             aliases[id] ?? AnchorMirrorNaming.Kind.focusSession.name(for: id)
         }
+        if sharing?.owner == owner && sharing?.enabled == true {
+            records += try commandStore.records(owner: owner)
+            if let id = UUID(uuidString: deviceId), let focusController {
+                #if os(macOS)
+                let devicePlatform = "macOS"
+                #else
+                let devicePlatform = "iOS"
+                #endif
+                let sharedSession = focusController.session.flatMap { $0.hubAccountID == owner ? $0 : nil }
+                var device = AnchorAgentDevice(id: id, deviceId: deviceId, platform: devicePlatform,
+                                              updatedAt: deviceObservedAt, observedAt: deviceObservedAt, session: sharedSession.map(AnchorAgentDevice.Session.init), activeSessionID: sharedSession?.id,
+                                              state: sharedSession?.state.rawValue ?? "idle", capturePresented: sharedSession != nil && focusController.isCapturing)
+                if focusController.hasSession && sharedSession == nil { device.capabilities = [] }
+                records.append(MirrorRecord(name: "agentdevice-" + id.uuidString.lowercased(), modifiedAt: .now,
+                                            payload: try AnchorAgentCommand.encoder.encode(device), hubOwnerID: owner))
+            }
+        }
+        return records
     }
 
     private func validateVersionContinuity() async throws {
@@ -416,12 +530,41 @@ public final class AnchorPlatformSync {
         }
         let isolated = ModelContext(context.container)
         isolated.autosaveEnabled = false
-        let changed = try AnchorMirror.apply(records, in: isolated, account: account.userID)
+        var plannerNames: Set<String> = []
+        if let sharing = try plannerSharingStore.load(), sharing.enabled, sharing.owner == account.userID {
+            let incoming = Set(records.compactMap { AnchorMirrorNaming.kind(of: $0.name)?.isPlanner == true ? $0.name : nil })
+            let collisions = try localPlannerNames().intersection(incoming).subtracting(sharing.names)
+            guard collisions.isEmpty else { throw HubHistoryOwnershipError.approvalRequired }
+            plannerNames = sharing.names.union(incoming)
+        }
+        let changed = try AnchorMirror.apply(records, in: isolated, account: account.userID, plannerNames: plannerNames)
+        // The immutable owner file already pins this inventory to one account.
+        // Only durably imported IDs become deletion-eligible on later passes.
+        if !plannerNames.isEmpty {
+            try plannerSharingStore.save(owner: account.userID, enabled: true, names: plannerNames)
+        }
+        if let sharing = try plannerSharingStore.load(), sharing.enabled, sharing.owner == account.userID {
+            try commandStore.ingest(records, owner: account.userID, deviceID: deviceId)
+        }
         guard changed else { return }
         // A held main-context model does not see the isolated commit; a fresh
         // fetch refreshes it in place without resetting user edits.
+        refreshImportedModels()
+    }
+
+    func refreshImportedModels() {
         _ = try? context.fetch(FetchDescriptor<FocusSession>())
         _ = try? context.fetch(FetchDescriptor<Distraction>())
+        _ = try? context.fetch(FetchDescriptor<Goal>())
+        _ = try? context.fetch(FetchDescriptor<Project>())
+        _ = try? context.fetch(FetchDescriptor<SavedTag>())
+        _ = try? context.fetch(FetchDescriptor<ScheduleTemplate>())
+        _ = try? context.fetch(FetchDescriptor<HabitCompletion>())
+        _ = try? context.fetch(FetchDescriptor<DayPlanConfirmation>())
+        _ = try? context.fetch(FetchDescriptor<PlanBlock>())
+        _ = try? context.fetch(FetchDescriptor<BehaviorProfile>())
+        _ = try? context.fetch(FetchDescriptor<AnchorPreferences>())
+        _ = try? context.fetch(FetchDescriptor<DivergenceEvent>())
     }
 
     private func validateSyncPass() async throws {

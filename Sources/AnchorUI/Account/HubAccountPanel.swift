@@ -109,11 +109,11 @@ public struct HubAccountPanel: View {
     private var privacyBoundary: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             boundaryRow(
-                "Hub receives only the finished session’s goal, timing, outcome, and interruption count.",
+                "Hub receives finished-session metadata. Planner sharing is a separate choice for this account.",
                 symbol: "checkmark.circle"
             )
             boundaryRow(
-                "Distraction notes, schedules, reflections, and behavior choices never enter Hub.",
+                "Distraction notes and learned keywords stay on this device. Calendar and reminder connections stay private.",
                 symbol: "lock.shield"
             )
         }
@@ -167,6 +167,32 @@ public struct HubAccountPanel: View {
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .disabled(platform.isSyncing)
                 .accessibilityIdentifier("anchor.hub.approve-history")
+            }
+
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Text("Share planner with connected assistants")
+                    .font(.body.weight(.semibold))
+                Text("Allow this account’s connected assistants to access and update approved goals, projects, tags, schedule, habits and preferences, and request focus actions while Anchor is active. New items you create here share automatically; imported iCloud items need approval.")
+                    .font(.caption).foregroundStyle(theme.textSecondary)
+                Button(platform.isPlannerSharingEnabled ? "stop planner sharing" : "approve planner sharing for this account") {
+                    Task {
+                        if await platform.setPlannerSharingEnabled(!platform.isPlannerSharingEnabled) {
+                            await platform.synchronize()
+                        }
+                    }
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .disabled(platform.isSyncing || platform.needsHistoryApproval)
+                .accessibilityIdentifier("anchor.hub.planner-sharing")
+                if platform.isPlannerSharingEnabled {
+                    Button("approve imported planner items") {
+                        Task { if await platform.setPlannerSharingEnabled(true) { await platform.synchronize() } }
+                    }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .disabled(platform.isSyncing)
+                }
+                Text("Stopping prevents future planner syncing and focus requests on this device. Copies already shared remain in your account until removed there.")
+                    .font(.caption).foregroundStyle(theme.textSecondary)
             }
 
             if presentation == .settings {

@@ -81,6 +81,8 @@ public final class AnchorAppWorld {
             storeKind: result.kind
         )
 
+        platform.attachFocusController(focusController)
+
         #if os(macOS)
         machineActivityMonitor = MachineActivityMonitor(
             context: result.container.mainContext,
@@ -92,6 +94,7 @@ public final class AnchorAppWorld {
 
 /// The identical product root used by the Mac and iPhone WindowGroups.
 public struct AnchorProductRoot: View {
+    @Environment(\.scenePhase) private var scenePhase
     private let world: AnchorAppWorld
 
     public init(world: AnchorAppWorld) {
@@ -107,6 +110,13 @@ public struct AnchorProductRoot: View {
             .anchorAppearance()
             .environment(\.anchorPlatformSync, world.platform)
             .task { await world.platform.restoreAndSynchronize() }
+            .task(id: scenePhase) {
+                guard scenePhase == .active else { return }
+                while !Task.isCancelled {
+                    if world.platform.isPlannerSharingEnabled { await world.platform.synchronize() }
+                    try? await Task.sleep(for: .seconds(15))
+                }
+            }
     }
 }
 
