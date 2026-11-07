@@ -56,7 +56,10 @@ let package = Package(
         ),
         .testTarget(
             name: "AnchorUITests",
-            dependencies: ["AnchorUI"],
+            dependencies: [
+                "AnchorUI",
+                .product(name: "PersonalSyncKit", package: "significanthobbies"),
+            ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
