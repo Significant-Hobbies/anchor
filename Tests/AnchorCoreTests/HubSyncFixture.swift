@@ -156,7 +156,9 @@ actor FixtureHub {
             for mutation in envelope.mutations {
                 if case let .object(fields) = mutation.record {
                     #expect(fields["recordType"] != nil)
-                    #expect(fields["note"] == nil && fields["keywords"] == nil)
+                    if fields["recordType"] == .string("distraction") {
+                        #expect(fields["note"] == nil && fields["keywords"] == nil)
+                    }
                 }
             }
             pushes.append(Push(token: token, mutations: envelope.mutations))

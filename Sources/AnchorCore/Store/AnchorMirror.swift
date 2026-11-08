@@ -168,6 +168,12 @@ struct FocusSessionPayload: Codable, Equatable {
         goalID = session.goal?.id.uuidString
         projectID = session.project?.id.uuidString
     }
+
+    mutating func normalizeFinishedTimerMarker() {
+        guard stateRaw == SessionState.finished.rawValue,
+              let endedAt, endedAt >= startedAt, runningSince == endedAt else { return }
+        runningSince = nil
+    }
 }
 
 struct DistractionPayload: Codable, Equatable {
@@ -505,6 +511,7 @@ enum AnchorMirror {
                 // fingerprint stable after the local owner is stamped on it.
                 var payload = FocusSessionPayload(session)
                 payload.hubAccountID = nil
+                payload.normalizeFinishedTimerMarker()
                 var encoded = try encoder.encode(payload)
                 if payload.projectID == nil && (session.hubProjectClearIsExplicit == true || explicitProjectClearSessionIDs.contains(session.id)) {
                     var fields = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
@@ -1018,6 +1025,7 @@ enum AnchorMirror {
             // never a legacy summary — it must not silently fall back.
             guard recordType == "focusSession" else { throw AnchorMirrorSyncError.invalidRecord }
             var value = try decode(FocusSessionPayload.self, from: payload)
+            value.normalizeFinishedTimerMarker()
             guard value.stateRaw == SessionState.finished.rawValue, value.runningSince == nil,
                   let id = UUID(uuidString: value.id), id == expectedID else {
                 throw AnchorMirrorSyncError.invalidRecord
