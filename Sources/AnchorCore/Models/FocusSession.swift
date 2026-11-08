@@ -37,7 +37,7 @@ public final class FocusSession {
     /// separate so the user's own taxonomy is never overwritten.
     public var tagIDStrings: [String] = []
 
-    /// A historical snapshot of the project's billing rate at session start.
+    /// Inert legacy attributes retained for existing SwiftData stores and CloudKit schema compatibility.
     public var hourlyRate: Double = 0
     public var currencyCode: String = "USD"
 

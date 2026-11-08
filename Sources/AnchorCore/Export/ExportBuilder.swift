@@ -117,9 +117,6 @@ public struct ExportBuilder: Sendable {
                 .text(record.projectTitle),
                 .text(record.tags.joined(separator: ", ")),
                 .text(record.notes),
-                .number(record.hourlyRate),
-                .text(record.currencyCode),
-                .number(record.earnedAmount),
                 .number(Double(record.plannedSeconds) / 60),
                 .number(record.focusedSeconds / 60),
                 .number(record.computerActiveSeconds / 60),
@@ -138,8 +135,6 @@ public struct ExportBuilder: Sendable {
                 .init("Goal", width: 28), .init("Theme", width: 16),
                 .init("Intent", width: 34), .init("Project", width: 24),
                 .init("Tags", width: 24), .init("Notes", width: 42),
-                .init("Hourly rate", width: 14), .init("Currency", width: 11),
-                .init("Tracked value", width: 15),
                 .init("Planned (min)", width: 14),
                 .init("Focused (min)", width: 14),
                 .init("Computer active (min)", width: 21),
@@ -255,7 +250,7 @@ public struct ExportBuilder: Sendable {
 
     public func sessionsCSV(from records: [SessionRecord]) -> String {
         let formatter = ISO8601DateFormatter()
-        var lines = ["started,ended,goal,theme,intent,project,tags,notes,hourly_rate,currency,tracked_value,planned_minutes,focused_minutes,computer_active_minutes,computer_away_minutes,state,outcome,interruptions,session_id"]
+        var lines = ["started,ended,goal,theme,intent,project,tags,notes,planned_minutes,focused_minutes,computer_active_minutes,computer_away_minutes,state,outcome,interruptions,session_id"]
         for record in records {
             lines.append(Self.csvRow([
                 formatter.string(from: record.startedAt),
@@ -266,9 +261,6 @@ public struct ExportBuilder: Sendable {
                 record.projectTitle,
                 record.tags.joined(separator: " "),
                 record.notes,
-                String(format: "%.2f", record.hourlyRate),
-                record.currencyCode,
-                String(format: "%.2f", record.earnedAmount),
                 String(format: "%.2f", Double(record.plannedSeconds) / 60),
                 String(format: "%.2f", record.focusedSeconds / 60),
                 String(format: "%.2f", record.computerActiveSeconds / 60),

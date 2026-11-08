@@ -70,7 +70,7 @@ can provide a signed, app-mediated bridge to its protected store.
 | `goal_progress` | Time and interruptions per goal |
 | `best_hours` | Focused time and interruptions by hour of day |
 | `search_distractions` | Free-text search across notes, saved tags, keywords and categories |
-| `work_patterns` | Project, tag, billing and distraction-timing breakdowns |
+| `work_patterns` | Project, tag and distraction-timing breakdowns |
 | `machine_presence` | Aggregate active, tracked and untracked computer time |
 | `daily_review` | One day's planned and timed-observed time, untimed completion count, largest gaps, causal evidence, and suggestions — never an adherence score |
 | `daily_measurement_counts` | Content-free daily counts of started and completed sessions, planned and completed blocks, and divergences; includes the date window and explicit gaps, with no record text or IDs |
@@ -103,8 +103,8 @@ invisible until it has already mislabelled a week of your data. Expect `8/8` and
 JSON — all from `ExportBuilder`, all built on the same snapshots the app reads,
 so no format can disagree with the UI.
 
-Raw session rows include their project, reusable tags, entry notes, snapshotted
-rate and currency, tracked value, and aggregate computer-active/away duration.
+Raw session rows include their project, reusable tags, entry notes, focus timing,
+and aggregate computer-active/away duration.
 Raw distraction rows include their editable text and reusable tags.
 
 The workbook has eight sheets: **Summary**, **Day plan**, **Schedule changes**,

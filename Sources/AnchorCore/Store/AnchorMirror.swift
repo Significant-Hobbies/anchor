@@ -90,6 +90,7 @@ struct ProjectPayload: Codable, Equatable {
     var archivedAt: Date?
     var symbolName: String
     var tintIndex: Int
+    // Preserve legacy values when mirroring existing stores and mixed app versions.
     var hourlyRate: Double
     var currencyCode: String
 
@@ -138,6 +139,7 @@ struct FocusSessionPayload: Codable, Equatable {
     var intent: String
     var notes: String
     var tagIDStrings: [String]
+    // Preserve legacy values when mirroring existing stores and mixed app versions.
     var hourlyRate: Double
     var currencyCode: String
     var computerActiveSeconds: Double

@@ -87,9 +87,9 @@ public enum DemoData {
         }
 
         let projects = [
-            Project(name: "Anchor launch", symbolName: "app.badge", tintIndex: 0, hourlyRate: 125),
+            Project(name: "Anchor launch", symbolName: "app.badge", tintIndex: 0),
             Project(name: "Learning", symbolName: "book.closed", tintIndex: 2),
-            Project(name: "Operations", symbolName: "briefcase", tintIndex: 3, hourlyRate: 90),
+            Project(name: "Operations", symbolName: "briefcase", tintIndex: 3),
         ]
         for project in projects { context.insert(project) }
 
@@ -157,8 +157,6 @@ public enum DemoData {
                     startedAt: startedAt
                 )
                 session.bankedSeconds = focused
-                session.hourlyRate = session.project?.hourlyRate ?? 0
-                session.currencyCode = session.project?.currencyCode ?? "USD"
                 session.computerActiveSeconds = focused * (0.78 + Double(random.next(18)) / 100)
                 session.computerAwaySeconds = max(0, focused - session.computerActiveSeconds)
                 session.runningSince = nil

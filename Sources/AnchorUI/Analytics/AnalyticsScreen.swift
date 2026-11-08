@@ -96,7 +96,6 @@ public struct AnalyticsScreen: View {
                     tiles(overview)
                     periodComparison(records, previous: previousRecords)
                     machinePresenceCard(machineRecords)
-                    billingCard(records)
                     summaryCard(records)
                     sessionPatterns(overview)
                     dailyChart(records)
@@ -211,37 +210,6 @@ public struct AnalyticsScreen: View {
             Text(label).font(.system(size: 10)).foregroundStyle(theme.textTertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func billingCard(_ records: [SessionRecord]) -> some View {
-        let totals = engine.billingTotals(records)
-        return Card {
-            VStack(alignment: .leading, spacing: Space.sm) {
-                SectionHeader("Tracked value", subtitle: "Focused time × the project rate preserved on each session")
-                if totals.isEmpty {
-                    Text("Set an hourly rate for a project in Settings to turn tracked time into billable value.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(theme.textSecondary)
-                } else {
-                    ForEach(totals) { total in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(Format.money(total.amount, currencyCode: total.currencyCode))
-                                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(theme.positive)
-                                Text("\(Format.duration(total.billableSeconds)) across \(total.sessionCount) sessions")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(theme.textTertiary)
-                            }
-                            Spacer()
-                            Text(total.currencyCode)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(theme.textSecondary)
-                        }
-                    }
-                }
-            }
-        }
     }
 
     private func sessionPatterns(_ overview: AnalyticsEngine.Overview) -> some View {

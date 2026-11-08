@@ -101,16 +101,6 @@ public struct CompactPanel: View {
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .tracking(1)
                         .foregroundStyle(theme.textTertiary)
-                    if let session = controller.session, session.hourlyRate > 0 {
-                        Text(
-                            Format.money(
-                                controller.elapsed / 3600 * session.hourlyRate,
-                                currencyCode: session.currencyCode
-                            )
-                        )
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(theme.positive)
-                    }
                 }
                 Spacer(minLength: 0)
             }
