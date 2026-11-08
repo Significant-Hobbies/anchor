@@ -38,10 +38,10 @@ final class SyncFixture {
         FixtureProtocol.servers.withLock { $0[origin.host!] = server }
     }
 
-    func makeSync() -> AnchorPlatformSync {
+    func makeSync(deviceId: String = "synthetic-device") -> AnchorPlatformSync {
         AnchorPlatformSync(
             context: context, identity: identity, supportDirectory: directory,
-            deviceId: "synthetic-device", receiptStore: receipts,
+            deviceId: deviceId, receiptStore: receipts,
             transport: transport, platformURL: origin, identityOrigin: origin,
             observeLocalSaves: false
         )
@@ -95,6 +95,11 @@ actor FixtureHub {
     private(set) var pushes: [Push] = []
     private(set) var pulls: [Pull] = []
     var remoteChanges: [[String: Any]] = []
+    private var acceptedEchoes = false
+    private var acceptedCursor = 100
+    private var acceptedVersions: [String: Int] = [:]
+    func enableAcceptedEchoes() { acceptedEchoes = true }
+    func acceptedVersion(for id: String) -> Int { acceptedVersions[id] ?? 0 }
     func enqueueRemote(_ json: String) throws {
         let change = try JSONSerialization.jsonObject(with: Data(json.utf8))
         guard let change = change as? [String: Any] else { throw URLError(.cannotParseResponse) }
@@ -170,12 +175,35 @@ actor FixtureHub {
                 }
             } else { status = failures.contains(token) ? 503 : 200 }
             guard status == 200 else { return Reply(status: status, data: Data("Synthetic unavailable".utf8)) }
+            if acceptedEchoes {
+                let mutations = try JSONSerialization.jsonObject(with: body) as! [String: Any]
+                var results: [[String: Any]] = []
+                for mutation in mutations["mutations"] as! [[String: Any]] {
+                    let id = mutation["id"] as! String
+                    let version = (acceptedVersions[id] ?? 0) + 1
+                    acceptedVersions[id] = version
+                    acceptedCursor += 1
+                    remoteChanges.append([
+                        "cursor": acceptedCursor, "changeId": UUID().uuidString, "domain": "anchor", "id": id,
+                        "operation": mutation["operation"]!, "version": version,
+                        "occurredAt": mutation["occurredAt"]!, "recordedAt": mutation["occurredAt"]!,
+                        "originDeviceId": "synthetic-device", "record": mutation["record"] ?? NSNull(),
+                    ])
+                    results.append(["id": id, "idempotencyKey": mutation["idempotencyKey"]!, "status": "accepted", "version": version])
+                }
+                return try json(["results": results])
+            }
             return try json(["results": envelope.mutations.map {
                 ["id": $0.id, "idempotencyKey": $0.idempotencyKey, "status": "accepted", "version": user == "A" ? 7 : 19] as [String: Any]
             }])
         case "/v1/sync/pull":
             let cursor = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!.first { $0.name == "cursor" }!.value!
             pulls.append(Pull(token: token, cursor: Int(cursor)!))
+            if acceptedEchoes {
+                let changes = remoteChanges.filter { ($0["cursor"] as? Int ?? 0) > Int(cursor)! }
+                let nextCursor = max(acceptedCursor, remoteChanges.compactMap { $0["cursor"] as? Int }.max() ?? 0)
+                return try json(["changes": changes, "cursor": nextCursor, "hasMore": false])
+            }
             let foreign: [String: Any] = [
                 "cursor": 1, "changeId": "remote-change", "domain": "anchor", "id": "remote-only-\(user)",
                 "operation": "upsert", "version": 1, "occurredAt": "2026-09-01T00:00:00Z",

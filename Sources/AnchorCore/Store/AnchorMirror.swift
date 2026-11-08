@@ -49,6 +49,21 @@ enum AnchorMirrorNaming {
     }
 }
 
+enum AnchorHubAffiliation {
+    static let commandPrefix = "agentcommand-"
+    static let devicePrefix = "agentdevice-"
+
+    static func requiresOwner(_ recordName: String) -> Bool {
+        AnchorMirrorNaming.kind(of: recordName)?.isPlanner == true
+            || recordName.hasPrefix(commandPrefix)
+            || recordName.hasPrefix(devicePrefix)
+    }
+
+    static func owner(for recordName: String, verifiedOwner: String) -> String? {
+        requiresOwner(recordName) ? verifiedOwner : nil
+    }
+}
+
 // MARK: - Payloads
 
 /// One flat Codable envelope per entity. `recordType` travels inside the JSON
@@ -546,8 +561,8 @@ enum AnchorMirror {
                     records.append(MirrorRecord(name: name, modifiedAt: now, payload: nil))
                 }
             }
-            for i in records.indices where AnchorMirrorNaming.kind(of: records[i].name)?.isPlanner == true {
-                records[i].hubOwnerID = account
+            for i in records.indices {
+                records[i].hubOwnerID = AnchorHubAffiliation.owner(for: records[i].name, verifiedOwner: account)
             }
             return records
         }
