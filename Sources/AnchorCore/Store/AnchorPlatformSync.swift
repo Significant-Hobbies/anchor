@@ -143,6 +143,7 @@ public final class AnchorPlatformSync {
                         (try? HubHistoryOwnershipStore(directory: supportDirectory).owner())
                             == verified.userID
                     },
+                    recordAffiliation: .matching(AnchorHubAffiliation.requiresOwner),
                     appendOnly: Self.isAppendOnlyRecord
                 )
             )
