@@ -43,9 +43,8 @@ struct MCPOutputTests {
         #expect(exportedSession["currencyCode"] == nil)
 
         // Exercise the shipped stdio transport against a separate, disposable store.
-        let executable = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appending(path: ".build/debug/anchor-mcp")
+        let executable = Bundle(for: MCPTestBundleMarker.self).bundleURL
+            .deletingLastPathComponent().appending(path: "anchor-mcp")
         #expect(FileManager.default.isExecutableFile(atPath: executable.path))
         let process = Process()
         process.executableURL = executable
@@ -114,3 +113,5 @@ private extension JSONValue {
         }
     }
 }
+
+private final class MCPTestBundleMarker: NSObject {}
