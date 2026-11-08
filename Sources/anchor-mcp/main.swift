@@ -65,9 +65,6 @@ final class AnchorQueryService {
                 "tags": .array(record.tags.map(JSONValue.string)),
                 "plannedMinutes": .double(Double(record.plannedSeconds) / 60),
                 "focusedMinutes": .double(record.focusedMinutes),
-                "hourlyRate": .double(record.hourlyRate),
-                "currency": .string(record.currencyCode),
-                "trackedValue": .double(record.earnedAmount),
                 "computerActiveMinutes": .double(record.computerActiveSeconds / 60),
                 "computerAwayMinutes": .double(record.computerAwaySeconds / 60),
                 "outcome": record.endReason.map { .string($0.rawValue) } ?? .string(record.state.rawValue),
@@ -145,14 +142,6 @@ final class AnchorQueryService {
                 ])
             })
         }
-        let billing = engine.billingTotals(rows).map { total in
-            JSONValue.object([
-                "currency": .string(total.currencyCode),
-                "amount": .double(total.amount),
-                "billableHours": .double(total.billableSeconds / 3600),
-                "sessions": .int(total.sessionCount),
-            ])
-        }
         let timing = engine.distractionTiming(rows).map { phase in
             JSONValue.object([
                 "phase": .string(phase.phase.label),
@@ -163,7 +152,6 @@ final class AnchorQueryService {
         return [
             "projects": encode(engine.byProject(rows)),
             "tags": encode(engine.byTag(rows)),
-            "billing": .array(billing),
             "distractionTiming": .array(timing),
         ]
     }
@@ -354,7 +342,7 @@ struct MCPServer {
         ),
         tool(
             "work_patterns",
-            "Project and tag performance, billable value, and when distractions land within sessions.",
+            "Project and tag performance, and when distractions land within sessions.",
             ["since_days": intProperty("How many days back to look. Omit for all time.")]
         ),
         tool(

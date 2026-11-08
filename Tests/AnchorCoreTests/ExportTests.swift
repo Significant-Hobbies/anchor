@@ -129,6 +129,42 @@ struct ExportTests {
         #expect(csv.contains("Write the post"))
     }
 
+    @Test("Session exports retain project and presence without monetary columns")
+    func sessionExportDimensions() throws {
+        var record = Fixture.session(focused: 1500, project: "Anchor", tags: ["deep"])
+        record.computerActiveSeconds = 1200
+        record.computerAwaySeconds = 300
+
+        let lines = builder.sessionsCSV(from: [record]).split(separator: "\n")
+        let headers = lines[0].split(separator: ",").map(String.init)
+        let values = lines[1].split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        #expect(headers == [
+            "started", "ended", "goal", "theme", "intent", "project", "tags", "notes",
+            "planned_minutes", "focused_minutes", "computer_active_minutes", "computer_away_minutes",
+            "state", "outcome", "interruptions", "session_id",
+        ])
+        #expect(values.count == headers.count)
+        let fields = Dictionary(uniqueKeysWithValues: zip(headers, values))
+        #expect(fields["project"] == "Anchor")
+        #expect(fields["tags"] == "deep")
+        #expect(fields["focused_minutes"] == "25.00")
+        #expect(fields["computer_active_minutes"] == "20.00")
+        #expect(fields["computer_away_minutes"] == "5.00")
+
+        let sheet = try #require(builder.workbook(from: [record], now: Fixture.day0).sheets.first { $0.name == "Sessions" })
+        #expect(sheet.columns.map(\.title) == [
+            "Started", "Ended", "Goal", "Theme", "Intent", "Project", "Tags", "Notes",
+            "Planned (min)", "Focused (min)", "Computer active (min)", "Computer away (min)",
+            "State", "Outcome", "Interruptions", "Per focused hour", "Session ID",
+        ])
+        let row = try #require(sheet.rows.first)
+        #expect(row.count == sheet.columns.count)
+        if case .text(let project) = row[5] { #expect(project == "Anchor") }
+        else { Issue.record("Project label was lost from workbook") }
+        if case .number(let minutes) = row[10] { #expect(minutes == 20) }
+        else { Issue.record("Computer presence was lost from workbook") }
+    }
+
     // MARK: JSON
 
     @Test("JSON export carries the overview and every session")

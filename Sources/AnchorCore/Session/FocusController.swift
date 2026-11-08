@@ -190,8 +190,6 @@ public final class FocusController {
             project: project,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
             tagIDStrings: tagIDStrings,
-            hourlyRate: project?.hourlyRate ?? 0,
-            currencyCode: project?.currencyCode ?? "USD",
             plannedSeconds: max(0, minutes * 60),
             startedAt: Date()
         )

@@ -22,8 +22,6 @@ public struct SessionRecord: Sendable, Codable, Equatable, Identifiable {
     public var projectTitle: String
     public var notes: String
     public var tags: [String]
-    public var hourlyRate: Double
-    public var currencyCode: String
     public var computerActiveSeconds: Double
     public var computerAwaySeconds: Double
 
@@ -42,8 +40,6 @@ public struct SessionRecord: Sendable, Codable, Equatable, Identifiable {
         projectTitle: String = "",
         notes: String = "",
         tags: [String] = [],
-        hourlyRate: Double = 0,
-        currencyCode: String = "USD",
         computerActiveSeconds: Double = 0,
         computerAwaySeconds: Double = 0
     ) {
@@ -61,14 +57,11 @@ public struct SessionRecord: Sendable, Codable, Equatable, Identifiable {
         self.projectTitle = projectTitle
         self.notes = notes
         self.tags = tags
-        self.hourlyRate = hourlyRate
-        self.currencyCode = currencyCode
         self.computerActiveSeconds = computerActiveSeconds
         self.computerAwaySeconds = computerAwaySeconds
     }
 
     public var focusedMinutes: Double { focusedSeconds / 60 }
-    public var earnedAmount: Double { focusedSeconds / 3600 * hourlyRate }
     public var computerObservedSeconds: Double { computerActiveSeconds + computerAwaySeconds }
     public var computerActiveRate: Double? {
         computerObservedSeconds > 0 ? computerActiveSeconds / computerObservedSeconds : nil
@@ -178,8 +171,6 @@ public extension FocusSession {
             projectTitle: project?.name ?? "",
             notes: notes,
             tags: tagIDStrings.compactMap { tagNamesByID[$0] },
-            hourlyRate: hourlyRate,
-            currencyCode: currencyCode,
             computerActiveSeconds: computerActiveSeconds,
             computerAwaySeconds: computerAwaySeconds
         )

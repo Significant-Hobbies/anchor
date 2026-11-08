@@ -15,8 +15,7 @@ public final class Project {
     public var archivedAt: Date?
     public var symbolName: String = "folder"
     public var tintIndex: Int = 0
-    /// Default rate copied into new sessions so later rate changes do not
-    /// rewrite historical earnings.
+    /// Inert legacy attributes retained for existing SwiftData stores and CloudKit schema compatibility.
     public var hourlyRate: Double = 0
     public var currencyCode: String = "USD"
 

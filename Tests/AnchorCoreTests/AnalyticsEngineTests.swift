@@ -44,9 +44,7 @@ enum Fixture {
         reason: SessionEndReason? = .completed,
         distractions: [DistractionRecord] = [],
         project: String = "",
-        tags: [String] = [],
-        hourlyRate: Double = 0,
-        currency: String = "USD"
+        tags: [String] = []
     ) -> SessionRecord {
         SessionRecord(
             id: UUID(),
@@ -61,9 +59,7 @@ enum Fixture {
             endReason: reason,
             distractions: distractions,
             projectTitle: project,
-            tags: tags,
-            hourlyRate: hourlyRate,
-            currencyCode: currency
+            tags: tags
         )
     }
 }
@@ -97,21 +93,22 @@ struct AnalyticsEngineTests {
         #expect(stats.uninterruptedSessionCount == 2)
     }
 
-    @Test("Projects, tags, and billing preserve useful reporting dimensions")
-    func workAndBilling() {
+    @Test("Projects and tags preserve useful reporting dimensions")
+    func workContexts() {
         let records = [
-            Fixture.session(focused: 3600, project: "Anchor", tags: ["deep"], hourlyRate: 100),
-            Fixture.session(focused: 1800, reason: .endedEarly, project: "Anchor", tags: ["admin"], hourlyRate: 100),
-            Fixture.session(focused: 7200, project: "Client", tags: ["deep"], hourlyRate: 50, currency: "EUR"),
+            Fixture.session(focused: 3600, project: "Anchor", tags: ["deep"]),
+            Fixture.session(focused: 1800, reason: .endedEarly, project: "Anchor", tags: ["admin"]),
+            Fixture.session(focused: 7200, project: "Client", tags: ["deep"]),
         ]
         let projects = engine.byProject(records)
         #expect(projects.first?.label == "Client")
         #expect(projects.first?.focusedSeconds == 7200)
         #expect(engine.byTag(records).first(where: { $0.label == "deep" })?.sessionCount == 2)
 
-        let totals = engine.billingTotals(records)
-        #expect(totals.first(where: { $0.currencyCode == "USD" })?.amount == 150)
-        #expect(totals.first(where: { $0.currencyCode == "EUR" })?.amount == 100)
+        let anchor = projects.first(where: { $0.label == "Anchor" })
+        #expect(anchor?.sessionCount == 2)
+        #expect(anchor?.focusedSeconds == 5400)
+        #expect(anchor?.completionRate == 0.5)
     }
 
     @Test("Machine presence separates logged from untracked active time")

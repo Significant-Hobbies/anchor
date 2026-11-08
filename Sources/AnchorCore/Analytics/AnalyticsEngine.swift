@@ -69,7 +69,7 @@ public struct AnalyticsEngine: Sendable {
         )
     }
 
-    // MARK: - Projects, tags and billing
+    // MARK: - Projects and tags
 
     public struct WorkStat: Sendable, Equatable, Codable, Identifiable {
         public var id: String { label }
@@ -110,27 +110,6 @@ public struct AnalyticsEngine: Sendable {
             )
         }
         .sorted { ($0.focusedSeconds, $0.sessionCount) > ($1.focusedSeconds, $1.sessionCount) }
-    }
-
-    public struct BillingTotal: Sendable, Equatable, Codable, Identifiable {
-        public var id: String { currencyCode }
-        public var currencyCode: String
-        public var amount: Double
-        public var billableSeconds: Double
-        public var sessionCount: Int
-    }
-
-    public func billingTotals(_ records: [SessionRecord]) -> [BillingTotal] {
-        let billable = records.filter { $0.hourlyRate > 0 }
-        return Dictionary(grouping: billable, by: \.currencyCode).map { currency, rows in
-            BillingTotal(
-                currencyCode: currency,
-                amount: rows.reduce(0) { $0 + $1.earnedAmount },
-                billableSeconds: rows.reduce(0) { $0 + $1.focusedSeconds },
-                sessionCount: rows.count
-            )
-        }
-        .sorted { $0.amount > $1.amount }
     }
 
     public struct MachinePresence: Sendable, Equatable, Codable {

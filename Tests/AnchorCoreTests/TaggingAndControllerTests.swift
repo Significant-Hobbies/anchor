@@ -162,6 +162,21 @@ struct FocusControllerTests {
         )
     }
 
+    @Test("New sessions keep project context without inheriting legacy rates")
+    func projectContextWithoutBilling() throws {
+        let (controller, context) = try makeController()
+        let project = Project(name: "Anchor", hourlyRate: 125, currencyCode: "EUR")
+        context.insert(project)
+        let session = try #require(controller.start(goal: nil, intent: "Ship", minutes: 25, project: project))
+        #expect(session.project?.id == project.id)
+        #expect(session.hourlyRate == 0)
+        #expect(session.currencyCode == "USD")
+        #expect(project.hourlyRate == 125)
+        #expect(project.currencyCode == "EUR")
+        #expect(session.snapshot().projectTitle == "Anchor")
+        controller.end(reason: .endedEarly)
+    }
+
     @Test("Pausing from capture preserves the session and records recovery only on resume")
     func pauseCapturedInterruption() throws {
         let (controller, context) = try makeController()

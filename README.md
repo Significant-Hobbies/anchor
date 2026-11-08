@@ -38,7 +38,7 @@ distraction text always stays on your device.
   Hobbies Hub session summaries after you connect and approve local history.
 - **On-device tagging** — Apple Intelligence sorts goals into themes and
   distractions into categories, so analytics work without you tagging anything.
-- **Analytics** — where your hours and billable value go, what interrupts you,
+- **Analytics** — where your hours go, what interrupts you,
   project and tag breakdowns, session depth, weekday rhythm, and active time that
   was not covered by a session.
 - **Export** — real `.xlsx`, CSV, JSON.

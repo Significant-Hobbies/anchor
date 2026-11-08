@@ -105,13 +105,6 @@ public struct RunningSessionView: View {
                     .foregroundStyle(theme.textTertiary)
                     .lineLimit(1)
             }
-            if let session, session.hourlyRate > 0 {
-                Text(
-                    "\(Format.money(controller.elapsed / 3600 * session.hourlyRate, currencyCode: session.currencyCode)) earned"
-                )
-                .font(.system(.caption2, design: .rounded).weight(.semibold))
-                .foregroundStyle(theme.positive)
-            }
         }
         .padding(.top, Space.xs)
     }
