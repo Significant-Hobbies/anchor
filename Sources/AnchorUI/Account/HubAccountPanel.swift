@@ -121,7 +121,7 @@ public struct HubAccountPanel: View {
 
     private func boundaryRow(_ copy: String, symbol: String) -> some View {
         Label(copy, systemImage: symbol)
-            .font(.caption.weight(.medium))
+            .font(.subheadline)
             .foregroundStyle(theme.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -172,6 +172,8 @@ public struct HubAccountPanel: View {
                 .accessibilityIdentifier("anchor.hub.approve-history")
             }
 
+            Divider().overlay(theme.hairline)
+
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text("Share planner with connected assistants")
                     .font(.body.weight(.semibold))
@@ -199,7 +201,12 @@ public struct HubAccountPanel: View {
             }
 
             if presentation == .settings {
-                VStack(spacing: Space.xxs) {
+                Divider().overlay(theme.hairline)
+                Text("Sync status")
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+
+                VStack(spacing: Space.xs) {
                     labelled("Hub status", statusText(platform))
                     labelled("Waiting locally", "\(platform.pendingCount)")
                     labelled("Last successful sync", lastSyncText(platform.receipt.lastSuccessfulAt))
@@ -210,8 +217,9 @@ public struct HubAccountPanel: View {
                         failure.explanation(pendingCount: platform.pendingCount),
                         systemImage: "exclamationmark.triangle.fill"
                     )
-                    .font(.caption.weight(.medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(theme.caution)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 ViewThatFits(in: .horizontal) {
