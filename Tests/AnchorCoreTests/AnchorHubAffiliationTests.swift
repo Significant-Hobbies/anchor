@@ -132,12 +132,22 @@ struct AnchorHubAffiliationTests {
         await fixture.signIn("A")
         #expect(await fixture.sync.approveHubHistory())
         #expect(await fixture.sync.setPlannerSharingEnabled(true))
+        let remoteTime = Date.now.addingTimeInterval(60)
         let tag = SavedTag(name: "Synthetic remote tag")
         let name = AnchorMirrorNaming.Kind.savedTag.name(for: tag.id)
         let payload = try AnchorAgentCommand.encoder.encode(SavedTagPayload(tag))
-        try await AnchorAssistantTests().enqueue(MirrorRecord(name: name, modifiedAt: .now, payload: payload), fixture: fixture, cursor: 101)
+        try await AnchorAssistantTests().enqueue(MirrorRecord(name: name, modifiedAt: .now, payload: payload), fixture: fixture, cursor: 101, occurredAt: remoteTime)
         await fixture.sync.synchronize()
         #expect(try fixture.context.fetch(FetchDescriptor<SavedTag>()).first?.name == "Synthetic remote tag")
+        for _ in 0..<3 { await fixture.sync.synchronize() }
+        #expect(await fixture.server.pushes.flatMap(\.mutations).filter { $0.id == name }.isEmpty)
+        tag.name = "Synthetic remote edit"
+        try await AnchorAssistantTests().enqueue(MirrorRecord(name: name, modifiedAt: .now, payload: try AnchorAgentCommand.encoder.encode(SavedTagPayload(tag))), fixture: fixture, cursor: 102, occurredAt: remoteTime.addingTimeInterval(1))
+        await fixture.sync.synchronize(); await fixture.sync.synchronize()
+        #expect(try fixture.context.fetch(FetchDescriptor<SavedTag>()).first?.name == "Synthetic remote edit")
+        try await AnchorAssistantTests().enqueue(MirrorRecord(name: name, modifiedAt: .now, payload: nil), fixture: fixture, cursor: 103, occurredAt: remoteTime.addingTimeInterval(2))
+        await fixture.sync.synchronize()
+        #expect(try fixture.context.fetch(FetchDescriptor<SavedTag>()).isEmpty)
         for _ in 0..<3 { await fixture.sync.synchronize() }
         #expect(await fixture.server.pushes.flatMap(\.mutations).filter { $0.id == name }.isEmpty)
         #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
