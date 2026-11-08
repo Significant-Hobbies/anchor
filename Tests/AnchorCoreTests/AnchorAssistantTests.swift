@@ -280,8 +280,8 @@ struct AnchorAssistantTests {
         #expect(!String(decoding: try Data(contentsOf: store.fileURL), as: UTF8.self).contains("PRIVATE REJECTED"))
     }
 
-    func enqueue(_ record: MirrorRecord, fixture: SyncFixture, cursor: Int) async throws {
-        let timestamp = ISO8601DateFormatter().string(from: .now.addingTimeInterval(60))
+    func enqueue(_ record: MirrorRecord, fixture: SyncFixture, cursor: Int, occurredAt: Date = .now.addingTimeInterval(60)) async throws {
+        let timestamp = ISO8601DateFormatter().string(from: occurredAt)
         let change: [String: Any] = ["cursor": cursor, "changeId": UUID().uuidString, "domain": "anchor", "id": record.name,
                                    "operation": record.payload == nil ? "delete" : "upsert", "version": cursor,
                                    "occurredAt": timestamp, "recordedAt": timestamp, "originDeviceId": "other-device",

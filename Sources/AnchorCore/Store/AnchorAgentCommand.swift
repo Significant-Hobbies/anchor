@@ -56,7 +56,7 @@ struct AnchorAgentCommand: Codable, Equatable {
     var args: Arguments
     var result: Result?
     var error: String?
-    var recordName: String { "agentcommand-" + id.uuidString.lowercased() }
+    var recordName: String { AnchorHubAffiliation.commandPrefix + id.uuidString.lowercased() }
 
     enum CodingKeys: String, CodingKey {
         case recordType, id, requestId, action, targetDeviceId, issuedAt, expiresAt, expectedSessionID, consentGeneration, status, args, result, error
@@ -181,6 +181,12 @@ struct AnchorAgentDevice: Encodable {
     var state: String
     var capturePresented: Bool
     var capabilities = ["start_focus", "pause_focus", "resume_focus", "end_focus", "capture_distraction", "copy_day", "materialize_day", "reconcile_template"]
+    var recordName: String { AnchorHubAffiliation.devicePrefix + id.uuidString.lowercased() }
+
+    func record(owner: String, now: Date = .now) throws -> MirrorRecord {
+        MirrorRecord(name: recordName, modifiedAt: now, payload: try AnchorAgentCommand.encoder.encode(self),
+                     hubOwnerID: AnchorHubAffiliation.owner(for: recordName, verifiedOwner: owner))
+    }
     enum CodingKeys: String, CodingKey { case recordType, id, deviceId, platform, updatedAt, observedAt, session, activeSessionID, consentGeneration, state, capturePresented, capabilities }
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -233,7 +239,7 @@ struct AnchorAgentCommandStore {
     }
     private func ingestUnlocked(_ records: [MirrorRecord], owner: String, deviceID: String) throws {
         var state = try load(owner: owner)
-        for record in records where record.name.hasPrefix("agentcommand-") {
+        for record in records where record.name.hasPrefix(AnchorHubAffiliation.commandPrefix) {
             if let recordOwner = record.hubOwnerID, recordOwner != owner { throw HubHistoryOwnershipError.differentAccount }
             // Tombstones and records for another/native-newer device are not
             // executable work here. Probe routing before strict action decoding.
@@ -244,7 +250,7 @@ struct AnchorAgentCommandStore {
             var command: AnchorAgentCommand
             do { command = try AnchorAgentCommand.decode(record) }
             catch {
-                if let id = UUID(uuidString: String(record.name.dropFirst("agentcommand-".count))) {
+                if let id = UUID(uuidString: String(record.name.dropFirst(AnchorHubAffiliation.commandPrefix.count))) {
                     state.quarantinedIDs = state.quarantinedIDs ?? [:]
                     state.quarantinedIDs?[id.uuidString] = "unsupportedOrMalformed"
                 }
@@ -265,7 +271,7 @@ struct AnchorAgentCommandStore {
     }
     func records(owner: String, now: Date = .now) throws -> [MirrorRecord] {
         try load(owner: owner).commands.values.map { command in
-            MirrorRecord(name: command.recordName, modifiedAt: now, payload: try AnchorAgentCommand.encoder.encode(command), hubOwnerID: owner)
+            MirrorRecord(name: command.recordName, modifiedAt: now, payload: try AnchorAgentCommand.encoder.encode(command), hubOwnerID: AnchorHubAffiliation.owner(for: command.recordName, verifiedOwner: owner))
         }
     }
 

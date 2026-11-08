@@ -19,7 +19,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/Significant-Hobbies/significanthobbies.git",
-            revision: "ebfc2387acf643bbb63e07c7a8e41fbc586cdca2"
+            revision: "bca98b34f38db4142583f7ff804b3bb86e764414"
         ),
         .package(url: "https://github.com/sass-maker/ui-library", from: "0.1.14"),
     ],

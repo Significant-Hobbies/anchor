@@ -143,6 +143,7 @@ public final class AnchorPlatformSync {
                         (try? HubHistoryOwnershipStore(directory: supportDirectory).owner())
                             == verified.userID
                     },
+                    recordAffiliation: .matching(AnchorHubAffiliation.requiresOwner),
                     appendOnly: Self.isAppendOnlyRecord
                 )
             )
@@ -537,8 +538,7 @@ public final class AnchorPlatformSync {
                                               updatedAt: deviceObservedAt, observedAt: deviceObservedAt, session: sharedSession.map(AnchorAgentDevice.Session.init), activeSessionID: sharedSession?.id,
                                               consentGeneration: sharing?.consentGeneration, state: sharedSession?.state.rawValue ?? "idle", capturePresented: sharedSession != nil && focusController.isCapturing)
                 if focusController.hasSession && sharedSession == nil { device.capabilities = [] }
-                records.append(MirrorRecord(name: "agentdevice-" + id.uuidString.lowercased(), modifiedAt: .now,
-                                            payload: try AnchorAgentCommand.encoder.encode(device), hubOwnerID: owner))
+                records.append(try device.record(owner: owner))
             }
         }
         return records
