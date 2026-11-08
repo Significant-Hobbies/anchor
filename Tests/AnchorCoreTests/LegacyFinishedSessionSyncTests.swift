@@ -13,7 +13,6 @@ struct LegacyFinishedSessionSyncTests {
         let fixture = try SyncFixture()
         defer { fixture.cleanUp() }
         let session = historicalSession()
-        fixture.context.insert(session)
         await fixture.signIn("A")
         #expect(await fixture.sync.approveHubHistory())
         await fixture.sync.synchronize()
@@ -25,7 +24,7 @@ struct LegacyFinishedSessionSyncTests {
         let change: [String: Any] = [
             "cursor": 2, "changeId": "legacy-finished-marker", "domain": "anchor",
             "id": session.id.uuidString.lowercased(), "operation": "upsert", "version": 4,
-            "occurredAt": "2027-01-01T09:00:00Z", "recordedAt": "2027-01-01T09:00:01Z",
+            "occurredAt": "2026-08-30T21:28:27Z", "recordedAt": "2026-08-30T21:28:28Z",
             "originDeviceId": "old-device", "record": payload,
         ]
         try await fixture.server.enqueueRemote(String(decoding: JSONSerialization.data(withJSONObject: change), as: UTF8.self))
@@ -52,7 +51,7 @@ struct LegacyFinishedSessionSyncTests {
 
     @Test("Only an ended finished session can clear the stale marker")
     func malformedAndForeignRecordsRemainRejected() throws {
-        for variant in ["running", "missing-end", "different-marker", "foreign-owner"] {
+        for variant in ["running", "missing-end", "different-marker", "backwards-end", "foreign-owner"] {
             let fixture = try SyncFixture()
             defer { fixture.cleanUp() }
             let session = historicalSession()
@@ -62,6 +61,9 @@ struct LegacyFinishedSessionSyncTests {
             case "running": payload.stateRaw = "running"
             case "missing-end": payload.endedAt = nil
             case "different-marker": payload.runningSince = session.startedAt
+            case "backwards-end":
+                payload.endedAt = session.startedAt.addingTimeInterval(-1)
+                payload.runningSince = payload.endedAt
             default: payload.hubAccountID = "stable-B"
             }
             let record = MirrorRecord(
