@@ -85,6 +85,9 @@ struct AnchorHubAffiliationTests {
         for _ in 0..<3 { await fixture.sync.synchronize() }
         #expect(await fixture.server.acceptedVersion(for: name) == 1)
         #expect(await fixture.server.pushes.flatMap(\.mutations).filter { $0.id == name }.count == 1)
+        try await fixture.sync.runtime?.repullAll()
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.acceptedVersion(for: name) == 1)
         tag.name = "Synthetic real edit"; try fixture.context.save()
         await fixture.sync.synchronize(); await fixture.sync.synchronize()
         #expect(await fixture.server.acceptedVersion(for: name) == 2)
@@ -95,6 +98,25 @@ struct AnchorHubAffiliationTests {
         #expect(mutations.count == 3)
         #expect(mutations.last?.operation == .delete)
         #expect(fixture.sync.receipt.lastSuccessfulAt != nil)
+    }
+
+    @Test("Unchanged native command output settles after its accepted Hub echo")
+    func commandConvergence() async throws {
+        let fixture = try SyncFixture(); defer { fixture.cleanUp() }
+        await fixture.server.enableAcceptedEchoes()
+        await fixture.signIn("A")
+        #expect(await fixture.sync.approveHubHistory())
+        #expect(await fixture.sync.setPlannerSharingEnabled(true))
+        let command = AnchorAssistantTests().command(.start, device: "synthetic-device")
+        let store = AnchorAgentCommandStore(directory: fixture.directory)
+        try store.ingest([AnchorAssistantTests().record(command, owner: "stable-A")], owner: "stable-A", deviceID: "synthetic-device")
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.acceptedVersion(for: command.recordName) == 1)
+        for _ in 0..<3 { await fixture.sync.synchronize() }
+        try await fixture.sync.runtime?.repullAll()
+        await fixture.sync.synchronize()
+        #expect(await fixture.server.acceptedVersion(for: command.recordName) == 1)
+        #expect(await fixture.server.pushes.flatMap(\.mutations).filter { $0.id == command.recordName }.count == 1)
     }
 
     @Test("Remote-first planner import rereads native state without uploading the unchanged record")
