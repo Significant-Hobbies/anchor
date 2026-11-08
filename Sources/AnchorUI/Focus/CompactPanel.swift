@@ -45,7 +45,8 @@ public struct CompactPanel: View {
     private static let presets = [15, 25, 45, 60]
 
     public var body: some View {
-        ScrollView {
+        VStack(alignment: .leading, spacing: Space.md) {
+            panelHeader
             VStack(alignment: .leading, spacing: Space.sm) {
                 if controller.isCapturing {
                     CompactCapture(controller: controller)
@@ -55,14 +56,12 @@ public struct CompactPanel: View {
                     idle
                 }
 
-                Divider().overlay(theme.hairline)
-                footer
             }
-            .padding(Space.md)
+            Divider().overlay(theme.hairline)
+            footer
         }
-        .frame(width: 300)
-        .frame(maxHeight: 520)
-        .scrollBounceBehavior(.basedOnSize)
+        .padding(Space.md)
+        .frame(width: 320)
         .background(theme.canvas)
         .task {
             while !Task.isCancelled {
@@ -70,6 +69,24 @@ public struct CompactPanel: View {
                 now = Date()
             }
         }
+    }
+
+    private var panelHeader: some View {
+        HStack(spacing: Space.xs) {
+            Image(systemName: "circle.dotted.circle")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(theme.textSecondary)
+            Text("ANCHOR")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .tracking(1.2)
+                .foregroundStyle(theme.textSecondary)
+            Spacer()
+            Text(controller.isCapturing ? "CAPTURE" : controller.hasSession ? (controller.isPaused ? "PAUSED" : "FOCUSING") : "READY")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(theme.textTertiary)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: Running
@@ -85,7 +102,7 @@ public struct CompactPanel: View {
                 ) {
                     EmptyView()
                 }
-                .frame(width: 58, height: 58)
+                .frame(width: 68, height: 68)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(headline)
@@ -93,17 +110,21 @@ public struct CompactPanel: View {
                         .foregroundStyle(theme.textSecondary)
                         .lineLimit(1)
                     Text(Format.clock(displaySeconds))
-                        .font(.system(size: 27, weight: .medium, design: .rounded))
+                        .font(.system(size: 30, weight: .medium, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(theme.textPrimary)
                         .contentTransition(.numericText(countsDown: true))
-                    Text(controller.isPaused ? "Paused" : "Remaining")
+                    Text(controller.isPaused ? "Paused" : (controller.session?.account.isOpenEnded == true ? "Elapsed" : "Remaining"))
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .tracking(1)
                         .foregroundStyle(theme.textTertiary)
                 }
                 Spacer(minLength: 0)
             }
+            .padding(Space.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.surface, in: .rect(cornerRadius: Radius.md))
+            .overlay(RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline, lineWidth: 1))
 
             Button {
                 controller.beginManualCapture()
@@ -177,9 +198,14 @@ public struct CompactPanel: View {
 
     private var adHocComposer: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
-            Text("Set your anchor")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .foregroundStyle(theme.textPrimary)
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text("Set your anchor")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(theme.textPrimary)
+                Text("Make a little space for what matters.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.textSecondary)
+            }
 
             TextField("What are you working on?", text: $intent)
                 .textFieldStyle(.plain)
@@ -193,6 +219,11 @@ public struct CompactPanel: View {
                 )
                 .focused($intentFocused)
                 .onSubmit(start)
+
+            Text("DURATION")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(theme.textTertiary)
 
             HStack(spacing: Space.xxs) {
                 ForEach(Self.presets, id: \.self) { preset in
@@ -218,6 +249,7 @@ public struct CompactPanel: View {
                             .foregroundStyle(minutes == preset ? theme.accent : theme.textSecondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(minutes == preset ? .isSelected : [])
                 }
             }
 
@@ -376,7 +408,7 @@ struct CompactCapture: View {
             HStack(spacing: Space.xxs) {
                 Image(systemName: isReturningFromPause ? "arrow.uturn.left.circle" : "lock.open.fill")
                     .font(.system(size: 13))
-                    .foregroundStyle(theme.accent)
+                    .foregroundStyle(theme.color(for: .mixed))
                 Text(isReturningFromPause ? "What pulled you away?" : "What's pulling at you?")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(theme.textPrimary)
