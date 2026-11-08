@@ -56,8 +56,13 @@ public struct SettingsScreen: View {
                     }
                 } else {
                     VStack(spacing: Space.lg) {
-                        primarySettingsColumn
-                        secondarySettingsColumn
+                        personalPreferences
+                        projectPreferences
+                        hubPreferences
+                        privacyPreferences
+                        dataPreferences
+                        RemindersSettings(coordinator: remindersCoordinator)
+                        CalendarSettings(coordinator: calendarCoordinator)
                     }
                 }
             }
@@ -82,6 +87,8 @@ public struct SettingsScreen: View {
         VStack(spacing: Space.lg) {
             personalPreferences
             projectPreferences
+            privacyPreferences
+            dataPreferences
         }
         .frame(maxWidth: .infinity, alignment: .top)
     }
@@ -89,8 +96,6 @@ public struct SettingsScreen: View {
     private var secondarySettingsColumn: some View {
         VStack(spacing: Space.lg) {
             hubPreferences
-            privacyPreferences
-            dataPreferences
             RemindersSettings(coordinator: remindersCoordinator)
             CalendarSettings(coordinator: calendarCoordinator)
         }
@@ -141,6 +146,7 @@ public struct SettingsScreen: View {
                         .foregroundStyle(theme.negative)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Space.md)
 
             if let onShowOnboarding {
@@ -350,6 +356,17 @@ private struct SettingsIntro: View {
             }
             .frame(minWidth: 620)
 
+            HStack(alignment: .center, spacing: Space.md) {
+                copy(
+                    showsEyebrow: false,
+                    titleFont: .system(.title, design: .rounded).weight(.semibold),
+                    messageFont: .subheadline
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                artwork.frame(width: 120)
+            }
+            .frame(minWidth: 440)
+
             VStack(alignment: .leading, spacing: Space.sm) {
                 copy(
                     showsEyebrow: false,
@@ -357,8 +374,8 @@ private struct SettingsIntro: View {
                     messageFont: .subheadline
                 )
                 artwork
-                    .frame(maxWidth: 210, maxHeight: 110)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: 130, maxHeight: 65)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
         .accessibilityElement(children: .combine)
