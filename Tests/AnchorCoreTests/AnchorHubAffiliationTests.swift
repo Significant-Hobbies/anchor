@@ -12,6 +12,7 @@ struct AnchorHubAffiliationTests {
     func nativeProjectionParity() throws {
         let fixture = try SyncFixture(); defer { fixture.cleanUp() }
         let c = fixture.context
+        c.insert(MachineActivityDay(day: .now, activeSeconds: 60, trackedSeconds: 120))
         c.insert(Goal(title: "Synthetic goal")); c.insert(Project(name: "Synthetic project"))
         c.insert(SavedTag(name: "Synthetic tag")); c.insert(AnchorPreferences()); c.insert(BehaviorProfile())
         let template = ScheduleTemplate(title: "Synthetic habit", startMinutesFromMidnight: 600, plannedSeconds: 600)
@@ -23,6 +24,7 @@ struct AnchorHubAffiliationTests {
         try c.save()
         let generic = try AnchorMirror.records(in: c, tombstonesFor: [])
         #expect(generic.allSatisfy { $0.hubOwnerID == nil })
+        #expect(generic.contains { $0.name.hasPrefix("machineday-") && $0.hubOwnerID == nil })
         let plannerKinds = AnchorMirrorNaming.Kind.allCases.filter(\.isPlanner)
         let names = Set(generic.filter { AnchorMirrorNaming.kind(of: $0.name)?.isPlanner == true }.map(\.name))
         #expect(Set(names.compactMap(AnchorMirrorNaming.kind)) == Set(plannerKinds))
@@ -51,6 +53,10 @@ struct AnchorHubAffiliationTests {
     func commandAndDeviceParity() async throws {
         let fixture = try SyncFixture(); defer { fixture.cleanUp() }
         let deviceID = UUID().uuidString.lowercased()
+        let device = AnchorAgentDevice(id: UUID(uuidString: deviceID)!, deviceId: deviceID, platform: "macOS",
+                                       updatedAt: .now, observedAt: .now, state: "idle", capturePresented: false)
+        let deviceRecord = try device.record(owner: "stable-A")
+        #expect(deviceRecord.hubOwnerID == AnchorHubAffiliation.owner(for: deviceRecord.name, verifiedOwner: "stable-A"))
         let sync = fixture.makeSync(deviceId: deviceID)
         let controller = FocusController(context: fixture.context)
         sync.attachFocusController(controller)
@@ -66,8 +72,8 @@ struct AnchorHubAffiliationTests {
         #expect(records.count == 1)
         #expect(records.allSatisfy { $0.hubOwnerID == AnchorHubAffiliation.owner(for: $0.name, verifiedOwner: "stable-A") })
         await sync.synchronize()
-        let device = try #require(await fixture.server.pushes.flatMap(\.mutations).first { $0.id.hasPrefix(AnchorHubAffiliation.devicePrefix) })
-        #expect(AnchorHubAffiliation.requiresOwner(device.id))
+        let emittedDevice = try #require(await fixture.server.pushes.flatMap(\.mutations).first { $0.id.hasPrefix(AnchorHubAffiliation.devicePrefix) })
+        #expect(AnchorHubAffiliation.requiresOwner(emittedDevice.id))
         #expect(AnchorHubAffiliation.requiresOwner(command.recordName))
     }
 

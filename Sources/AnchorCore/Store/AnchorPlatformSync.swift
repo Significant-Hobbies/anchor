@@ -537,10 +537,7 @@ public final class AnchorPlatformSync {
                                               updatedAt: deviceObservedAt, observedAt: deviceObservedAt, session: sharedSession.map(AnchorAgentDevice.Session.init), activeSessionID: sharedSession?.id,
                                               consentGeneration: sharing?.consentGeneration, state: sharedSession?.state.rawValue ?? "idle", capturePresented: sharedSession != nil && focusController.isCapturing)
                 if focusController.hasSession && sharedSession == nil { device.capabilities = [] }
-                let name = AnchorHubAffiliation.devicePrefix + id.uuidString.lowercased()
-                records.append(MirrorRecord(name: name, modifiedAt: .now,
-                                            payload: try AnchorAgentCommand.encoder.encode(device),
-                                            hubOwnerID: AnchorHubAffiliation.owner(for: name, verifiedOwner: owner)))
+                records.append(try device.record(owner: owner))
             }
         }
         return records

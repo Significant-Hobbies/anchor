@@ -181,6 +181,12 @@ struct AnchorAgentDevice: Encodable {
     var state: String
     var capturePresented: Bool
     var capabilities = ["start_focus", "pause_focus", "resume_focus", "end_focus", "capture_distraction", "copy_day", "materialize_day", "reconcile_template"]
+    var recordName: String { AnchorHubAffiliation.devicePrefix + id.uuidString.lowercased() }
+
+    func record(owner: String, now: Date = .now) throws -> MirrorRecord {
+        MirrorRecord(name: recordName, modifiedAt: now, payload: try AnchorAgentCommand.encoder.encode(self),
+                     hubOwnerID: AnchorHubAffiliation.owner(for: recordName, verifiedOwner: owner))
+    }
     enum CodingKeys: String, CodingKey { case recordType, id, deviceId, platform, updatedAt, observedAt, session, activeSessionID, consentGeneration, state, capturePresented, capabilities }
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
