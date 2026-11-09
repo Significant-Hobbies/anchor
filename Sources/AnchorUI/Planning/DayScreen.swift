@@ -1257,7 +1257,7 @@ struct DayReviewScreen: View {
                         symbol: review.plannedSeconds == 0 ? "calendar.badge.plus" : "checkmark.circle",
                         title: review.plannedSeconds == 0 ? "Nothing was planned here yet" : "No meaningful gap needs explaining",
                         message: review.plannedSeconds == 0
-                            ? "Build the day in Plan, then Anchor will reconcile it here."
+                            ? "Build the day in Today, then Anchor will reconcile it here."
                             : "Small differences are normal and stay out of the way."
                     )
                 } else {
