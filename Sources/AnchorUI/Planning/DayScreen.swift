@@ -26,6 +26,8 @@ struct PlanScreen: View {
     @State private var loggingBlock: PlanBlock?
     @State private var scrolledDay: Date?
     @State private var loadError: String?
+    @State private var showsAllCalendarEvents = false
+    @State private var calendarReferenceTime = Date()
 
     init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
         self.controller = controller
@@ -39,6 +41,16 @@ struct PlanScreen: View {
 
     private var blocks: [PlanBlock] {
         allBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
+    }
+
+    private func upcomingCalendarEvents(at now: Date) -> [PlanBlock] {
+        let window = CalendarSyncPolicy.syncWindow(now: now)
+        return allBlocks.filter { block in
+            block.externalEventKey != nil
+                && block.plannedStart < window.end
+                && block.plannedStart.addingTimeInterval(Double(block.plannedSeconds)) > now
+                && (block.state == .planned || block.state == .inProgress)
+        }
     }
 
     private var timetableEntries: [DayTimetable.Entry] {
@@ -60,6 +72,11 @@ struct PlanScreen: View {
                 dayHeader
 
                 dayControls
+
+                let calendarEvents = upcomingCalendarEvents(at: calendarReferenceTime)
+                if !calendarEvents.isEmpty {
+                    upcomingCalendarSection(calendarEvents)
+                }
 
                 if !blocks.isEmpty {
                     daySummary
@@ -166,7 +183,7 @@ struct PlanScreen: View {
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
-            PlanBlockEditor(initialDay: today, block: block) { refresh() }
+            PlanBlockEditor(initialDay: block.plannedStart, block: block) { refresh() }
                 .anchorTheme()
         }
         .sheet(isPresented: $showsCustomize) {
@@ -204,6 +221,7 @@ struct PlanScreen: View {
                 .anchorTheme()
         }
         .task {
+            calendarReferenceTime = Date()
             refresh()
             while !Task.isCancelled {
                 do {
@@ -212,6 +230,7 @@ struct PlanScreen: View {
                     return
                 }
                 let current = Date()
+                calendarReferenceTime = current
                 if !Calendar.current.isDate(current, inSameDayAs: lastCalendarDay) {
                     if Calendar.current.isDate(today, inSameDayAs: lastCalendarDay) { today = current }
                     lastCalendarDay = current
@@ -230,6 +249,56 @@ struct PlanScreen: View {
             message: "Everything this day asks of you, laid out on the clock.",
             compact: true
         )
+    }
+
+    private func upcomingCalendarSection(_ events: [PlanBlock]) -> some View {
+        let previewCount = 3
+        return Card {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Label("Upcoming calendar events", systemImage: "calendar")
+                    .font(.headline)
+                    .foregroundStyle(theme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+
+                ForEach(events.prefix(showsAllCalendarEvents ? events.count : previewCount)) { event in
+                    Divider()
+                    Button {
+                        editingBlock = event
+                    } label: {
+                        HStack(spacing: Space.sm) {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text(event.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(theme.textPrimary)
+                                Text(
+                                    event.plannedStart,
+                                    format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()
+                                )
+                                .font(.caption)
+                                .foregroundStyle(theme.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(theme.textSecondary)
+                                .accessibilityHidden(true)
+                        }
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens event details")
+                }
+
+                if events.count > previewCount {
+                    Button(showsAllCalendarEvents ? "Show fewer events" : "Show all \(events.count) events") {
+                        showsAllCalendarEvents.toggle()
+                    }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                }
+            }
+        }
+        .accessibilityIdentifier("anchor.today.upcoming-calendar")
     }
 
     private var dayControls: some View {
@@ -344,6 +413,7 @@ struct PlanScreen: View {
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
         guard Calendar.current.isDateInToday(today), !blocks.isEmpty,
+              upcomingCalendarEvents(at: Date()).isEmpty,
               scrolledDay != today else { return }
         scrolledDay = today
         DispatchQueue.main.async {
