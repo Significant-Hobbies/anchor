@@ -49,16 +49,27 @@ public enum GoogleCalendarConfig {
 public enum GoogleCalendarError: LocalizedError, Equatable, Sendable {
     case notConfigured
     case invalidResponse
+    case workspacePolicy
+    case organizationOnly
     case authorizationRejected
     case missingRefreshToken
     case api(status: Int, message: String)
     case keychain(status: Int32)
 
+    public var connectionMessage: String {
+        if case let .api(status, _) = self {
+            return "Google returned HTTP \(status) while connecting the calendar. Try connecting again."
+        }
+        return localizedDescription
+    }
+
     public var errorDescription: String? {
         switch self {
         case .notConfigured: "Google Calendar is not configured in this build."
         case .invalidResponse: "Google returned an unexpected response."
-        case .authorizationRejected: "Google sign-in did not complete."
+        case .workspacePolicy: "Your Google Workspace administrator restricts this calendar connection. Ask them to allow Anchor’s read-only Google Calendar access."
+        case .organizationOnly: "This Google OAuth app only accepts accounts from its own organization."
+        case .authorizationRejected: "Google did not grant calendar access. Check the message on Google’s sign-in page, then try again."
         case .missingRefreshToken: "Google did not return offline access. Reconnect the account."
         case let .api(status, message): "Google Calendar request failed (\(status)): \(message)"
         case .keychain: "The stored Google session could not be accessed."
@@ -110,7 +121,7 @@ public extension GoogleCalendarConfig {
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: scopes.joined(separator: " ")),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent"),
+            URLQueryItem(name: "prompt", value: "select_account consent"),
             URLQueryItem(name: "state", value: state),
             URLQueryItem(name: "code_challenge", value: pkce.challenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
@@ -133,11 +144,17 @@ public extension GoogleCalendarConfig {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let items = components.queryItems
         else { throw GoogleCalendarError.invalidResponse }
-        if items.contains(where: { $0.name == "error" }) {
-            throw GoogleCalendarError.authorizationRejected
+        guard items.first(where: { $0.name == "state" })?.value == expectedState else {
+            throw GoogleCalendarError.invalidResponse
         }
-        guard items.first(where: { $0.name == "state" })?.value == expectedState,
-              let code = items.first(where: { $0.name == "code" })?.value,
+        if let error = items.first(where: { $0.name == "error" }) {
+            switch error.value {
+            case "admin_policy_enforced": throw GoogleCalendarError.workspacePolicy
+            case "org_internal": throw GoogleCalendarError.organizationOnly
+            default: throw GoogleCalendarError.authorizationRejected
+            }
+        }
+        guard let code = items.first(where: { $0.name == "code" })?.value,
               !code.isEmpty
         else { throw GoogleCalendarError.invalidResponse }
         return code

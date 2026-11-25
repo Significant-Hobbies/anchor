@@ -23,11 +23,15 @@ public struct CalendarSettings: View {
             if !inSheet {
                 Label("Google Calendar", systemImage: "calendar").font(.headline)
             }
+            if let issue = coordinator.connectionIssue {
+                Label(issue, systemImage: "exclamationmark.triangle")
+                    .font(.subheadline).foregroundStyle(theme.caution)
+            }
             if !coordinator.isConfigured {
                 Text("Calendar import is unavailable in this build.")
                     .foregroundStyle(theme.textSecondary)
             } else if coordinator.accounts.isEmpty {
-                Text("Connect Google Calendar to see timed events for today and the next seven days in your plan.")
+                Text("Connect Google Calendar to see timed events in the day or week you open.")
                     .foregroundStyle(theme.textSecondary)
                 connectButton
                 syncStatus
@@ -100,6 +104,9 @@ public struct CalendarSettings: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .accessibilityLabel("More actions for \(account.displayName)")
+            }
+            if let issue = coordinator.calendarListIssues[account.id] {
+                Text(issue).font(.subheadline).foregroundStyle(theme.caution)
             }
             if calendars.isEmpty {
                 Text("Refresh calendars from the account menu to load the list.")
