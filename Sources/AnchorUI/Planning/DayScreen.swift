@@ -824,7 +824,7 @@ struct PlanBlockEditor: View {
     private let block: PlanBlock?
     private let template: ScheduleTemplate?
     private let placingHabit: ScheduleTemplate?
-    private let dayIsFull: Bool
+    private let fullDaySuggestedStart: Date?
     private let isBehaviorHabit: Bool
     private let initialDay: Date
     private let onSave: () -> Void
@@ -875,7 +875,7 @@ struct PlanBlockEditor: View {
         self.template = template
         self.placingHabit = placingHabit
         self.isBehaviorHabit = startsBehaviorHabit || template?.isBehaviorHabit == true
-        self.dayIsFull = dayIsFull
+        self.fullDaySuggestedStart = dayIsFull ? suggestedStart : nil
         self.initialDay = initialDay
         self.onSave = onSave
     }
@@ -884,8 +884,8 @@ struct PlanBlockEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.lg) {
-                if dayIsFull {
-                    Label("No open slot remains. Choose a time to overlap another entry or select a different day.", systemImage: "calendar.badge.clock")
+                if plannedStart == fullDaySuggestedStart {
+                    Label("No suggested opening from this time. Choose a different start or day.", systemImage: "calendar.badge.clock")
                         .font(.callout).foregroundStyle(theme.caution)
                 }
                 if block?.templateID != nil {
