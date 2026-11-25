@@ -8,6 +8,8 @@ struct PlanScreen: View {
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.modelContext) private var context
+    private var calendarVisibility = CalendarBlockVisibility()
+    @State private var removal: CalendarEventRemoval?
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
@@ -76,16 +78,7 @@ struct PlanScreen: View {
     }
 
     private var visibleBlocks: [PlanBlock] {
-        guard let accounts = calendarCoordinator?.accounts, !accounts.isEmpty else { return allBlocks }
-        let selections = Dictionary(accounts.map { ($0.id, Set($0.selectedCalendarIDs)) },
-                                    uniquingKeysWith: { first, _ in first })
-        return allBlocks.filter { block in
-            guard block.state == .planned, block.sessionID == nil, block.actualStartedAt == nil,
-                  !block.isTemplateOverride, let key = block.externalEventKey,
-                  let source = GoogleCalendarEvent.linkedCalendar(key),
-                  let selected = selections[source.accountID] else { return true }
-            return selected.contains(source.calendarID)
-        }
+        calendarVisibility.filter(allBlocks)
     }
 
     private var blocks: [PlanBlock] {
@@ -103,7 +96,7 @@ struct PlanScreen: View {
     }
 
     private var timetableEntries: [DayTimetable.Entry] {
-        blocks.sorted { $0.plannedStart < $1.plannedStart }.map { block in
+        visibleBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }.map { block in
             DayTimetable.Entry(
                 block: block,
                 projectName: projects.first { $0.id == block.projectID }?.name,
@@ -170,7 +163,7 @@ struct PlanScreen: View {
                         daySummary
                     }
 
-                    if blocks.isEmpty {
+                    if timetableEntries.isEmpty {
                         Card(padding: Space.lg) {
                             #if os(macOS)
                             HStack(spacing: Space.lg) {
@@ -208,6 +201,7 @@ struct PlanScreen: View {
                             onOpenFocus: onOpenFocus,
                             onComplete: complete,
                             onEdit: { editingBlock = $0 },
+                            onRemove: { removal = CalendarEventRemoval($0) },
                             onExplain: { explainingBlock = $0 },
                             onLogActual: { loggingBlock = $0 },
                             onAddAt: { editorSeed = EditorSeed(start: $0) }
@@ -229,9 +223,11 @@ struct PlanScreen: View {
                 .background(.bar)
         }
         .safeAreaInset(edge: .bottom) {
-            if viewMode == .day && !blocks.isEmpty {
+            if viewMode == .day && !timetableEntries.isEmpty {
                 Button("add an entry") { editorSeed = suggestedEntry }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(PrimaryButtonStyle(expands: false))
+                    .frame(maxWidth: workspaceMaxWidth, alignment: .trailing)
+                    .frame(maxWidth: .infinity)
                     .padding(.horizontal, Space.lg)
                     .padding(.vertical, Space.xs)
                     .background(.bar)
@@ -258,8 +254,9 @@ struct PlanScreen: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .modifier(CalendarEventRemovalDialog(request: $removal, onRemove: refresh))
         .onAppear { reloadCheckIns() }
-        .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
+        .onReceive(NotificationCenter.default.publisher(for: .plannerCheckInsChanged)) { _ in reloadCheckIns() }
         .sheet(isPresented: $showsCalendars, onDismiss: {
             refreshRequest = UUID()
         }) {
@@ -285,10 +282,8 @@ struct PlanScreen: View {
         }
         .sheet(item: $checkingEntry) { entry in
             PlannerCheckInSheet(entry: entry, previous: checkIns[entry.id]) { record in
-                guard let store = checkInStore else { throw CocoaError(.fileWriteUnknown) }
-                try store.save(record)
+                try context.savePlannerCheckIn(record)
                 checkIns[record.id] = record
-                NotificationCenter.default.post(name: Self.checkInsChanged, object: nil)
             }
             .anchorTheme()
         }
@@ -382,28 +377,21 @@ struct PlanScreen: View {
         .onChange(of: controller.hasSession) { reconcileSessions() }
     }
 
-    private static let checkInsChanged = Notification.Name("anchor.planner.check-ins.changed")
-
-    private var checkInStore: PlannerCheckInStore? {
-        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
-        return PlannerCheckInStore(storeURL: config.url)
-    }
-
     private func reloadCheckIns() {
         do {
-            let result = try checkInStore?.load()
+            let result = try context.plannerCheckInStore?.load()
             checkIns = result?.records ?? [:]
             checkInLoadFailed = result?.hasUnreadableFiles ?? false
         } catch { checkInLoadFailed = true }
     }
 
     private func openCheckIn(_ block: PlanBlock) {
-        checkingEntry = PlannerCheckIn(id: block.id, title: block.title, plannedStart: block.plannedStart,
-                                       outcome: .successful, reason: "")
+        checkingEntry = PlannerCheckIn(block: block)
     }
 
     private var openBlockers: [PlannerCheckIn] {
-        let blocked = checkIns.values.filter { $0.outcome == .blocked }
+        let removedIDs = calendarVisibility.removedBlockIDs
+        let blocked = checkIns.values.filter { $0.outcome == .blocked && !removedIDs.contains($0.id.uuidString) }
         guard !blocked.isEmpty else { return [] }
         let blocksByID = Dictionary(allBlocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return blocked.map { record in
@@ -944,6 +932,7 @@ struct PlanBlockEditor: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @State private var removal: CalendarEventRemoval?
     @State private var title = ""
     @State private var details = ""
     @State private var selectedProjectID: UUID?
@@ -1031,13 +1020,20 @@ struct PlanBlockEditor: View {
                         .padding(Space.sm)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
-                } else if block?.externalEventKey != nil {
-                    Label("imported from google calendar. editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
+                } else if let block, block.externalEventKey != nil {
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        Label("imported from google calendar. editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(theme.textSecondary)
                         .padding(Space.sm)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
+                    Button("Remove from Anchor…", systemImage: "trash", role: .destructive) {
+                        removal = CalendarEventRemoval(block)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("anchor.plan.remove-calendar-event")
+                    }
                 }
                 if let saveError {
                     Label(saveError, systemImage: "exclamationmark.triangle.fill")
@@ -1165,6 +1161,10 @@ struct PlanBlockEditor: View {
                 }
             }
         }
+        .modifier(CalendarEventRemovalDialog(request: $removal) {
+            dismiss()
+            onSave()
+        })
         #if os(macOS)
         .frame(minWidth: 540, idealWidth: 620, minHeight: 460, idealHeight: 680)
         #endif
@@ -1186,9 +1186,10 @@ struct PlanBlockEditor: View {
         let calendar = Calendar.current
         do {
             if let block {
-                let scheduleChanged = block.plannedStart != plannedStart || block.plannedSeconds != minutes * 60
-                let occurrenceChanged = scheduleChanged
-                    || block.title != trimmed
+                let durationChanged = minutes != max(5, block.plannedSeconds / 60)
+                let scheduleChanged = block.plannedStart != plannedStart || durationChanged
+                let providerFieldsChanged = scheduleChanged || block.title != trimmed
+                let occurrenceChanged = providerFieldsChanged
                     || block.details != details
                     || block.projectID != selectedProjectID
                     || block.kind != kind
@@ -1198,12 +1199,12 @@ struct PlanBlockEditor: View {
                 block.title = trimmed
                 block.details = details
                 block.plannedStart = plannedStart
-                block.plannedSeconds = minutes * 60
+                if durationChanged { block.plannedSeconds = minutes * 60 }
                 block.kind = kind
                 block.flexibility = flexibility
                 block.lifeDirection = direction
                 block.behaviorPattern = behaviorPattern
-                if (block.templateID != nil || block.externalEventKey != nil) && occurrenceChanged {
+                if (block.templateID != nil && occurrenceChanged) || (block.externalEventKey != nil && providerFieldsChanged) {
                     block.isTemplateOverride = true
                 }
                 block.updatedAt = Date()
@@ -1545,6 +1546,7 @@ struct DayReviewScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.modelContext) private var context
+    private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @Query(sort: \DivergenceEvent.occurredAt) private var divergences: [DivergenceEvent]
@@ -1555,9 +1557,9 @@ struct DayReviewScreen: View {
     private var review: DayReviewEngine.Review {
         let interval = Calendar.current.dateInterval(of: .day, for: selectedDay)
             ?? DateInterval(start: selectedDay, duration: 86_400)
-        let dayBlocks = blocks.filter { interval.contains($0.plannedStart) }.map { $0.snapshot() }
-        let daySessions = sessions.filter { interval.contains($0.startedAt) }.map { $0.snapshot() }
-        let dayDivergences = divergences.filter { interval.contains($0.occurredAt) }.map { $0.snapshot() }
+        let dayBlocks = calendarVisibility.filter(blocks).filter { $0.contributesToDayReview(in: interval) }.map { $0.snapshot() }
+        let daySessions = sessions.filter { $0.startedAt >= interval.start && $0.startedAt < interval.end }.map { $0.snapshot() }
+        let dayDivergences = divergences.filter { $0.occurredAt >= interval.start && $0.occurredAt < interval.end }.map { $0.snapshot() }
         let profile = profiles.first?.snapshot() ?? BehaviorProfileRecord()
         return DayReviewEngine().review(
             day: selectedDay,

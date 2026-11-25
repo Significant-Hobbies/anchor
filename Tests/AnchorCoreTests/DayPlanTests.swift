@@ -579,6 +579,55 @@ struct DayPlanTests {
 struct DayReviewTests {
     private let engine = DayReviewEngine(calendar: Fixture.calendar)
 
+    @Test("A long calendar event is measured per day and does not dominate Focus")
+    func longCalendarCommitment() {
+        let noon = Fixture.calendar.startOfDay(for: Fixture.day0).addingTimeInterval(43_200)
+        let summit = PlanBlockRecord(id: UUID(), title: "Summit", plannedStart: noon, plannedSeconds: 5 * 86_400,
+                                     externalEventKey: "a\u{1F}b\u{1F}c")
+        let middle = noon.addingTimeInterval(2 * 86_400)
+        #expect(engine.review(day: noon, blocks: [summit], sessions: [], divergences: []).plannedSeconds == 43_200)
+        #expect(engine.review(day: middle, blocks: [summit], sessions: [], divergences: []).plannedSeconds == 86_400)
+        #expect(ScheduledFocusResolver().nextBlock(from: [summit], now: noon, calendar: Fixture.calendar) == nil)
+    }
+
+    @Test("A session spanning midnight counts its focused seconds once and never reinterprets its pauses as focus")
+    func crossMidnightLinkedSession() {
+        let midnight = Fixture.calendar.startOfDay(for: Fixture.day0).addingTimeInterval(86_400)
+        var session = Fixture.session(focused: 1200, planned: 3600)
+        session.startedAt = midnight.addingTimeInterval(-1800)
+        session.endedAt = midnight.addingTimeInterval(1800)
+        let block = PlanBlockRecord(id: UUID(), sessionID: session.id, title: "Overnight",
+                                    plannedStart: session.startedAt, plannedSeconds: 3600,
+                                    actualStartedAt: session.startedAt, actualEndedAt: session.endedAt, state: .completed)
+        let first = engine.review(day: session.startedAt, blocks: [block], sessions: [session], divergences: [])
+        let next = engine.review(day: midnight, blocks: [block], sessions: [session], divergences: [])
+        #expect(first.actualSeconds == 1200 && next.actualSeconds == 0)
+        #expect(first.plannedSeconds == 1800 && next.plannedSeconds == 1800)
+        #expect(next.unobservedCompletedBlocks == 0)
+    }
+
+    @MainActor
+    @Test("Manually logged time on a different day counts once without an extra plan or an invented gap")
+    func manualTimeOutsidePlan() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let plannedDay = Fixture.calendar.startOfDay(for: Fixture.day0)
+        let actualStart = plannedDay.addingTimeInterval(2 * 86_400 - 900)
+        let block = PlanBlock(title: "Design review", plannedStart: plannedDay, plannedSeconds: 1800)
+        block.state = .completed
+        block.actualStartedAt = actualStart
+        block.actualEndedAt = actualStart.addingTimeInterval(1800)
+        context.insert(block)
+        try context.save()
+        let reviews = try [plannedDay, actualStart, actualStart.addingTimeInterval(1800)].map { day in
+            let records = try context.planBlockRecords(on: day, calendar: Fixture.calendar)
+            return engine.review(day: day, blocks: records, sessions: [], divergences: [])
+        }
+        #expect(reviews.map(\.plannedSeconds) == [1800, 0, 0])
+        #expect(reviews.map(\.actualSeconds) == [0, 900, 900])
+        #expect(reviews.allSatisfy { $0.gaps.isEmpty && $0.unobservedCompletedBlocks == 0 })
+    }
+
     @Test("Review compares planned and actual without an adherence score")
     func plannedVersusActual() {
         let session = Fixture.session(focused: 2_700, planned: 1_800)
@@ -726,7 +775,7 @@ struct DayReviewTests {
 
     @Test("A logged entry is observed lived time, not an invented session")
     func loggedEntryCountsAsObserved() {
-        let start = Fixture.day0.addingTimeInterval(5_400)
+        let start = Fixture.calendar.startOfDay(for: Fixture.day0).addingTimeInterval(5_400)
         let block = PlanBlockRecord(
             id: UUID(),
             title: "Logged lunch walk",

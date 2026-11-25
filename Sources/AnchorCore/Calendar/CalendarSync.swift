@@ -1,4 +1,29 @@
 import Foundation
+import SwiftData
+
+/// A planner removal identifies one Google occurrence across devices and imports.
+/// CloudKit may deliver duplicate markers; membership is by key.
+@Model
+public final class RemovedCalendarOccurrence {
+    public var eventKey: String = ""
+
+    public var removedBlockIDs: [String] = []
+
+    public init(eventKey: String, blockIDs: [UUID] = []) {
+        self.eventKey = eventKey
+        self.removedBlockIDs = blockIDs.map(\.uuidString)
+    }
+
+    /// Append newly learned IDs instead of editing an existing CloudKit marker.
+    /// Concurrent removals on different devices therefore preserve both sets.
+    public static func remember(key: String, blockIDs: [UUID], existing: [RemovedCalendarOccurrence], in context: ModelContext) {
+        let known = Set(existing.flatMap(\.removedBlockIDs))
+        let additional = blockIDs.filter { !known.contains($0.uuidString) }
+        if existing.isEmpty || !additional.isEmpty {
+            context.insert(RemovedCalendarOccurrence(eventKey: key, blockIDs: additional))
+        }
+    }
+}
 
 /// A Google account participating in one sync pass, with its resolved access
 /// token and the calendars the owner chose to import from.
@@ -65,10 +90,13 @@ public enum CalendarSyncPolicy {
     /// `isTemplateOverride` doubles as the edited marker: the editor sets it
     /// when an imported block is changed by hand.
     public static func isUntouched(_ block: PlanBlockRecord) -> Bool {
-        block.state == .planned
-            && block.sessionID == nil
-            && block.actualStartedAt == nil
-            && !block.isTemplateOverride
+        followsProviderSchedule(block) && block.details.isEmpty && block.projectID == nil
+            && block.kind == .commitment && block.flexibility == .fixed
+            && block.behaviorPattern == nil && block.lifeDirection == nil
+    }
+
+    private static func followsProviderSchedule(_ block: PlanBlockRecord) -> Bool {
+        block.state == .planned && block.sessionID == nil && block.actualStartedAt == nil && !block.isTemplateOverride
     }
 
     /// Whether the linked event still matches what the block shows.
@@ -93,13 +121,19 @@ public enum CalendarSyncPolicy {
         events: [GoogleCalendarEvent],
         blocks: [PlanBlockRecord],
         window: DateInterval,
-        fetchedCalendars: [String: Set<String>]
+        fetchedCalendars: [String: Set<String>],
+        removedEventKeys: Set<String> = []
     ) -> CalendarSyncPlan {
         var plan = CalendarSyncPlan()
 
         let managed = blocks.filter { block in
-            guard let key = block.externalEventKey,
-                  let source = GoogleCalendarEvent.linkedCalendar(key) else { return false }
+            guard let key = block.externalEventKey else { return false }
+            if removedEventKeys.contains(key) {
+                // A stale copy may arrive from another device after the removal.
+                plan.deletions.append(block.id)
+                return false
+            }
+            guard let source = GoogleCalendarEvent.linkedCalendar(key) else { return false }
             return fetchedCalendars[source.accountID]?.contains(source.calendarID) == true
         }
         var blocksByKey: [String: [PlanBlockRecord]] = [:]
@@ -109,7 +143,7 @@ public enum CalendarSyncPolicy {
 
         var seenKeys = Set<String>()
         for event in events where fetchedCalendars[event.accountID]?.contains(event.calendarID) == true {
-            guard seenKeys.insert(event.linkKey).inserted else { continue }
+            guard !removedEventKeys.contains(event.linkKey), seenKeys.insert(event.linkKey).inserted else { continue }
             let linked = blocksByKey[event.linkKey] ?? []
 
             // Cancelled or all-day events cannot be represented: untouched
@@ -127,7 +161,7 @@ public enum CalendarSyncPolicy {
                 continue
             }
             if !matches(primary, event: event) {
-                if isUntouched(primary) {
+                if followsProviderSchedule(primary) {
                     plan.updates.append(CalendarBlockUpdate(blockID: primary.id, event: event))
                 } else if !primary.isTemplateOverride && primary.plannedStart != event.start {
                     // Keep the owner's original occurrence and show Google's new time.
@@ -185,11 +219,12 @@ public struct CalendarSyncService: Sendable {
         accounts: [CalendarSyncAccount],
         blocks: [PlanBlockRecord],
         now: Date = Date(),
-        window: DateInterval? = nil
+        window: DateInterval? = nil,
+        removedEventKeys: Set<String> = []
     ) async -> CalendarSyncReport {
         let window = window ?? CalendarSyncPolicy.syncWindow(now: now, calendar: calendar)
         let batch = await fetch(accounts: accounts, window: window)
-        return batch.reconcile(blocks: blocks, now: now)
+        return batch.reconcile(blocks: blocks, removedEventKeys: removedEventKeys, now: now)
     }
 
     public func fetch(accounts: [CalendarSyncAccount], window: DateInterval) async -> CalendarEventBatch {
@@ -225,12 +260,16 @@ public struct CalendarEventBatch: Sendable {
     fileprivate var fetchedCalendars: [String: Set<String>] = [:]
     fileprivate var failedAccountIDs: Set<String> = []
 
-    public func reconcile(blocks: [PlanBlockRecord], eligibleAccountIDs: Set<String>? = nil, now: Date) -> CalendarSyncReport {
+    public func reconcile(
+        blocks: [PlanBlockRecord], eligibleAccountIDs: Set<String>? = nil,
+        removedEventKeys: Set<String> = [], now: Date
+    ) -> CalendarSyncReport {
         let plan = CalendarSyncPolicy.plan(
             events: events,
             blocks: blocks,
             window: window,
-            fetchedCalendars: fetchedCalendars.filter { eligibleAccountIDs?.contains($0.key) ?? true }
+            fetchedCalendars: fetchedCalendars.filter { eligibleAccountIDs?.contains($0.key) ?? true },
+            removedEventKeys: removedEventKeys
         )
         var report = CalendarSyncReport(syncedAt: now)
         report.failedAccounts = failedAccountIDs.intersection(eligibleAccountIDs ?? failedAccountIDs)

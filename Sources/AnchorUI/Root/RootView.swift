@@ -11,6 +11,7 @@ import SwiftUI
 public struct FocusScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
+    private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
@@ -20,6 +21,9 @@ public struct FocusScreen: View {
     @State private var isChangingActivity = false
     @State private var actualIntent = ""
     @State private var loadError: String?
+    @State private var checkInBlock: PlanBlock?
+    @State private var previousCheckIn: PlannerCheckIn?
+    @State private var checkInReadFailed = false
 
     public init(controller: FocusController) {
         self.controller = controller
@@ -88,6 +92,31 @@ public struct FocusScreen: View {
                 .transition(.opacity)
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if !controller.hasSession, !showsAdHocComposer, let block = lastFinishedBlock {
+                Button("Check in on \(block.title)", systemImage: "checkmark.circle") {
+                    do {
+                        guard let store = context.plannerCheckInStore else { throw CocoaError(.fileReadUnknown) }
+                        previousCheckIn = try store.load().records[block.id]
+                        checkInBlock = block
+                    } catch { checkInReadFailed = true }
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .accessibilityIdentifier("anchor.focus.check-in")
+                .padding(.horizontal, Space.md)
+                .padding(.vertical, Space.xs)
+            }
+        }
+        .sheet(item: $checkInBlock) { block in
+            PlannerCheckInSheet(entry: PlannerCheckIn(block: block), previous: previousCheckIn,
+                                onSave: context.savePlannerCheckIn)
+                .anchorTheme()
+        }
+        .alert("Couldn’t open this check-in", isPresented: $checkInReadFailed) {
+            Button("OK") {}
+        } message: {
+            Text("Check that Anchor can access its local planner store and try again.")
+        }
         .animation(Motion.gentle, value: controller.hasSession)
         .task {
             refreshSchedule()
@@ -113,8 +142,14 @@ public struct FocusScreen: View {
         }
     }
 
+    private var lastFinishedBlock: PlanBlock? {
+        guard let latest = sessions.first(where: { $0.startedAt <= Date() }), latest.state == .finished,
+              let endedAt = latest.endedAt, Calendar.current.isDateInToday(endedAt) else { return nil }
+        return calendarVisibility.filter(blocks).first { $0.sessionID == latest.id }
+    }
+
     private var scheduledBlock: PlanBlock? {
-        guard let record = ScheduledFocusResolver().nextBlock(from: blocks.map { $0.snapshot() }, now: now) else {
+        guard let record = ScheduledFocusResolver().nextBlock(from: calendarVisibility.filter(blocks).map { $0.snapshot() }, now: now) else {
             return nil
         }
         return blocks.first { $0.id == record.id }

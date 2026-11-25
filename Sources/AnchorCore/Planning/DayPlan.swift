@@ -629,6 +629,22 @@ public struct DayPlanService {
         self.calendar = calendar
     }
 
+    /// Atomically remove all local copies of one occurrence and remember the decision.
+    /// Session and divergence history have independent records and are kept.
+    public func removeImportedEvent(key: String) throws {
+        guard GoogleCalendarEvent.linkedCalendar(key) != nil else { throw CocoaError(.validationMissingMandatoryProperty) }
+        // An independent context keeps an unsuccessful delete from rolling back
+        // unrelated planner edits and only commits this removal.
+        let removal = ModelContext(context.container)
+        removal.autosaveEnabled = false
+        let blocks = try removal.fetch(FetchDescriptor<PlanBlock>(predicate: #Predicate { $0.externalEventKey == key }))
+        let existing = FetchDescriptor<RemovedCalendarOccurrence>(predicate: #Predicate { $0.eventKey == key })
+        RemovedCalendarOccurrence.remember(key: key, blockIDs: blocks.map(\.id),
+                                           existing: try removal.fetch(existing), in: removal)
+        for block in blocks { removal.delete(block) }
+        if removal.hasChanges { try removal.save() }
+    }
+
     /// Materialize matching templates once for a day. No unique constraint is
     /// used because that would make the schema invalid for CloudKit.
     @discardableResult

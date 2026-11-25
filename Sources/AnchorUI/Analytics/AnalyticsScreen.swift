@@ -13,6 +13,9 @@ import SwiftUI
 public struct AnalyticsScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \PlanBlock.plannedStart) private var plans: [PlanBlock]
+    @Query(sort: \DivergenceEvent.occurredAt) private var divergences: [DivergenceEvent]
+    private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \MachineActivityDay.day, order: .reverse) private var machineDays: [MachineActivityDay]
 
     @State private var range: Range = .month
@@ -58,6 +61,14 @@ public struct AnalyticsScreen: View {
               let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date())
         else { return all }
         return all.filter { $0.startedAt >= cutoff }
+    }
+
+    private func exportData(_ format: ExportFormat) -> Data {
+        guard format == .workbook else { return format.makeData(from: records) }
+        let cutoff = range.days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) } ?? .distantPast
+        let dayPlan = calendarVisibility.filter(plans).filter { $0.plannedEnd > cutoff }.map { $0.snapshot() }
+        let changes = divergences.filter { $0.occurredAt >= cutoff }.map { $0.snapshot() }
+        return format.makeData(from: records, plans: dayPlan, divergences: changes)
     }
 
     private var previousRecords: [SessionRecord] {
@@ -125,7 +136,7 @@ public struct AnalyticsScreen: View {
         .background(theme.canvas)
         .fileExporter(
             isPresented: Binding(get: { exporting != nil }, set: { if !$0 { exporting = nil } }),
-            document: exporting.map { ExportDocument(data: $0.makeData(from: records), contentType: $0.contentType) },
+            document: exporting.map { ExportDocument(data: exportData($0), contentType: $0.contentType) },
             contentType: exporting?.contentType ?? .json,
             defaultFilename: exporting?.defaultFileName()
         ) { _ in

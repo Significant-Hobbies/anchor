@@ -365,34 +365,51 @@ public struct QuietButtonStyle: PrimitiveButtonStyle {
 }
 
 private struct AnchorSMButton: View {
-    @Environment(\.anchorTheme) private var theme
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let configuration: PrimitiveButtonStyleConfiguration
     let kind: SMButtonStyle.Kind
     let expands: Bool
     var isDestructive = false
 
-    private var palette: SMPalette {
-        var palette = theme.smPalette
-        if isDestructive {
-            palette = palette.brand(theme.negative, foreground: theme.onAccent)
-        }
-        return palette
-    }
-
     var body: some View {
         Button(role: configuration.role, action: configuration.trigger) {
             configuration.label
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: expands ? .infinity : nil)
-                .padding(.vertical, Space.xs)
         }
-        .buttonStyle(SMButtonStyle(kind))
-        .background(kind == .outline ? theme.surfaceRaised : .clear, in: .capsule)
-        .environment(\.smPalette, palette)
-        .opacity(isEnabled ? 1 : 0.4)
-        .transaction { if reduceMotion { $0.animation = nil } }
+        .buttonStyle(PlannerActionStyle(primary: kind == .brand, expands: expands,
+                                        destructive: isDestructive))
+    }
+}
+
+private struct PlannerActionStyle: ButtonStyle {
+    @Environment(\.anchorTheme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+    let primary: Bool
+    let expands: Bool
+    let destructive: Bool
+
+    #if os(macOS)
+    private let faceHeight: CGFloat = 28
+    private let targetHeight: CGFloat = 28
+    #else
+    private let faceHeight: CGFloat = 34
+    private let targetHeight: CGFloat = 44
+    #endif
+
+    func makeBody(configuration: Configuration) -> some View {
+        let palette = theme.smPalette
+        let shape = Capsule(style: .circular)
+        return configuration.label
+            .font(.custom(palette.displayFont, size: 13, relativeTo: .subheadline).weight(.semibold))
+            .textCase(palette.uiLowercase ? .lowercase : nil)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .frame(maxWidth: expands ? .infinity : nil, minHeight: faceHeight)
+            .foregroundStyle(primary ? theme.onAccent : theme.textPrimary)
+            .background(primary ? (destructive ? theme.negative : palette.brand) : theme.surfaceRaised, in: shape)
+            .overlay { if !primary { shape.strokeBorder(palette.border) } }
+            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+            .frame(minHeight: targetHeight)
+            .contentShape(Rectangle())
     }
 }
 #else

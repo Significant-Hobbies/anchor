@@ -38,6 +38,7 @@ public struct ConnectedGoogleAccount: Codable, Sendable, Equatable, Identifiable
 @MainActor
 public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     public static let accountsKey = "anchor.calendar.accounts"
+    public static let disconnectedAccountsKey = "anchor.calendar.disconnected-accounts"
     public static let lastSyncKey = "anchor.calendar.last-sync"
 
     @Published public private(set) var accounts: [ConnectedGoogleAccount] = []
@@ -169,6 +170,8 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             account.selectedCalendarIDs = previous?.selectedCalendarIDs.filter { fetchedIDs.contains($0) }
                 ?? calendars.filter(\.isPrimary).map(\.id)
             upsert(account)
+            var disconnected = disconnectedAccountIDs
+            if disconnected.remove(account.id) != nil { persistDisconnected(disconnected) }
             connectionIssue = nil
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             connectionIssue = nil
@@ -182,11 +185,9 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         return "Google sign-in could not be completed. Check your connection and try again."
     }
 
-    /// Stops imports for the account: revokes the grant (best-effort), drops
-    /// the Keychain credentials and the account record, and unlinks the
-    /// account's imported blocks. Block contents — including past check-offs
-    /// and history — are kept.
-    public func disconnect(accountID: String, context: ModelContext, blocks: [PlanBlock]) async {
+    /// Forget the local account and revoke the grant. Shared block links
+    /// remain intact so another connected device does not reimport duplicates.
+    public func disconnect(accountID: String, context _: ModelContext, blocks _: [PlanBlock]) async {
         if let credentials = try? await credentialStore.load(accountID: accountID) {
             await tokenClient.revoke(credentials.refreshToken)
         }
@@ -197,13 +198,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         calendarListRequests.removeValue(forKey: accountID)
         calendarListIssues.removeValue(forKey: accountID)
 
-        let prefix = GoogleCalendarEvent.linkPrefix(accountID: accountID)
-        var detached = false
-        for block in blocks where block.externalEventKey?.hasPrefix(prefix) == true {
-            block.externalEventKey = nil
-            detached = true
-        }
-        if detached { try? context.save() }
+        persistDisconnected(disconnectedAccountIDs.union([accountID]))
         status = "Calendar account disconnected."
     }
 
@@ -290,7 +285,16 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         do {
             let linked = FetchDescriptor<PlanBlock>(predicate: #Predicate { $0.externalEventKey != nil })
             let blocks = try context.fetch(linked)
-            report = batch.reconcile(blocks: blocks.map { $0.snapshot() }, eligibleAccountIDs: eligible, now: Date())
+            // Read after the network await so a removal during import also wins.
+            let removals = try context.fetch(FetchDescriptor<RemovedCalendarOccurrence>())
+            report = batch.reconcile(blocks: blocks.map { $0.snapshot() }, eligibleAccountIDs: eligible,
+                                     removedEventKeys: Set(removals.map(\.eventKey)), now: Date())
+            let markers = Dictionary(grouping: removals, by: \.eventKey)
+            let stale = blocks.filter { block in block.externalEventKey.map { markers[$0] != nil } ?? false }
+            for (key, copies) in Dictionary(grouping: stale, by: { $0.externalEventKey! }) {
+                RemovedCalendarOccurrence.remember(key: key, blockIDs: copies.map(\.id),
+                                                   existing: markers[key] ?? [], in: context)
+            }
             try apply(report: report, to: blocks, context: context)
         } catch {
             context.rollback()
@@ -369,6 +373,15 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             accounts.append(account)
         }
         persistAccounts()
+    }
+
+    private var disconnectedAccountIDs: Set<String> {
+        guard let data = defaults.data(forKey: Self.disconnectedAccountsKey) else { return [] }
+        return (try? JSONDecoder().decode(Set<String>.self, from: data)) ?? []
+    }
+
+    private func persistDisconnected(_ ids: Set<String>) {
+        defaults.set(try? JSONEncoder().encode(ids), forKey: Self.disconnectedAccountsKey)
     }
 
     private func persistAccounts() {

@@ -3,6 +3,7 @@ import SwiftData
 
 public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public var id: UUID
+    public var projectID: UUID?
     public var templateID: UUID?
     public var templateOccurrenceDay: Date?
     public var sessionID: UUID?
@@ -25,6 +26,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
 
     public init(
         id: UUID,
+        projectID: UUID? = nil,
         templateID: UUID? = nil,
         templateOccurrenceDay: Date? = nil,
         isTemplateOverride: Bool = false,
@@ -45,6 +47,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
         externalEventKey: String? = nil
     ) {
         self.id = id
+        self.projectID = projectID
         self.templateID = templateID
         self.templateOccurrenceDay = templateOccurrenceDay
         self.isTemplateOverride = isTemplateOverride
@@ -114,9 +117,16 @@ public struct BehaviorProfileRecord: Sendable, Codable, Equatable {
 }
 
 public extension PlanBlock {
+    func contributesToDayReview(in interval: DateInterval) -> Bool {
+        if plannedStart < interval.end && plannedEnd > interval.start { return true }
+        guard sessionID == nil, let actualStartedAt, let actualEndedAt else { return false }
+        return actualStartedAt < actualEndedAt && actualStartedAt < interval.end && actualEndedAt > interval.start
+    }
+
     func snapshot() -> PlanBlockRecord {
         PlanBlockRecord(
             id: id,
+            projectID: projectID,
             templateID: templateID,
             templateOccurrenceDay: templateOccurrenceDay,
             isTemplateOverride: isTemplateOverride,
@@ -168,8 +178,9 @@ public extension ModelContext {
     func planBlockRecords(on day: Date, calendar: Calendar = .current) throws -> [PlanBlockRecord] {
         let start = calendar.startOfDay(for: day)
         let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        let interval = DateInterval(start: start, end: end)
         return try fetch(FetchDescriptor<PlanBlock>())
-            .filter { $0.plannedStart >= start && $0.plannedStart < end }
+            .filter { $0.contributesToDayReview(in: interval) }
             .sorted { $0.plannedStart < $1.plannedStart }
             .map { $0.snapshot() }
     }
@@ -339,7 +350,10 @@ public struct DayReviewEngine: Sendable {
         divergences: [DivergenceRecord],
         profile: BehaviorProfileRecord = BehaviorProfileRecord()
     ) -> Review {
-        let sessionsByID = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        let start = calendar.startOfDay(for: day)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
+        let daySessions = sessions.filter { $0.startedAt >= start && $0.startedAt < end }
+        let sessionsByID = Dictionary(uniqueKeysWithValues: daySessions.map { ($0.id, $0) })
         let divergencesByBlock = Dictionary(grouping: divergences, by: \.blockID)
         var planned: Double = 0
         var actual: Double = 0
@@ -347,18 +361,41 @@ public struct DayReviewEngine: Sendable {
         var gaps: [Gap] = []
 
         for block in blocks {
-            let plannedSeconds = Double(block.plannedSeconds)
+            let blockEnd = block.plannedStart.addingTimeInterval(Double(block.plannedSeconds))
+            let plannedSeconds = min(end, blockEnd).timeIntervalSince(max(start, block.plannedStart))
+            guard plannedSeconds > 0 else {
+                // The entry was planned on another day. Credit only the portion
+                // manually logged here; there is no local plan to compare against.
+                if block.sessionID == nil { actual += storedActualSeconds(block, from: start, until: end) ?? 0 }
+                continue
+            }
             let session = block.sessionID.flatMap { sessionsByID[$0] }
-            let storedActual = storedActualSeconds(block)
-            let actualDurationKnown = session != nil || storedActual != nil
+            // Timed focus is measured once on the session's start day. Its
+            // wall-clock span can include pauses, so it cannot fill another
+            // day's actual minutes when the linked snapshot is outside it.
+            let entirelyWithinDay = block.actualStartedAt.map { $0 >= start } == true
+                && block.actualEndedAt.map { $0 <= end } == true
+            let storedActual = block.sessionID == nil || entirelyWithinDay
+                ? storedActualSeconds(block, from: start, until: end) : nil
+            let hasManualLog = block.sessionID == nil && block.actualStartedAt.map { loggedStart in
+                block.actualEndedAt.map { $0 > loggedStart } ?? false
+            } == true
+            let actualDurationKnown = session != nil || storedActual != nil || hasManualLog
             let actualSeconds = session?.focusedSeconds ?? storedActual ?? 0
             planned += plannedSeconds
+            if block.sessionID != nil, session == nil, let startedAt = block.actualStartedAt,
+               startedAt < start || startedAt >= end {
+                continue // Its timer outcome belongs in the review for its start day.
+            }
             actual += actualSeconds
+            let explicit = divergencesByBlock[block.id]?.sorted { $0.occurredAt > $1.occurredAt }.first
+            if hasManualLog, storedActual == nil, explicit == nil {
+                continue // Observed on another day, not an unobserved completion.
+            }
             if !actualDurationKnown && block.state == .completed {
                 unobservedCompletedBlocks += 1
             }
 
-            let explicit = divergencesByBlock[block.id]?.sorted { $0.occurredAt > $1.occurredAt }.first
             let capturedCause = session.flatMap(capturedInterruptionCause)
             let cause = explicit?.kind ?? capturedCause?.kind ?? .unknown
             let evidence = explicit?.evidence ?? capturedCause?.evidence ?? .unknown
@@ -391,7 +428,7 @@ public struct DayReviewEngine: Sendable {
         }
 
         let linkedSessionIDs = Set(blocks.compactMap(\.sessionID))
-        for session in sessions where !linkedSessionIDs.contains(session.id) {
+        for session in daySessions where !linkedSessionIDs.contains(session.id) {
             let actualSeconds = session.focusedSeconds
             actual += actualSeconds
             let explicit = divergencesByBlock[session.id]?.sorted { $0.occurredAt > $1.occurredAt }.first
@@ -423,9 +460,10 @@ public struct DayReviewEngine: Sendable {
         )
     }
 
-    private func storedActualSeconds(_ block: PlanBlockRecord) -> Double? {
-        guard let start = block.actualStartedAt, let end = block.actualEndedAt else { return nil }
-        return max(0, end.timeIntervalSince(start))
+    private func storedActualSeconds(_ block: PlanBlockRecord, from dayStart: Date, until dayEnd: Date) -> Double? {
+        guard let start = block.actualStartedAt, let end = block.actualEndedAt,
+              start < dayEnd, end > dayStart else { return nil }
+        return max(0, min(end, dayEnd).timeIntervalSince(max(start, dayStart)))
     }
 
     private func capturedInterruptionCause(
