@@ -11,127 +11,123 @@ public struct CalendarSettings: View {
     @Query(sort: \PlanBlock.plannedStart) private var planBlocks: [PlanBlock]
     @ObservedObject private var coordinator: CalendarSyncCoordinator
 
-    public init(coordinator: CalendarSyncCoordinator) {
+    private let inSheet: Bool
+
+    public init(coordinator: CalendarSyncCoordinator, inSheet: Bool = false) {
+        self.inSheet = inSheet
         _coordinator = ObservedObject(wrappedValue: coordinator)
     }
 
     public var body: some View {
-        PreferenceGroup("Calendars", subtitle: "Bring real commitments into Today") {
-            VStack(alignment: .leading, spacing: Space.sm) {
-                if !coordinator.isConfigured {
-                    PreferenceInfoRow(
-                        systemImage: "calendar.badge.exclamationmark",
-                        title: "Google Calendar",
-                        detail: "Calendar import isn't configured in this build yet."
-                    )
-                } else {
-                    PreferenceInfoRow(
-                        systemImage: "calendar",
-                        title: "Google Calendar",
-                        detail: "Imports timed events as commitment blocks for today and the next seven days. Read-only — nothing is sent back."
-                    ) {
-                        Button(coordinator.isConnecting ? "connecting…" : "connect account") {
-                            Task { await coordinator.connect() }
-                        }
-                        .buttonStyle(QuietButtonStyle(expands: false))
-                        .disabled(coordinator.isConnecting)
-                        .accessibilityIdentifier("anchor.calendar.connect")
-                    }
-
-                    ForEach(coordinator.accounts) { account in
-                        PreferenceDivider()
-                        accountSection(account)
-                    }
-
-                    if let status = coordinator.status {
-                        PreferenceDivider()
-                        Text(status)
-                            .font(.caption)
-                            .foregroundStyle(theme.textSecondary)
-                            .padding(.horizontal, Space.md)
-                            .padding(.bottom, Space.sm)
-                    } else if !coordinator.accounts.isEmpty, let lastSync = coordinator.lastSyncedAt {
-                        PreferenceDivider()
-                        Text("Last synced \(lastSync.formatted(date: .omitted, time: .shortened))")
-                            .font(.caption)
-                            .foregroundStyle(theme.textTertiary)
-                            .padding(.horizontal, Space.md)
-                            .padding(.bottom, Space.sm)
-                    }
-                }
+        VStack(alignment: .leading, spacing: Space.md) {
+            if !inSheet {
+                Label("Google Calendar", systemImage: "calendar").font(.headline)
             }
+            if !coordinator.isConfigured {
+                Text("Calendar import is unavailable in this build.")
+                    .foregroundStyle(theme.textSecondary)
+            } else if coordinator.accounts.isEmpty {
+                Text("Connect Google Calendar to see timed events for today and the next seven days in your plan.")
+                    .foregroundStyle(theme.textSecondary)
+                connectButton
+                syncStatus
+            } else {
+                syncStatus
+                ForEach(coordinator.accounts) { account in
+                    accountSection(account)
+                }
+                connectButton
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var connectButton: some View {
+        Button {
+            Task { await coordinator.connect() }
+        } label: {
+            Label(coordinator.isConnecting ? "Connecting…" :
+                    (coordinator.accounts.isEmpty ? "Connect account" : "Add another account"),
+                  systemImage: "plus")
+        }
+        .buttonStyle(.borderless)
+        .disabled(coordinator.isConnecting)
+        .accessibilityIdentifier("anchor.calendar.connect")
+    }
+
+    @ViewBuilder private var syncStatus: some View {
+        if let status = coordinator.status {
+            Text(status).font(.subheadline).foregroundStyle(theme.textSecondary)
+        } else if !coordinator.accounts.isEmpty, let lastSync = coordinator.lastSyncedAt {
+            Text("Last synced \(lastSync.formatted(date: .omitted, time: .shortened))")
+                .font(.subheadline).foregroundStyle(theme.textSecondary)
         }
     }
 
-    @ViewBuilder
     private func accountSection(_ account: ConnectedGoogleAccount) -> some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            HStack(spacing: Space.sm) {
-                Image(systemName: "person.crop.circle")
-                    .foregroundStyle(theme.textSecondary)
-                    .frame(width: 28, height: 28)
-                    .background(theme.textSecondary.opacity(0.10), in: .circle)
+        let calendars = coordinator.availableCalendars[account.id] ?? []
+        let ordered = calendars.filter(\.isPrimary) + calendars.filter { !$0.isPrimary }
+        return VStack(alignment: .leading, spacing: Space.sm) {
+            HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(account.displayName)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(theme.textPrimary)
-                    if !account.email.isEmpty {
-                        Text(account.email)
-                            .font(.caption)
-                            .foregroundStyle(theme.textSecondary)
+                    Text(account.displayName.isEmpty ? account.email : account.displayName)
+                        .font(.headline)
+                    if !account.displayName.isEmpty, !account.email.isEmpty,
+                       account.displayName.caseInsensitiveCompare(account.email) != .orderedSame {
+                        Text(account.email).font(.caption).foregroundStyle(theme.textSecondary)
                     }
                 }
-                Spacer(minLength: Space.sm)
+                Spacer()
                 Menu {
-                    Button("refresh calendars", systemImage: "arrow.clockwise") {
+                    Button("Refresh calendars", systemImage: "arrow.clockwise") {
                         Task { await coordinator.refreshCalendars(accountID: account.id) }
                     }
-                    Button("sync now", systemImage: "arrow.triangle.2.circlepath") {
+                    Button("Sync now", systemImage: "arrow.triangle.2.circlepath") {
                         Task { await coordinator.sync(context: context, blocks: planBlocks) }
                     }
-                    Button("disconnect", role: .destructive) {
+                    Button("Disconnect", role: .destructive) {
                         Task {
-                            await coordinator.disconnect(
-                                accountID: account.id,
-                                context: context,
-                                blocks: planBlocks
-                            )
+                            await coordinator.disconnect(accountID: account.id, context: context, blocks: planBlocks)
                         }
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
-                        .frame(width: 32, height: 32)
-                        .contentShape(.rect)
+                    Image(systemName: "ellipsis.circle").font(.title3)
+                        .frame(minWidth: 32, minHeight: 32)
                 }
+                #if os(macOS)
+                .menuStyle(.borderlessButton)
+                #endif
                 .menuIndicator(.hidden)
+                .fixedSize()
                 .accessibilityLabel("More actions for \(account.displayName)")
             }
-            .padding(.horizontal, Space.md)
-
-            let calendars = coordinator.availableCalendars[account.id] ?? []
             if calendars.isEmpty {
-                Text("No calendars loaded yet — refresh to list this account's calendars.")
-                    .font(.caption)
-                    .foregroundStyle(theme.textTertiary)
-                    .padding(.horizontal, Space.md)
+                Text("Refresh calendars from the account menu to load the list.")
+                    .font(.subheadline).foregroundStyle(theme.textSecondary)
             } else {
-                ForEach(calendars) { calendar in
-                    Toggle(isOn: selectionBinding(accountID: account.id, calendarID: calendar.id)) {
-                        HStack(spacing: Space.xs) {
-                            Text(calendar.title)
-                                .font(.subheadline)
-                                .foregroundStyle(theme.textPrimary)
-                            if calendar.isPrimary {
-                                Text("Primary")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(theme.textTertiary)
+                Text("Show in Today").font(.subheadline.weight(.medium)).foregroundStyle(theme.textSecondary)
+                VStack(spacing: 0) {
+                    ForEach(ordered) { calendar in
+                        if calendar.id != ordered.first?.id { Divider() }
+                        Toggle(isOn: selectionBinding(accountID: account.id, calendarID: calendar.id)) {
+                            HStack(spacing: Space.xs) {
+                                let usesAddress = calendar.isPrimary && calendar.title.caseInsensitiveCompare(account.email) == .orderedSame
+                                Text(usesAddress ? "Primary calendar" : calendar.title)
+                                if calendar.isPrimary && !usesAddress {
+                                    Text("Primary").font(.caption).foregroundStyle(theme.textSecondary)
+                                }
+                                Spacer(minLength: 0)
                             }
+                            .frame(minHeight: 40)
+                            .contentShape(Rectangle())
                         }
+                        .padding(.horizontal, Space.sm)
+                        .accessibilityIdentifier("anchor.calendar.toggle.\(calendar.id)")
                     }
-                    .tint(theme.accent)
-                    .padding(.horizontal, Space.md)
-                    .accessibilityIdentifier("anchor.calendar.toggle.\(calendar.id)")
                 }
+                .padding(.horizontal, Space.xs)
+                .background(theme.surface, in: .rect(cornerRadius: Radius.md))
+                .overlay { RoundedRectangle(cornerRadius: Radius.md).strokeBorder(theme.hairline) }
             }
         }
         .task {
