@@ -290,7 +290,10 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         do {
             let linked = FetchDescriptor<PlanBlock>(predicate: #Predicate { $0.externalEventKey != nil })
             let blocks = try context.fetch(linked)
-            report = batch.reconcile(blocks: blocks.map { $0.snapshot() }, eligibleAccountIDs: eligible, now: Date())
+            // Read after the network await so a removal during import also wins.
+            let removals = try context.fetch(FetchDescriptor<RemovedCalendarOccurrence>())
+            report = batch.reconcile(blocks: blocks.map { $0.snapshot() }, eligibleAccountIDs: eligible,
+                                     removedEventKeys: Set(removals.map(\.eventKey)), now: Date())
             try apply(report: report, to: blocks, context: context)
         } catch {
             context.rollback()

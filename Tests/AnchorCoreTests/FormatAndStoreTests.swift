@@ -56,7 +56,7 @@ struct FormatTests {
     @Test("An in-memory container is usable and isolated")
     func inMemoryContainer() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)
-        #expect(container.schema.entities.count == 13)
+        #expect(container.schema.entities.count == 14)
     }
 
     @Test("The schema carries the complete CloudKit-safe model set")
@@ -65,7 +65,7 @@ struct FormatTests {
         #expect(names == [
             "Project", "SavedTag", "Goal", "FocusSession", "Distraction", "MachineActivityDay",
             "AnchorPreferences", "BehaviorProfile", "ScheduleTemplate", "HabitCompletion", "DayPlanConfirmation",
-            "PlanBlock", "DivergenceEvent",
+            "PlanBlock", "RemovedCalendarOccurrence", "DivergenceEvent",
         ])
     }
 
@@ -275,6 +275,7 @@ struct CloudKitSchemaSeedTests {
         #expect(try context.fetchCount(FetchDescriptor<HabitCompletion>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<DayPlanConfirmation>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<PlanBlock>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<RemovedCalendarOccurrence>()) == 1)
         #expect(try context.fetchCount(FetchDescriptor<DivergenceEvent>()) == 1)
 
         let distraction = try #require(context.fetch(FetchDescriptor<Distraction>()).first)

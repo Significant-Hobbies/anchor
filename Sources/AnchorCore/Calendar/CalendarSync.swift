@@ -1,4 +1,16 @@
 import Foundation
+import SwiftData
+
+/// A planner removal identifies one Google occurrence across devices and imports.
+/// CloudKit may deliver duplicate markers; membership is by key.
+@Model
+public final class RemovedCalendarOccurrence {
+    public var eventKey: String = ""
+
+    public init(eventKey: String) {
+        self.eventKey = eventKey
+    }
+}
 
 /// A Google account participating in one sync pass, with its resolved access
 /// token and the calendars the owner chose to import from.
@@ -93,13 +105,19 @@ public enum CalendarSyncPolicy {
         events: [GoogleCalendarEvent],
         blocks: [PlanBlockRecord],
         window: DateInterval,
-        fetchedCalendars: [String: Set<String>]
+        fetchedCalendars: [String: Set<String>],
+        removedEventKeys: Set<String> = []
     ) -> CalendarSyncPlan {
         var plan = CalendarSyncPlan()
 
         let managed = blocks.filter { block in
-            guard let key = block.externalEventKey,
-                  let source = GoogleCalendarEvent.linkedCalendar(key) else { return false }
+            guard let key = block.externalEventKey else { return false }
+            if removedEventKeys.contains(key) {
+                // A stale copy may arrive from another device after the removal.
+                plan.deletions.append(block.id)
+                return false
+            }
+            guard let source = GoogleCalendarEvent.linkedCalendar(key) else { return false }
             return fetchedCalendars[source.accountID]?.contains(source.calendarID) == true
         }
         var blocksByKey: [String: [PlanBlockRecord]] = [:]
@@ -109,7 +127,7 @@ public enum CalendarSyncPolicy {
 
         var seenKeys = Set<String>()
         for event in events where fetchedCalendars[event.accountID]?.contains(event.calendarID) == true {
-            guard seenKeys.insert(event.linkKey).inserted else { continue }
+            guard !removedEventKeys.contains(event.linkKey), seenKeys.insert(event.linkKey).inserted else { continue }
             let linked = blocksByKey[event.linkKey] ?? []
 
             // Cancelled or all-day events cannot be represented: untouched
@@ -185,11 +203,12 @@ public struct CalendarSyncService: Sendable {
         accounts: [CalendarSyncAccount],
         blocks: [PlanBlockRecord],
         now: Date = Date(),
-        window: DateInterval? = nil
+        window: DateInterval? = nil,
+        removedEventKeys: Set<String> = []
     ) async -> CalendarSyncReport {
         let window = window ?? CalendarSyncPolicy.syncWindow(now: now, calendar: calendar)
         let batch = await fetch(accounts: accounts, window: window)
-        return batch.reconcile(blocks: blocks, now: now)
+        return batch.reconcile(blocks: blocks, removedEventKeys: removedEventKeys, now: now)
     }
 
     public func fetch(accounts: [CalendarSyncAccount], window: DateInterval) async -> CalendarEventBatch {
@@ -225,12 +244,16 @@ public struct CalendarEventBatch: Sendable {
     fileprivate var fetchedCalendars: [String: Set<String>] = [:]
     fileprivate var failedAccountIDs: Set<String> = []
 
-    public func reconcile(blocks: [PlanBlockRecord], eligibleAccountIDs: Set<String>? = nil, now: Date) -> CalendarSyncReport {
+    public func reconcile(
+        blocks: [PlanBlockRecord], eligibleAccountIDs: Set<String>? = nil,
+        removedEventKeys: Set<String> = [], now: Date
+    ) -> CalendarSyncReport {
         let plan = CalendarSyncPolicy.plan(
             events: events,
             blocks: blocks,
             window: window,
-            fetchedCalendars: fetchedCalendars.filter { eligibleAccountIDs?.contains($0.key) ?? true }
+            fetchedCalendars: fetchedCalendars.filter { eligibleAccountIDs?.contains($0.key) ?? true },
+            removedEventKeys: removedEventKeys
         )
         var report = CalendarSyncReport(syncedAt: now)
         report.failedAccounts = failedAccountIDs.intersection(eligibleAccountIDs ?? failedAccountIDs)

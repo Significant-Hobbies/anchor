@@ -184,6 +184,71 @@ struct CalendarCoordinatorTests {
         #expect(try context.fetch(FetchDescriptor<PlanBlock>()).map(\.id) == [block.id])
     }
 
+    @Test("Removal wins over an in-flight fetch and a later import from a reopened store")
+    func removeDuringImport() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("Calendar.store")
+        let container = try AnchorStore.makeContainer(kind: .localOnly, url: url)
+        let context = ModelContext(container)
+        let start = Date(timeIntervalSince1970: 2_000_000_000)
+        let period = DateInterval(start: start, duration: 7 * 86_400)
+        let original = GoogleCalendarEvent(accountID: "108", calendarID: "primary", eventID: "series_20330518",
+                                          title: "Planning", start: start, end: start.addingTimeInterval(3600))
+        var following = original
+        following.eventID = "series_20330519"
+        following.start = start.addingTimeInterval(86_400)
+        following.end = following.start.addingTimeInterval(3600)
+        var otherCalendar = original
+        otherCalendar.calendarID = "team"
+        let defaults = freshDefaults()
+        let credentials = InMemoryCredentialStore()
+        try await seedAccount(ConnectedGoogleAccount(id: "108", email: "", displayName: "Me", selectedCalendarIDs: ["primary", "team"]),
+                              credentials: GoogleCredentials(accessToken: "a", refreshToken: "r", expiresAt: .distantFuture),
+                              into: defaults, store: credentials)
+        let source = FixtureCalendarStore()
+        source.eventsByKey["primary"] = [original, following]
+        source.eventsByKey["team"] = [otherCalendar]
+        let coordinator = makeCoordinator(defaults: defaults, store: source, credentials: credentials)
+        #expect(await coordinator.sync(context: context, window: period) == nil)
+        let blocks = try context.fetch(FetchDescriptor<PlanBlock>())
+        let item = try #require(blocks.first { $0.externalEventKey == original.linkKey })
+        let next = try #require(blocks.first { $0.externalEventKey == following.linkKey })
+        let team = try #require(blocks.first { $0.externalEventKey == otherCalendar.linkKey })
+        let duplicate = PlanBlock(title: "Earlier imported copy", plannedStart: start, plannedSeconds: 3600)
+        duplicate.externalEventKey = original.linkKey
+        let authored = PlanBlock(title: "Local plan", plannedStart: start, plannedSeconds: 3600)
+        let session = FocusSession(goal: nil, plannedSeconds: 3600, startedAt: start)
+        item.sessionID = session.id
+        context.insert(duplicate)
+        context.insert(authored)
+        context.insert(session)
+        try context.save()
+
+        let gate = CalendarRequestGate()
+        source.beforeEvents = { window in await gate.enter(window) }
+        let fetching = Task { await coordinator.sync(context: context, window: period) }
+        await gate.waitForFirstRequest()
+        let planner = DayPlanService(context: context)
+        try planner.removeImportedEvent(key: original.linkKey)
+        try planner.removeImportedEvent(key: original.linkKey)
+        await gate.release()
+        #expect(await fetching.value == nil)
+
+        let reopened = try AnchorStore.makeContainer(kind: .localOnly, url: url)
+        let fresh = ModelContext(reopened)
+        // Simulate a stale CloudKit copy arriving after the marker.
+        let late = PlanBlock(title: "Late duplicate", plannedStart: start, plannedSeconds: 3600)
+        late.externalEventKey = original.linkKey
+        fresh.insert(late)
+        try fresh.save()
+        #expect(await coordinator.sync(context: fresh, window: period) == nil)
+        #expect(try Set(fresh.fetch(FetchDescriptor<PlanBlock>()).map(\.id)) == [authored.id, next.id, team.id])
+        #expect(try fresh.fetch(FetchDescriptor<FocusSession>()).map(\.id) == [session.id])
+        #expect(try fresh.fetch(FetchDescriptor<RemovedCalendarOccurrence>()).map(\.eventKey) == [original.linkKey])
+    }
+
     @Test("Overlapping selected periods wait, reuse existing links, and preserve other dates")
     func selectedPeriodDuringSync() async throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)

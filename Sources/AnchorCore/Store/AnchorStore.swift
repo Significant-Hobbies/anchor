@@ -36,6 +36,7 @@ public enum AnchorStore {
         HabitCompletion.self,
         DayPlanConfirmation.self,
         PlanBlock.self,
+        RemovedCalendarOccurrence.self,
         DivergenceEvent.self,
     ])
 
