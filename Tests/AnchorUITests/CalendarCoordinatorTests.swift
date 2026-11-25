@@ -177,8 +177,11 @@ struct CalendarCoordinatorTests {
         #expect(block.externalEventKey == "108\u{1F}primary\u{1F}evt-9")
         coordinator.setCalendarSelected(accountID: "108", calendarID: "primary", selected: false)
         await coordinator.sync(context: context, blocks: blocks)
-        #expect(try context.fetch(FetchDescriptor<PlanBlock>()).isEmpty)
-
+        #expect(try context.fetch(FetchDescriptor<PlanBlock>()).map(\.id) == [block.id])
+        #expect(block.externalEventKey == "108\u{1F}primary\u{1F}evt-9")
+        coordinator.setCalendarSelected(accountID: "108", calendarID: "primary", selected: true)
+        await coordinator.sync(context: context, blocks: blocks)
+        #expect(try context.fetch(FetchDescriptor<PlanBlock>()).map(\.id) == [block.id])
     }
 
     @Test("Overlapping selected periods wait, reuse existing links, and preserve other dates")

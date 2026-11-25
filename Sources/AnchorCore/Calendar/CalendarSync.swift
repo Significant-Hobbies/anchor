@@ -41,6 +41,14 @@ public struct CalendarSyncPlan: Sendable, Equatable {
     public init() {}
 }
 
+public extension GoogleCalendarEvent {
+    static func linkedCalendar(_ key: String) -> (accountID: String, calendarID: String)? {
+        let parts = key.split(separator: "\u{1F}", omittingEmptySubsequences: false)
+        guard parts.count == 3, parts.allSatisfy({ !$0.isEmpty }) else { return nil }
+        return (String(parts[0]), String(parts[1]))
+    }
+}
+
 public enum CalendarSyncPolicy {
     /// Same rolling window as the Reminders sync: today plus the next seven
     /// days.
@@ -72,11 +80,11 @@ public enum CalendarSyncPolicy {
 
     /// Reconcile fetched events against linked blocks.
     ///
-    /// - Only blocks whose link belongs to a managed account are considered —
-    ///   a disconnected or failed account's blocks must not look "vanished".
-    /// - A vanished event (deleted upstream, moved outside the window, or on a
-    ///   calendar the owner unselected) removes untouched blocks and detaches
-    ///   touched ones.
+    /// - Only successfully fetched account/calendar pairs provide evidence of absence.
+    ///   Device-local visibility preferences never authorize deleting shared records.
+    /// - A missing event may remove an untouched import or unlink historical activity.
+    ///   A local override can live on a different day from the provider event, so
+    ///   absence in the local window is never sufficient evidence to unlink it.
     /// - All-day events are not imported in v1; a timed event that became
     ///   all-day is treated like a cancellation.
     /// - Touched blocks always keep their content; the worst case is a cleared
@@ -85,15 +93,14 @@ public enum CalendarSyncPolicy {
         events: [GoogleCalendarEvent],
         blocks: [PlanBlockRecord],
         window: DateInterval,
-        managedAccountIDs: Set<String>
+        fetchedCalendars: [String: Set<String>]
     ) -> CalendarSyncPlan {
         var plan = CalendarSyncPlan()
 
         let managed = blocks.filter { block in
             guard let key = block.externalEventKey,
-                  let accountID = key.components(separatedBy: "\u{1F}").first
-            else { return false }
-            return managedAccountIDs.contains(accountID)
+                  let source = GoogleCalendarEvent.linkedCalendar(key) else { return false }
+            return fetchedCalendars[source.accountID]?.contains(source.calendarID) == true
         }
         var blocksByKey: [String: [PlanBlockRecord]] = [:]
         for block in managed where block.externalEventKey != nil {
@@ -101,7 +108,7 @@ public enum CalendarSyncPolicy {
         }
 
         var seenKeys = Set<String>()
-        for event in events where managedAccountIDs.contains(event.accountID) {
+        for event in events where fetchedCalendars[event.accountID]?.contains(event.calendarID) == true {
             guard seenKeys.insert(event.linkKey).inserted else { continue }
             let linked = blocksByKey[event.linkKey] ?? []
 
@@ -115,14 +122,14 @@ public enum CalendarSyncPolicy {
                 continue
             }
 
-            guard let primary = linked.first else {
+            guard let primary = linked.first(where: \.isTemplateOverride) ?? linked.first else {
                 plan.creations.append(event)
                 continue
             }
             if !matches(primary, event: event) {
                 if isUntouched(primary) {
                     plan.updates.append(CalendarBlockUpdate(blockID: primary.id, event: event))
-                } else if primary.plannedStart != event.start {
+                } else if !primary.isTemplateOverride && primary.plannedStart != event.start {
                     // Keep the owner's original occurrence and show Google's new time.
                     plan.detachments.append(primary.id)
                     plan.creations.append(event)
@@ -130,14 +137,14 @@ public enum CalendarSyncPolicy {
                 // At the same start time, keep the claimed entry and its link.
                 // A title or duration change must not duplicate a finished meeting.
             }
-            for duplicate in linked.dropFirst() {
+            for duplicate in linked where duplicate.id != primary.id && !duplicate.isTemplateOverride {
                 if isUntouched(duplicate) { plan.deletions.append(duplicate.id) }
                 else { plan.detachments.append(duplicate.id) }
             }
         }
 
         for block in managed
-        where block.externalEventKey != nil
+        where !block.isTemplateOverride && block.externalEventKey != nil
             && isInWindow(block, window: window)
             && !seenKeys.contains(block.externalEventKey!) {
             if isUntouched(block) { plan.deletions.append(block.id) }
@@ -201,7 +208,7 @@ public struct CalendarSyncService: Sendable {
                 }
                 // Only a complete account response can establish which events vanished.
                 batch.events += events
-                batch.managedAccountIDs.insert(account.id)
+                batch.fetchedCalendars[account.id] = account.selectedCalendarIDs
             } catch {
                 batch.failedAccountIDs.insert(account.id)
             }
@@ -215,7 +222,7 @@ public struct CalendarSyncService: Sendable {
 public struct CalendarEventBatch: Sendable {
     fileprivate var window: DateInterval
     fileprivate var events: [GoogleCalendarEvent] = []
-    fileprivate var managedAccountIDs: Set<String> = []
+    fileprivate var fetchedCalendars: [String: Set<String>] = [:]
     fileprivate var failedAccountIDs: Set<String> = []
 
     public func reconcile(blocks: [PlanBlockRecord], eligibleAccountIDs: Set<String>? = nil, now: Date) -> CalendarSyncReport {
@@ -223,7 +230,7 @@ public struct CalendarEventBatch: Sendable {
             events: events,
             blocks: blocks,
             window: window,
-            managedAccountIDs: managedAccountIDs.intersection(eligibleAccountIDs ?? managedAccountIDs)
+            fetchedCalendars: fetchedCalendars.filter { eligibleAccountIDs?.contains($0.key) ?? true }
         )
         var report = CalendarSyncReport(syncedAt: now)
         report.failedAccounts = failedAccountIDs.intersection(eligibleAccountIDs ?? failedAccountIDs)

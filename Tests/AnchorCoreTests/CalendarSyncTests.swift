@@ -62,7 +62,7 @@ struct CalendarSyncTests {
     func createsForNewEvents() {
         let e = event("Standup")
         let plan = CalendarSyncPolicy.plan(
-            events: [e], blocks: [], window: window, managedAccountIDs: ["acct-1"]
+            events: [e], blocks: [], window: window, fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.creations == [e])
         #expect(plan.updates.isEmpty && plan.deletions.isEmpty && plan.detachments.isEmpty)
@@ -73,7 +73,7 @@ struct CalendarSyncTests {
         let e = event("Moved meeting", seconds: 1_800)
         let stale = block(for: event("Old title"))
         let plan = CalendarSyncPolicy.plan(
-            events: [e], blocks: [stale], window: window, managedAccountIDs: ["acct-1"]
+            events: [e], blocks: [stale], window: window, fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.updates == [CalendarBlockUpdate(blockID: stale.id, event: e)])
         #expect(plan.creations.isEmpty && plan.deletions.isEmpty && plan.detachments.isEmpty)
@@ -86,7 +86,7 @@ struct CalendarSyncTests {
         let started = block(for: event("Gone"), state: .completed)
         let plan = CalendarSyncPolicy.plan(
             events: [cancelled], blocks: [fresh, started], window: window,
-            managedAccountIDs: ["acct-1"]
+            fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.deletions == [fresh.id])
         #expect(plan.detachments == [started.id])
@@ -97,12 +97,12 @@ struct CalendarSyncTests {
     func vanishedHandling() {
         let e = event("Meeting")
         let fresh = block(for: e)
-        let edited = block(for: e, edited: true)
+        let historical = block(for: e, state: .completed)
         let plan = CalendarSyncPolicy.plan(
-            events: [], blocks: [fresh, edited], window: window, managedAccountIDs: ["acct-1"]
+            events: [], blocks: [fresh, historical], window: window, fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.deletions == [fresh.id])
-        #expect(plan.detachments == [edited.id])
+        #expect(plan.detachments == [historical.id])
     }
 
     @Test("A rescheduled event keeps the claimed occurrence and imports the new time")
@@ -110,9 +110,9 @@ struct CalendarSyncTests {
         var e = event("Moved meeting")
         e.start = e.start.addingTimeInterval(3600)
         e.end = e.end.addingTimeInterval(3600)
-        let touched = block(for: event("Original"), edited: true)
+        let touched = block(for: event("Original"), state: .completed)
         let plan = CalendarSyncPolicy.plan(
-            events: [e], blocks: [touched], window: window, managedAccountIDs: ["acct-1"]
+            events: [e], blocks: [touched], window: window, fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.detachments == [touched.id])
         #expect(plan.creations == [e])
@@ -123,18 +123,53 @@ struct CalendarSyncTests {
     func preservesMatchingCompletedLink() {
         let meeting = event("Meeting")
         let plan = CalendarSyncPolicy.plan(events: [meeting], blocks: [block(for: meeting, state: .completed)],
-                                           window: window, managedAccountIDs: ["acct-1"])
+                                           window: window, fetchedCalendars: ["acct-1": ["primary"]])
         #expect(plan == CalendarSyncPlan())
         let renamed = CalendarSyncPolicy.plan(events: [event("Updated title")], blocks: [block(for: meeting, state: .completed)],
-                                             window: window, managedAccountIDs: ["acct-1"])
+                                             window: window, fetchedCalendars: ["acct-1": ["primary"]])
         #expect(renamed == CalendarSyncPlan())
+    }
+
+    @Test("A manual move keeps its link on the Google date and on the locally chosen date")
+    func ownerMovedImport() {
+        let upstream = event("Planning")
+        let localDate = upstream.start.addingTimeInterval(14 * 86_400)
+        let moved = block(for: event("Personal planning", start: localDate), edited: true)
+        let fetched: [String: Set<String>] = ["acct-1": ["primary"]]
+        let googleDay = DateInterval(start: upstream.start, duration: 86_400)
+        let localDay = DateInterval(start: localDate, duration: 86_400)
+        #expect(CalendarSyncPolicy.plan(events: [upstream], blocks: [moved], window: googleDay,
+                                        fetchedCalendars: fetched) == CalendarSyncPlan())
+        #expect(CalendarSyncPolicy.plan(events: [], blocks: [moved], window: localDay,
+                                        fetchedCalendars: fetched) == CalendarSyncPlan())
+        var cancelled = upstream
+        cancelled.isCancelled = true
+        let plan = CalendarSyncPolicy.plan(events: [cancelled], blocks: [moved], window: googleDay, fetchedCalendars: fetched)
+        #expect(plan.detachments == [moved.id] && plan.deletions.isEmpty)
+    }
+
+    @Test("Locally unselected calendars preserve shared entries and links even with no calendars selected")
+    func keepsUnselectedCalendars() async {
+        let source = FixtureCalendarStore()
+        let selected = block(for: event("No longer on Google"))
+        let unselected = block(for: event("Team meeting", calendar: "team"))
+        let history = block(for: event("Finished meeting", calendar: "team", id: "2"), state: .completed)
+        let service = CalendarSyncService(store: source, calendar: calendar)
+        for selection: Set<String> in [["primary"], []] {
+            let report = await service.sync(
+                accounts: [CalendarSyncAccount(id: "acct-1", accessToken: "test", selectedCalendarIDs: selection)],
+                blocks: [selected, unselected, history], window: window
+            )
+            #expect(report.deletions == (selection.isEmpty ? [] : [selected.id]))
+            #expect(report.detachments.isEmpty && report.updates.isEmpty && report.creations.isEmpty)
+        }
     }
 
     @Test("All-day events are not imported")
     func skipsAllDay() {
         let plan = CalendarSyncPolicy.plan(
             events: [event("Offsite", allDay: true)], blocks: [], window: window,
-            managedAccountIDs: ["acct-1"]
+            fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.creations.isEmpty)
     }
@@ -143,7 +178,7 @@ struct CalendarSyncTests {
     func ignoresUnmanagedAccounts() {
         let foreign = block(for: event("Other", account: "acct-2"))
         let plan = CalendarSyncPolicy.plan(
-            events: [], blocks: [foreign], window: window, managedAccountIDs: ["acct-1"]
+            events: [], blocks: [foreign], window: window, fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.deletions.isEmpty && plan.detachments.isEmpty)
     }
@@ -154,7 +189,7 @@ struct CalendarSyncTests {
         let e = event("Far future", start: distant)
         let b = block(for: e)
         let plan = CalendarSyncPolicy.plan(
-            events: [], blocks: [b], window: window, managedAccountIDs: ["acct-1"]
+            events: [], blocks: [b], window: window, fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.deletions.isEmpty && plan.detachments.isEmpty)
     }
@@ -166,7 +201,7 @@ struct CalendarSyncTests {
             events: [e],
             blocks: [block(for: e), block(for: e)],
             window: window,
-            managedAccountIDs: ["acct-1"]
+            fetchedCalendars: ["acct-1": ["primary"]]
         )
         #expect(plan.deletions.count == 1)
         #expect(plan.creations.isEmpty)

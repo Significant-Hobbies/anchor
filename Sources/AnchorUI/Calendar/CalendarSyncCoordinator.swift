@@ -262,15 +262,10 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         }
         guard !Task.isCancelled else { return nil }
 
-        let requested = accounts
+        let requested = accounts.filter { !$0.selectedCalendarIDs.isEmpty }
         var syncAccounts: [CalendarSyncAccount] = []
         var unauthenticated: Set<String> = []
         for account in requested {
-            if account.selectedCalendarIDs.isEmpty {
-                // No provider request is needed to reconcile an explicit empty selection.
-                syncAccounts.append(CalendarSyncAccount(id: account.id, accessToken: "", selectedCalendarIDs: []))
-                continue
-            }
             do {
                 let token = try await accessToken(for: account.id)
                 syncAccounts.append(CalendarSyncAccount(
