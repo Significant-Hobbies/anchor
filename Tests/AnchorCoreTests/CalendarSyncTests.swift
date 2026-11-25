@@ -105,14 +105,17 @@ struct CalendarSyncTests {
         #expect(plan.detachments == [edited.id])
     }
 
-    @Test("A changed event detaches a touched block instead of overwriting")
+    @Test("A rescheduled event keeps the claimed occurrence and imports the new time")
     func touchedBlockDetachesOnChange() {
-        let e = event("Renamed")
+        var e = event("Moved meeting")
+        e.start = e.start.addingTimeInterval(3600)
+        e.end = e.end.addingTimeInterval(3600)
         let touched = block(for: event("Original"), edited: true)
         let plan = CalendarSyncPolicy.plan(
             events: [e], blocks: [touched], window: window, managedAccountIDs: ["acct-1"]
         )
         #expect(plan.detachments == [touched.id])
+        #expect(plan.creations == [e])
         #expect(plan.updates.isEmpty && plan.deletions.isEmpty)
     }
 
@@ -122,6 +125,9 @@ struct CalendarSyncTests {
         let plan = CalendarSyncPolicy.plan(events: [meeting], blocks: [block(for: meeting, state: .completed)],
                                            window: window, managedAccountIDs: ["acct-1"])
         #expect(plan == CalendarSyncPlan())
+        let renamed = CalendarSyncPolicy.plan(events: [event("Updated title")], blocks: [block(for: meeting, state: .completed)],
+                                             window: window, managedAccountIDs: ["acct-1"])
+        #expect(renamed == CalendarSyncPlan())
     }
 
     @Test("All-day events are not imported")

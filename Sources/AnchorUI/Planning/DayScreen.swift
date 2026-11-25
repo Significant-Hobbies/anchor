@@ -56,6 +56,14 @@ struct PlanScreen: View {
         return dayInterval
     }
 
+    private var calendarImportInterval: DateInterval {
+        if viewMode == .day && Calendar.current.isDateInToday(today) {
+            // Today also shows upcoming calendar events beyond the timetable.
+            return CalendarSyncPolicy.syncWindow(now: today)
+        }
+        return visibleInterval
+    }
+
     private var visibleDays: [Date] {
         (0..<(viewMode == .week ? 7 : 1)).compactMap {
             Calendar.current.date(byAdding: .day, value: $0, to: visibleInterval.start)
@@ -244,7 +252,7 @@ struct PlanScreen: View {
         }) {
             if let calendarCoordinator {
                 NavigationStack {
-                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true, visibleInterval: visibleInterval).padding(Space.lg) }
+                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true, visibleInterval: calendarImportInterval).padding(Space.lg) }
                         .background(theme.canvas)
                         .navigationTitle("Google Calendar")
                         #if os(iOS)
@@ -285,15 +293,15 @@ struct PlanScreen: View {
             }
             .anchorTheme()
         }
-        .task(id: PeriodRequest(interval: visibleInterval, refresh: refreshRequest)) {
+        .task(id: PeriodRequest(interval: calendarImportInterval, refresh: refreshRequest)) {
             refresh()
             periodSyncError = nil
-            guard let calendarCoordinator, calendarCoordinator.accounts.contains(where: { !$0.selectedCalendarIDs.isEmpty }) else {
+            guard let calendarCoordinator, !calendarCoordinator.accounts.isEmpty else {
                 isLoadingPeriod = false
                 return
             }
             isLoadingPeriod = true
-            let error = await calendarCoordinator.sync(context: context, window: visibleInterval)
+            let error = await calendarCoordinator.sync(context: context, window: calendarImportInterval)
             guard !Task.isCancelled else { return }
             periodSyncError = error
             isLoadingPeriod = false
@@ -671,7 +679,10 @@ struct PlanScreen: View {
     private func refresh() {
         do {
             let planner = DayPlanService(context: context)
-            for day in visibleDays { _ = try planner.materialize(day: day) }
+            let startOfToday = Calendar.current.startOfDay(for: Date())
+            for day in visibleDays where day >= startOfToday {
+                _ = try planner.materialize(day: day)
+            }
             reconcileSessions()
             loadError = nil
         } catch {

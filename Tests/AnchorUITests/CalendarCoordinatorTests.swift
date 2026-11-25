@@ -175,6 +175,10 @@ struct CalendarCoordinatorTests {
         #expect(block.kind == .commitment)
         #expect(block.flexibility == .fixed)
         #expect(block.externalEventKey == "108\u{1F}primary\u{1F}evt-9")
+        coordinator.setCalendarSelected(accountID: "108", calendarID: "primary", selected: false)
+        await coordinator.sync(context: context, blocks: blocks)
+        #expect(try context.fetch(FetchDescriptor<PlanBlock>()).isEmpty)
+
     }
 
     @Test("Overlapping selected periods wait, reuse existing links, and preserve other dates")

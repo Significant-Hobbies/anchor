@@ -122,9 +122,13 @@ public enum CalendarSyncPolicy {
             if !matches(primary, event: event) {
                 if isUntouched(primary) {
                     plan.updates.append(CalendarBlockUpdate(blockID: primary.id, event: event))
-                } else {
+                } else if primary.plannedStart != event.start {
+                    // Keep the owner's original occurrence and show Google's new time.
                     plan.detachments.append(primary.id)
+                    plan.creations.append(event)
                 }
+                // At the same start time, keep the claimed entry and its link.
+                // A title or duration change must not duplicate a finished meeting.
             }
             for duplicate in linked.dropFirst() {
                 if isUntouched(duplicate) { plan.deletions.append(duplicate.id) }
