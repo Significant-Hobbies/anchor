@@ -606,6 +606,28 @@ struct DayReviewTests {
         #expect(next.unobservedCompletedBlocks == 0)
     }
 
+    @MainActor
+    @Test("Manually logged time on a different day counts once without an extra plan or an invented gap")
+    func manualTimeOutsidePlan() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let plannedDay = Fixture.calendar.startOfDay(for: Fixture.day0)
+        let actualStart = plannedDay.addingTimeInterval(2 * 86_400 - 900)
+        let block = PlanBlock(title: "Design review", plannedStart: plannedDay, plannedSeconds: 1800)
+        block.state = .completed
+        block.actualStartedAt = actualStart
+        block.actualEndedAt = actualStart.addingTimeInterval(1800)
+        context.insert(block)
+        try context.save()
+        let reviews = try [plannedDay, actualStart, actualStart.addingTimeInterval(1800)].map { day in
+            let records = try context.planBlockRecords(on: day, calendar: Fixture.calendar)
+            return engine.review(day: day, blocks: records, sessions: [], divergences: [])
+        }
+        #expect(reviews.map(\.plannedSeconds) == [1800, 0, 0])
+        #expect(reviews.map(\.actualSeconds) == [0, 900, 900])
+        #expect(reviews.allSatisfy { $0.gaps.isEmpty && $0.unobservedCompletedBlocks == 0 })
+    }
+
     @Test("Review compares planned and actual without an adherence score")
     func plannedVersusActual() {
         let session = Fixture.session(focused: 2_700, planned: 1_800)

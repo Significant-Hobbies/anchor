@@ -1555,7 +1555,7 @@ struct DayReviewScreen: View {
     private var review: DayReviewEngine.Review {
         let interval = Calendar.current.dateInterval(of: .day, for: selectedDay)
             ?? DateInterval(start: selectedDay, duration: 86_400)
-        let dayBlocks = calendarVisibility.filter(blocks).filter { $0.plannedStart < interval.end && $0.plannedEnd > interval.start }.map { $0.snapshot() }
+        let dayBlocks = calendarVisibility.filter(blocks).filter { $0.contributesToDayReview(in: interval) }.map { $0.snapshot() }
         let daySessions = sessions.filter { $0.startedAt >= interval.start && $0.startedAt < interval.end }.map { $0.snapshot() }
         let dayDivergences = divergences.filter { $0.occurredAt >= interval.start && $0.occurredAt < interval.end }.map { $0.snapshot() }
         let profile = profiles.first?.snapshot() ?? BehaviorProfileRecord()

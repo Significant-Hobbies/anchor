@@ -26,7 +26,7 @@ struct CalendarEventRemovalDialog: ViewModifier {
         content
             .alert(item: $request) { event in
                 Alert(title: Text("Remove this event from Anchor?"),
-                      message: Text("“\(event.title)” will stay in Google Calendar. Future imports will skip this occurrence."),
+                      message: Text("Anchor will delete “\(event.title)” from your planner, including any entry details and manually logged time. Linked focus sessions stay in History. The event stays in Google Calendar, and future imports will skip this occurrence."),
                       primaryButton: .destructive(Text("Remove from Anchor")) {
                           do {
                               try DayPlanService(context: context).removeImportedEvent(key: event.id)
