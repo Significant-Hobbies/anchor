@@ -75,13 +75,26 @@ struct PlanScreen: View {
         let refresh: UUID
     }
 
+    private var visibleBlocks: [PlanBlock] {
+        guard let accounts = calendarCoordinator?.accounts, !accounts.isEmpty else { return allBlocks }
+        let selections = Dictionary(accounts.map { ($0.id, Set($0.selectedCalendarIDs)) },
+                                    uniquingKeysWith: { first, _ in first })
+        return allBlocks.filter { block in
+            guard block.state == .planned, block.sessionID == nil, block.actualStartedAt == nil,
+                  !block.isTemplateOverride, let key = block.externalEventKey,
+                  let source = GoogleCalendarEvent.linkedCalendar(key),
+                  let selected = selections[source.accountID] else { return true }
+            return selected.contains(source.calendarID)
+        }
+    }
+
     private var blocks: [PlanBlock] {
-        allBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
+        visibleBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
     }
 
     private func upcomingCalendarEvents(at now: Date) -> [PlanBlock] {
         let window = CalendarSyncPolicy.syncWindow(now: now)
-        return allBlocks.filter { block in
+        return visibleBlocks.filter { block in
             block.externalEventKey != nil
                 && block.plannedStart < window.end
                 && block.plannedStart.addingTimeInterval(Double(block.plannedSeconds)) > now
@@ -142,13 +155,13 @@ struct PlanScreen: View {
 
                 if viewMode == .week {
                     WeekAgenda(days: visibleDays,
-                               entries: allBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
+                               entries: visibleBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
                                openDay: { today = $0; viewMode = .day },
                                add: { editorSeed = suggestedEntry(on: $0) },
                                edit: { editingBlock = $0 })
                 } else {
                     let calendarEvents = Calendar.current.isDateInToday(today) ? upcomingCalendarEvents(at: calendarReferenceTime)
-                        : allBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
+                        : visibleBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
                     if !calendarEvents.isEmpty {
                         upcomingCalendarSection(calendarEvents)
                     }
@@ -282,7 +295,7 @@ struct PlanScreen: View {
         .sheet(isPresented: $showsCopyDay) {
             CopyDaySheet(sourceDay: today, entryCount: blocks.count) { destination in
                 do {
-                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination)
+                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination, including: Set(blocks.map(\.id)))
                     today = destination
                     refresh()
                     return nil
@@ -648,7 +661,7 @@ struct PlanScreen: View {
         let wholeMinute = calendar.dateInterval(of: .minute, for: base)?.start ?? base
         let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: wholeMinute) ?? wholeMinute
         let opening = PlannerGap.opening(from: rounded, until: dayInterval.end,
-            occupied: allBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
+            occupied: visibleBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
                 .map { DateInterval(start: $0.plannedStart, end: $0.plannedEnd) })
         if let opening { return EditorSeed(start: opening.start, minutes: Int(opening.duration / 60)) }
         return EditorSeed(start: min(rounded, dayInterval.end.addingTimeInterval(-60)), dayIsFull: true)

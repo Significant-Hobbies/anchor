@@ -659,10 +659,10 @@ public struct DayPlanService {
     /// Copy authored content only. Existing destination entries and both days'
     /// execution history remain untouched; copies are independent dated entries.
     @discardableResult
-    public func copyDay(from sourceDay: Date, to targetDay: Date) throws -> [PlanBlock] {
+    public func copyDay(from sourceDay: Date, to targetDay: Date, including entryIDs: Set<UUID>? = nil) throws -> [PlanBlock] {
         guard !calendar.isDate(sourceDay, inSameDayAs: targetDay) else { return [] }
         let source = try context.fetch(FetchDescriptor<PlanBlock>()).filter {
-            calendar.isDate($0.plannedStart, inSameDayAs: sourceDay)
+            calendar.isDate($0.plannedStart, inSameDayAs: sourceDay) && (entryIDs?.contains($0.id) ?? true)
         }.sorted { $0.plannedStart < $1.plannedStart }
         let copies = source.map { block in
             let time = calendar.dateComponents([.hour, .minute, .second], from: block.plannedStart)
