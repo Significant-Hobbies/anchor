@@ -98,9 +98,18 @@ struct PlanScreen: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
-                dayHeader
-
-                dayControls
+                if viewMode == .week {
+                    HStack {
+                        Text(visibleInterval.start.formatted(date: .abbreviated, time: .omitted) + " – " +
+                             (visibleDays.last ?? today).formatted(date: .abbreviated, time: .omitted))
+                            .font(.headline)
+                        Spacer()
+                        calendarsButton.buttonStyle(.borderless)
+                    }
+                } else {
+                    dayHeader
+                    dayControls
+                }
                 if isLoadingPeriod {
                     Label("Updating calendar events…", systemImage: "arrow.triangle.2.circlepath")
                         .font(.footnote).foregroundStyle(theme.textSecondary)
@@ -225,6 +234,9 @@ struct PlanScreen: View {
         .onChange(of: today) { _, _ in scrolledDay = nil }
         }
         .background(theme.canvas)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onAppear { reloadCheckIns() }
         .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
         .sheet(isPresented: $showsCalendars, onDismiss: {
@@ -416,8 +428,8 @@ struct PlanScreen: View {
         DoodleScene(
             "TodayDoodle",
             eyebrow: today.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
-            title: viewMode == .day ? "Draw the day" : "Week ahead",
-            message: viewMode == .day ? "Everything this day asks of you, laid out on the clock." : visibleInterval.start.formatted(date: .abbreviated, time: .omitted) + " – " + (visibleDays.last ?? today).formatted(date: .abbreviated, time: .omitted),
+            title: "Draw the day",
+            message: "Everything this day asks of you, laid out on the clock.",
             compact: true
         )
     }
@@ -521,9 +533,7 @@ struct PlanScreen: View {
 
     private var dayControls: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
-            if viewMode == .week {
-                calendarsButton.buttonStyle(QuietButtonStyle(expands: false))
-            } else if horizontalSizeClass == .compact {
+            if horizontalSizeClass == .compact {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     HStack(spacing: Space.xs) {
                         copyDayButton
