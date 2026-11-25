@@ -20,6 +20,11 @@ struct PlanScreen: View {
     @State private var checkIns: [UUID: PlannerCheckIn] = [:]
     @State private var checkingEntry: PlannerCheckIn?
     @State private var checkInLoadFailed = false
+    private enum CalendarViewMode: String { case day, week }
+    @SceneStorage("anchor.planner.view") private var viewMode = CalendarViewMode.day
+    @State private var periodSyncError: String?
+    @State private var isLoadingPeriod = false
+    @State private var refreshRequest = UUID()
     @State private var today = Date()
     @State private var lastCalendarDay = Date()
     @State private var showsCopyDay = false
@@ -46,13 +51,50 @@ struct PlanScreen: View {
             ?? DateInterval(start: today, duration: 86_400)
     }
 
+    private var visibleInterval: DateInterval {
+        if viewMode == .week, let week = Calendar.current.dateInterval(of: .weekOfYear, for: today) { return week }
+        return dayInterval
+    }
+
+    private var calendarImportInterval: DateInterval {
+        if viewMode == .day && Calendar.current.isDateInToday(today) {
+            // Today also shows upcoming calendar events beyond the timetable.
+            return CalendarSyncPolicy.syncWindow(now: today)
+        }
+        return visibleInterval
+    }
+
+    private var visibleDays: [Date] {
+        (0..<(viewMode == .week ? 7 : 1)).compactMap {
+            Calendar.current.date(byAdding: .day, value: $0, to: visibleInterval.start)
+        }
+    }
+
+    private struct PeriodRequest: Equatable {
+        let interval: DateInterval
+        let refresh: UUID
+    }
+
+    private var visibleBlocks: [PlanBlock] {
+        guard let accounts = calendarCoordinator?.accounts, !accounts.isEmpty else { return allBlocks }
+        let selections = Dictionary(accounts.map { ($0.id, Set($0.selectedCalendarIDs)) },
+                                    uniquingKeysWith: { first, _ in first })
+        return allBlocks.filter { block in
+            guard block.state == .planned, block.sessionID == nil, block.actualStartedAt == nil,
+                  !block.isTemplateOverride, let key = block.externalEventKey,
+                  let source = GoogleCalendarEvent.linkedCalendar(key),
+                  let selected = selections[source.accountID] else { return true }
+            return selected.contains(source.calendarID)
+        }
+    }
+
     private var blocks: [PlanBlock] {
-        allBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
+        visibleBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
     }
 
     private func upcomingCalendarEvents(at now: Date) -> [PlanBlock] {
         let window = CalendarSyncPolicy.syncWindow(now: now)
-        return allBlocks.filter { block in
+        return visibleBlocks.filter { block in
             block.externalEventKey != nil
                 && block.plannedStart < window.end
                 && block.plannedStart.addingTimeInterval(Double(block.plannedSeconds)) > now
@@ -77,23 +119,32 @@ struct PlanScreen: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
-                dayHeader
-
-                dayControls
+                if viewMode == .week {
+                    HStack {
+                        Text(visibleInterval.start.formatted(date: .abbreviated, time: .omitted) + " – " +
+                             (visibleDays.last ?? today).formatted(date: .abbreviated, time: .omitted))
+                            .font(.headline)
+                        Spacer()
+                        calendarsButton.buttonStyle(.borderless)
+                    }
+                } else {
+                    dayHeader
+                    dayControls
+                }
+                if isLoadingPeriod {
+                    Label("Updating calendar events…", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.footnote).foregroundStyle(theme.textSecondary)
+                } else if let periodSyncError {
+                    HStack {
+                        Text(periodSyncError).font(.footnote).foregroundStyle(theme.caution)
+                        Button("Retry") { refreshRequest = UUID() }
+                    }
+                }
                 if checkInLoadFailed {
                     Label("Some saved check-ins could not be read on this device.", systemImage: "exclamationmark.triangle")
                 }
                 if !openBlockers.isEmpty {
                     blockersSection
-                }
-
-                let calendarEvents = upcomingCalendarEvents(at: calendarReferenceTime)
-                if Calendar.current.isDateInToday(today), !calendarEvents.isEmpty {
-                    upcomingCalendarSection(calendarEvents)
-                }
-
-                if !blocks.isEmpty {
-                    daySummary
                 }
 
                 if let loadError {
@@ -102,57 +153,83 @@ struct PlanScreen: View {
                         .foregroundStyle(theme.caution)
                 }
 
-                if blocks.isEmpty {
-                    Card(padding: Space.lg) {
-                        #if os(macOS)
-                        HStack(spacing: Space.lg) {
-                            emptyDayCopy
-                            Spacer(minLength: Space.lg)
-                            Button("add the first entry") { editorSeed = suggestedEntry }
-                                .buttonStyle(PrimaryButtonStyle(expands: false))
-                        }
-                        #else
-                        ViewThatFits(in: .horizontal) {
+                if viewMode == .week {
+                    WeekAgenda(days: visibleDays,
+                               entries: visibleBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
+                               openDay: { today = $0; viewMode = .day },
+                               add: { editorSeed = suggestedEntry(on: $0) },
+                               edit: { editingBlock = $0 })
+                } else {
+                    let calendarEvents = Calendar.current.isDateInToday(today) ? upcomingCalendarEvents(at: calendarReferenceTime)
+                        : visibleBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
+                    if !calendarEvents.isEmpty {
+                        upcomingCalendarSection(calendarEvents)
+                    }
+
+                    if !blocks.isEmpty {
+                        daySummary
+                    }
+
+                    if blocks.isEmpty {
+                        Card(padding: Space.lg) {
+                            #if os(macOS)
                             HStack(spacing: Space.lg) {
                                 emptyDayCopy
                                 Spacer(minLength: Space.lg)
                                 Button("add the first entry") { editorSeed = suggestedEntry }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                             }
-                            VStack(alignment: .leading, spacing: Space.md) {
-                                emptyDayCopy
-                                Button("add the first entry") { editorSeed = suggestedEntry }
-                                .buttonStyle(PrimaryButtonStyle())
+                            #else
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: Space.lg) {
+                                    emptyDayCopy
+                                    Spacer(minLength: Space.lg)
+                                    Button("add the first entry") { editorSeed = suggestedEntry }
+                                        .buttonStyle(PrimaryButtonStyle(expands: false))
+                                }
+                                VStack(alignment: .leading, spacing: Space.md) {
+                                    emptyDayCopy
+                                    Button("add the first entry") { editorSeed = suggestedEntry }
+                                    .buttonStyle(PrimaryButtonStyle())
+                                }
                             }
+                            #endif
                         }
-                        #endif
+                    } else {
+                        DayTimetable(
+                            day: today,
+                            entries: timetableEntries,
+                            windowStartHour: timetablePrefs.startHour,
+                            windowEndHour: timetablePrefs.endHour,
+                            showsLivedTrace: timetablePrefs.showsLivedTrace,
+                            dimsFinished: timetablePrefs.dimsFinished,
+                            onCheckIn: openCheckIn,
+                            onStart: start,
+                            onOpenFocus: onOpenFocus,
+                            onComplete: complete,
+                            onEdit: { editingBlock = $0 },
+                            onExplain: { explainingBlock = $0 },
+                            onLogActual: { loggingBlock = $0 },
+                            onAddAt: { editorSeed = EditorSeed(start: $0) }
+                        )
                     }
-                } else {
-                    DayTimetable(
-                        day: today,
-                        entries: timetableEntries,
-                        windowStartHour: timetablePrefs.startHour,
-                        windowEndHour: timetablePrefs.endHour,
-                        showsLivedTrace: timetablePrefs.showsLivedTrace,
-                        dimsFinished: timetablePrefs.dimsFinished,
-                        onCheckIn: openCheckIn,
-                        onStart: start,
-                        onOpenFocus: onOpenFocus,
-                        onComplete: complete,
-                        onEdit: { editingBlock = $0 },
-                        onExplain: { explainingBlock = $0 },
-                        onLogActual: { loggingBlock = $0 },
-                        onAddAt: { editorSeed = EditorSeed(start: $0) }
-                    )
-                }
 
+                }
             }
             .padding(Space.lg)
             .frame(maxWidth: workspaceMaxWidth)
             .frame(maxWidth: .infinity)
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            periodNavigation
+                .padding(.horizontal, Space.lg)
+                .padding(.vertical, Space.xs)
+                .frame(maxWidth: workspaceMaxWidth)
+                .frame(maxWidth: .infinity)
+                .background(.bar)
+        }
         .safeAreaInset(edge: .bottom) {
-            if !blocks.isEmpty {
+            if viewMode == .day && !blocks.isEmpty {
                 Button("add an entry") { editorSeed = suggestedEntry }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Space.lg)
@@ -178,14 +255,17 @@ struct PlanScreen: View {
         .onChange(of: today) { _, _ in scrolledDay = nil }
         }
         .background(theme.canvas)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onAppear { reloadCheckIns() }
         .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
         .sheet(isPresented: $showsCalendars, onDismiss: {
-            Task { await calendarCoordinator?.sync(context: context, blocks: allBlocks) }
+            refreshRequest = UUID()
         }) {
             if let calendarCoordinator {
                 NavigationStack {
-                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true).padding(Space.lg) }
+                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true, visibleInterval: calendarImportInterval).padding(Space.lg) }
                         .background(theme.canvas)
                         .navigationTitle("Google Calendar")
                         #if os(iOS)
@@ -215,7 +295,7 @@ struct PlanScreen: View {
         .sheet(isPresented: $showsCopyDay) {
             CopyDaySheet(sourceDay: today, entryCount: blocks.count) { destination in
                 do {
-                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination)
+                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination, including: Set(blocks.map(\.id)))
                     today = destination
                     refresh()
                     return nil
@@ -226,9 +306,21 @@ struct PlanScreen: View {
             }
             .anchorTheme()
         }
-        .onChange(of: today) { refresh() }
+        .task(id: PeriodRequest(interval: calendarImportInterval, refresh: refreshRequest)) {
+            refresh()
+            periodSyncError = nil
+            guard let calendarCoordinator, !calendarCoordinator.accounts.isEmpty else {
+                isLoadingPeriod = false
+                return
+            }
+            isLoadingPeriod = true
+            let error = await calendarCoordinator.sync(context: context, window: calendarImportInterval)
+            guard !Task.isCancelled else { return }
+            periodSyncError = error
+            isLoadingPeriod = false
+        }
         .sheet(item: $editorSeed) { seed in
-            PlanBlockEditor(initialDay: today, suggestedStart: seed.start, suggestedMinutes: seed.minutes, dayIsFull: seed.dayIsFull) { refresh() }
+            PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes, dayIsFull: seed.dayIsFull) { refresh() }
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
@@ -273,7 +365,6 @@ struct PlanScreen: View {
         }
         .task {
             calendarReferenceTime = Date()
-            refresh()
             while !Task.isCancelled {
                 do {
                     try await Task.sleep(for: .seconds(60))
@@ -285,7 +376,6 @@ struct PlanScreen: View {
                 if !Calendar.current.isDate(current, inSameDayAs: lastCalendarDay) {
                     if Calendar.current.isDate(today, inSameDayAs: lastCalendarDay) { today = current }
                     lastCalendarDay = current
-                    refresh()
                 }
             }
         }
@@ -374,7 +464,7 @@ struct PlanScreen: View {
         let previewCount = 3
         return Card {
             VStack(alignment: .leading, spacing: Space.xs) {
-                Label("Upcoming calendar events", systemImage: "calendar")
+                Label(Calendar.current.isDateInToday(today) ? "Upcoming calendar events" : "Calendar events", systemImage: "calendar")
                     .font(.headline)
                     .foregroundStyle(theme.textPrimary)
                     .accessibilityAddTraits(.isHeader)
@@ -420,14 +510,50 @@ struct PlanScreen: View {
         .accessibilityIdentifier("anchor.today.upcoming-calendar")
     }
 
+    private var periodNavigation: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack { modePicker; Spacer(); dateNavigation }
+            VStack(alignment: .leading, spacing: Space.xs) { modePicker; dateNavigation }
+        }
+    }
+
+    private var modePicker: some View {
+        Picker("Calendar view", selection: $viewMode) {
+            Text("Day").tag(CalendarViewMode.day)
+            Text("Week").tag(CalendarViewMode.week)
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 150)
+        .accessibilityIdentifier("anchor.planner.view-mode")
+    }
+
+    private var dateNavigation: some View {
+        HStack(spacing: Space.sm) {
+            periodArrow(-1)
+            DatePicker("Day", selection: $today, displayedComponents: .date)
+                .labelsHidden().fixedSize()
+            periodArrow(1)
+            Button("Today") { today = Date() }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Go to today")
+        }
+    }
+
+    private func periodArrow(_ direction: Int) -> some View {
+        Button {
+            let component: Calendar.Component = viewMode == .week ? .weekOfYear : .day
+            today = Calendar.current.date(byAdding: component, value: direction, to: today) ?? today
+        } label: {
+            Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
+                .frame(minWidth: 30, minHeight: 32)
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel((direction < 0 ? "Previous " : "Next ") + viewMode.rawValue)
+    }
+
     private var dayControls: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
-            HStack(spacing: Space.sm) {
-                DatePicker("Day", selection: $today, displayedComponents: .date)
-                Button("today") { today = Date() }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Go to today")
-            }
             if horizontalSizeClass == .compact {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     HStack(spacing: Space.xs) {
@@ -524,15 +650,18 @@ struct PlanScreen: View {
         .accessibilityIdentifier("anchor.today.completion")
     }
 
-    private var suggestedEntry: EditorSeed {
+    private var suggestedEntry: EditorSeed { suggestedEntry(on: today) }
+
+    private func suggestedEntry(on day: Date) -> EditorSeed {
         let calendar = Calendar.current
         let now = Date()
-        let base = calendar.isDate(now, inSameDayAs: today) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
+        let dayInterval = calendar.dateInterval(of: .day, for: day) ?? self.dayInterval
+        let base = calendar.isDate(now, inSameDayAs: day) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
         let minute = calendar.component(.minute, from: base)
         let wholeMinute = calendar.dateInterval(of: .minute, for: base)?.start ?? base
         let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: wholeMinute) ?? wholeMinute
         let opening = PlannerGap.opening(from: rounded, until: dayInterval.end,
-            occupied: allBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
+            occupied: visibleBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
                 .map { DateInterval(start: $0.plannedStart, end: $0.plannedEnd) })
         if let opening { return EditorSeed(start: opening.start, minutes: Int(opening.duration / 60)) }
         return EditorSeed(start: min(rounded, dayInterval.end.addingTimeInterval(-60)), dayIsFull: true)
@@ -544,7 +673,7 @@ struct PlanScreen: View {
     }
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
-        guard Calendar.current.isDateInToday(today), !blocks.isEmpty,
+        guard viewMode == .day, Calendar.current.isDateInToday(today), !blocks.isEmpty,
               openBlockers.isEmpty,
               !upcomingCalendarEvents(at: Date()).contains(where: { $0.plannedStart < dayInterval.end }),
               scrolledDay != today else { return }
@@ -562,7 +691,11 @@ struct PlanScreen: View {
 
     private func refresh() {
         do {
-            _ = try DayPlanService(context: context).materialize(day: today)
+            let planner = DayPlanService(context: context)
+            let startOfToday = Calendar.current.startOfDay(for: Date())
+            for day in visibleDays where day >= startOfToday {
+                _ = try planner.materialize(day: day)
+            }
             reconcileSessions()
             loadError = nil
         } catch {
