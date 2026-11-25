@@ -136,9 +136,10 @@ public enum CloudKitSchemaSeed {
         block.reminderLastSyncedAt = timestamp
         block.externalEventKey = "schema-seed\u{1F}calendar\u{1F}event"
 
-        _ = try firstOrInsert(RemovedCalendarOccurrence.self, into: context) {
+        let removal = try firstOrInsert(RemovedCalendarOccurrence.self, into: context) {
             RemovedCalendarOccurrence(eventKey: "schema-seed\u{1F}calendar\u{1F}removed-event")
         }
+        removal.removedBlockIDs = [block.id.uuidString]
 
         let divergence = try firstOrInsert(DivergenceEvent.self, into: context) {
             DivergenceEvent(

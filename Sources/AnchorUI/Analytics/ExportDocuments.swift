@@ -75,21 +75,22 @@ public enum ExportFormat: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    public func defaultFileName(now: Date = Date()) -> String {
-        let stamp = now.formatted(.iso8601.year().month().day().dateSeparator(.dash))
+    public func defaultFileName(now: Date = Date(), timeZone: TimeZone = .current) -> String {
+        let stamp = now.formatted(Date.ISO8601FormatStyle(timeZone: timeZone).year().month().day().dateSeparator(.dash))
         switch self {
-        case .workbook: return "Anchor \(stamp)"
+        case .workbook: return "Anchor \(stamp).xlsx"
         case .sessionsCSV: return "Anchor sessions \(stamp)"
         case .distractionsCSV: return "Anchor distractions \(stamp)"
         case .json: return "Anchor \(stamp)"
         }
     }
 
-    public func makeData(from records: [SessionRecord], now: Date = Date()) -> Data {
+    public func makeData(from records: [SessionRecord], plans: [PlanBlockRecord] = [],
+                         divergences: [DivergenceRecord] = [], now: Date = Date()) -> Data {
         let builder = ExportBuilder()
         switch self {
         case .workbook:
-            return builder.xlsxData(from: records, now: now)
+            return builder.xlsxData(from: records, plans: plans, divergences: divergences, now: now)
         case .sessionsCSV:
             return Data(builder.sessionsCSV(from: records).utf8)
         case .distractionsCSV:

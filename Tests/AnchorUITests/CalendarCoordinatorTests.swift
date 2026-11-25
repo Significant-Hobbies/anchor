@@ -246,7 +246,9 @@ struct CalendarCoordinatorTests {
         #expect(await coordinator.sync(context: fresh, window: period) == nil)
         #expect(try Set(fresh.fetch(FetchDescriptor<PlanBlock>()).map(\.id)) == [authored.id, next.id, team.id])
         #expect(try fresh.fetch(FetchDescriptor<FocusSession>()).map(\.id) == [session.id])
-        #expect(try fresh.fetch(FetchDescriptor<RemovedCalendarOccurrence>()).map(\.eventKey) == [original.linkKey])
+        let markers = try fresh.fetch(FetchDescriptor<RemovedCalendarOccurrence>())
+        #expect(Set(markers.map(\.eventKey)) == [original.linkKey])
+        #expect(Set(markers.flatMap(\.removedBlockIDs)) == [item.id.uuidString, duplicate.id.uuidString, late.id.uuidString])
     }
 
     @Test("Overlapping selected periods wait, reuse existing links, and preserve other dates")
@@ -311,7 +313,7 @@ struct CalendarCoordinatorTests {
         #expect(try context.fetch(FetchDescriptor<PlanBlock>()).map(\.id) == [imported.id])
     }
 
-    @Test("Disconnect unlinks imported blocks, drops credentials, and forgets the account")
+    @Test("Disconnect hides unclaimed imports locally, keeps shared links, and drops credentials")
     func disconnectCleansUp() async throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)
         let context = ModelContext(container)
@@ -344,7 +346,17 @@ struct CalendarCoordinatorTests {
         await coordinator.disconnect(accountID: "108", context: context, blocks: blocks)
 
         #expect(coordinator.accounts.isEmpty)
-        #expect(block.externalEventKey == nil)
+        #expect(block.externalEventKey == "108\u{1F}primary\u{1F}evt-1")
+        let data = try #require(defaults.data(forKey: CalendarSyncCoordinator.disconnectedAccountsKey))
+        let disconnected = try JSONDecoder().decode(Set<String>.self, from: data)
+        #expect(disconnected == ["108"])
+        #expect(CalendarBlockVisibility.filter(blocks, accounts: [], disconnected: disconnected, removed: []).isEmpty)
+        let deselected = ConnectedGoogleAccount(id: "108", email: "", displayName: "", selectedCalendarIDs: [])
+        #expect(CalendarBlockVisibility.filter(blocks, accounts: [deselected], disconnected: [], removed: []).isEmpty)
+        #expect(CalendarBlockVisibility.filter(blocks, accounts: [], disconnected: [], removed: []).count == 1)
+        block.state = .completed
+        #expect(CalendarBlockVisibility.filter(blocks, accounts: [], disconnected: disconnected, removed: []).count == 1)
+        #expect(CalendarBlockVisibility.filter(blocks, accounts: [], disconnected: [], removed: [block.externalEventKey!]).isEmpty)
         #expect(block.title == "Imported meeting")
         #expect(try await credentials.load(accountID: "108") == nil)
         #expect(http.lastRequest?.url?.absoluteString.contains("revoke") == true)

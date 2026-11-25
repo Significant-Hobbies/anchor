@@ -8,7 +8,7 @@ struct PlanScreen: View {
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.modelContext) private var context
-    @Query private var removedOccurrences: [RemovedCalendarOccurrence]
+    private var calendarVisibility = CalendarBlockVisibility()
     @State private var removal: CalendarEventRemoval?
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
@@ -78,18 +78,7 @@ struct PlanScreen: View {
     }
 
     private var visibleBlocks: [PlanBlock] {
-        let removedKeys = Set(removedOccurrences.map(\.eventKey))
-        let accounts = calendarCoordinator?.accounts ?? []
-        let selections = Dictionary(accounts.map { ($0.id, Set($0.selectedCalendarIDs)) },
-                                    uniquingKeysWith: { first, _ in first })
-        return allBlocks.filter { block in
-            if let key = block.externalEventKey, removedKeys.contains(key) { return false }
-            guard block.state == .planned, block.sessionID == nil, block.actualStartedAt == nil,
-                  !block.isTemplateOverride, let key = block.externalEventKey,
-                  let source = GoogleCalendarEvent.linkedCalendar(key),
-                  let selected = selections[source.accountID] else { return true }
-            return selected.contains(source.calendarID)
-        }
+        calendarVisibility.filter(allBlocks)
     }
 
     private var blocks: [PlanBlock] {
@@ -399,7 +388,8 @@ struct PlanScreen: View {
     }
 
     private var openBlockers: [PlannerCheckIn] {
-        let blocked = checkIns.values.filter { $0.outcome == .blocked }
+        let removedIDs = calendarVisibility.removedBlockIDs
+        let blocked = checkIns.values.filter { $0.outcome == .blocked && !removedIDs.contains($0.id.uuidString) }
         guard !blocked.isEmpty else { return [] }
         let blocksByID = Dictionary(allBlocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return blocked.map { record in
@@ -1194,9 +1184,10 @@ struct PlanBlockEditor: View {
         let calendar = Calendar.current
         do {
             if let block {
-                let scheduleChanged = block.plannedStart != plannedStart || block.plannedSeconds != minutes * 60
-                let occurrenceChanged = scheduleChanged
-                    || block.title != trimmed
+                let durationChanged = minutes != max(5, block.plannedSeconds / 60)
+                let scheduleChanged = block.plannedStart != plannedStart || durationChanged
+                let providerFieldsChanged = scheduleChanged || block.title != trimmed
+                let occurrenceChanged = providerFieldsChanged
                     || block.details != details
                     || block.projectID != selectedProjectID
                     || block.kind != kind
@@ -1206,12 +1197,12 @@ struct PlanBlockEditor: View {
                 block.title = trimmed
                 block.details = details
                 block.plannedStart = plannedStart
-                block.plannedSeconds = minutes * 60
+                if durationChanged { block.plannedSeconds = minutes * 60 }
                 block.kind = kind
                 block.flexibility = flexibility
                 block.lifeDirection = direction
                 block.behaviorPattern = behaviorPattern
-                if (block.templateID != nil || block.externalEventKey != nil) && occurrenceChanged {
+                if (block.templateID != nil && occurrenceChanged) || (block.externalEventKey != nil && providerFieldsChanged) {
                     block.isTemplateOverride = true
                 }
                 block.updatedAt = Date()
@@ -1553,6 +1544,7 @@ struct DayReviewScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.modelContext) private var context
+    private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @Query(sort: \DivergenceEvent.occurredAt) private var divergences: [DivergenceEvent]
@@ -1563,9 +1555,9 @@ struct DayReviewScreen: View {
     private var review: DayReviewEngine.Review {
         let interval = Calendar.current.dateInterval(of: .day, for: selectedDay)
             ?? DateInterval(start: selectedDay, duration: 86_400)
-        let dayBlocks = blocks.filter { $0.plannedStart < interval.end && $0.plannedEnd > interval.start }.map { $0.snapshot() }
-        let daySessions = sessions.filter { interval.contains($0.startedAt) }.map { $0.snapshot() }
-        let dayDivergences = divergences.filter { interval.contains($0.occurredAt) }.map { $0.snapshot() }
+        let dayBlocks = calendarVisibility.filter(blocks).filter { $0.plannedStart < interval.end && $0.plannedEnd > interval.start }.map { $0.snapshot() }
+        let daySessions = sessions.filter { $0.startedAt >= interval.start && $0.startedAt < interval.end }.map { $0.snapshot() }
+        let dayDivergences = divergences.filter { $0.occurredAt >= interval.start && $0.occurredAt < interval.end }.map { $0.snapshot() }
         let profile = profiles.first?.snapshot() ?? BehaviorProfileRecord()
         return DayReviewEngine().review(
             day: selectedDay,

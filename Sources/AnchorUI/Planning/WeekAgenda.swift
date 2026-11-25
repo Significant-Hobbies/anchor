@@ -39,7 +39,10 @@ struct WeekAgenda: View {
                     ForEach(blocks) { block in
                         Button { edit(block) } label: {
                             HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
-                                Text(max(day, block.plannedStart), format: .dateTime.hour().minute())
+                                Group {
+                                    if block.plannedStart < day { Text("Continues") }
+                                    else { Text(block.plannedStart, format: .dateTime.hour().minute()) }
+                                }
                                     .font(.subheadline.monospacedDigit())
                                     .foregroundStyle(theme.textSecondary)
                                 Text(block.title).font(.body.weight(.medium))

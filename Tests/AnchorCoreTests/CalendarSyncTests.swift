@@ -51,7 +51,7 @@ struct CalendarSyncTests {
             plannedStart: event.start,
             plannedSeconds: Int(event.end.timeIntervalSince(event.start)),
             state: state,
-            kind: .commitment,
+            kind: .commitment, flexibility: .fixed,
             externalEventKey: event.linkKey
         )
     }
@@ -77,6 +77,22 @@ struct CalendarSyncTests {
         )
         #expect(plan.updates == [CalendarBlockUpdate(blockID: stale.id, event: e)])
         #expect(plan.creations.isEmpty && plan.deletions.isEmpty && plan.detachments.isEmpty)
+    }
+
+    @Test("Annotated imports follow Google moves while retaining local metadata on cancellation")
+    func annotatedImport() {
+        let original = event("Work meeting")
+        var local = block(for: original)
+        local.projectID = UUID()
+        local.details = "Bring drawings"
+        var moved = original
+        moved.start = moved.start.addingTimeInterval(3600)
+        moved.end = moved.end.addingTimeInterval(3600)
+        let plan = CalendarSyncPolicy.plan(events: [moved], blocks: [local], window: window, fetchedCalendars: ["acct-1": ["primary"]])
+        #expect(plan.updates.map(\.blockID) == [local.id])
+        moved.isCancelled = true
+        let deleted = CalendarSyncPolicy.plan(events: [moved], blocks: [local], window: window, fetchedCalendars: ["acct-1": ["primary"]])
+        #expect(deleted.detachments == [local.id] && deleted.deletions.isEmpty)
     }
 
     @Test("Cancelled events delete untouched blocks and detach touched ones")

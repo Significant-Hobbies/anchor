@@ -590,6 +590,22 @@ struct DayReviewTests {
         #expect(ScheduledFocusResolver().nextBlock(from: [summit], now: noon, calendar: Fixture.calendar) == nil)
     }
 
+    @Test("A session spanning midnight counts its focused seconds once and never reinterprets its pauses as focus")
+    func crossMidnightLinkedSession() {
+        let midnight = Fixture.calendar.startOfDay(for: Fixture.day0).addingTimeInterval(86_400)
+        var session = Fixture.session(focused: 1200, planned: 3600)
+        session.startedAt = midnight.addingTimeInterval(-1800)
+        session.endedAt = midnight.addingTimeInterval(1800)
+        let block = PlanBlockRecord(id: UUID(), sessionID: session.id, title: "Overnight",
+                                    plannedStart: session.startedAt, plannedSeconds: 3600,
+                                    actualStartedAt: session.startedAt, actualEndedAt: session.endedAt, state: .completed)
+        let first = engine.review(day: session.startedAt, blocks: [block], sessions: [session], divergences: [])
+        let next = engine.review(day: midnight, blocks: [block], sessions: [session], divergences: [])
+        #expect(first.actualSeconds == 1200 && next.actualSeconds == 0)
+        #expect(first.plannedSeconds == 1800 && next.plannedSeconds == 1800)
+        #expect(next.unobservedCompletedBlocks == 0)
+    }
+
     @Test("Review compares planned and actual without an adherence score")
     func plannedVersusActual() {
         let session = Fixture.session(focused: 2_700, planned: 1_800)

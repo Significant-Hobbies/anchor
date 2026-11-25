@@ -11,6 +11,7 @@ import SwiftUI
 public struct FocusScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
+    private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
@@ -142,13 +143,13 @@ public struct FocusScreen: View {
     }
 
     private var lastFinishedBlock: PlanBlock? {
-        guard let latest = sessions.first, latest.state == .finished,
+        guard let latest = sessions.first(where: { $0.startedAt <= Date() }), latest.state == .finished,
               let endedAt = latest.endedAt, Calendar.current.isDateInToday(endedAt) else { return nil }
-        return blocks.first { $0.sessionID == latest.id }
+        return calendarVisibility.filter(blocks).first { $0.sessionID == latest.id }
     }
 
     private var scheduledBlock: PlanBlock? {
-        guard let record = ScheduledFocusResolver().nextBlock(from: blocks.map { $0.snapshot() }, now: now) else {
+        guard let record = ScheduledFocusResolver().nextBlock(from: calendarVisibility.filter(blocks).map { $0.snapshot() }, now: now) else {
             return nil
         }
         return blocks.first { $0.id == record.id }

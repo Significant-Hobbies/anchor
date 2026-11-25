@@ -639,9 +639,8 @@ public struct DayPlanService {
         removal.autosaveEnabled = false
         let blocks = try removal.fetch(FetchDescriptor<PlanBlock>(predicate: #Predicate { $0.externalEventKey == key }))
         let existing = FetchDescriptor<RemovedCalendarOccurrence>(predicate: #Predicate { $0.eventKey == key })
-        if try removal.fetchCount(existing) == 0 {
-            removal.insert(RemovedCalendarOccurrence(eventKey: key))
-        }
+        RemovedCalendarOccurrence.remember(key: key, blockIDs: blocks.map(\.id),
+                                           existing: try removal.fetch(existing), in: removal)
         for block in blocks { removal.delete(block) }
         if removal.hasChanges { try removal.save() }
     }
