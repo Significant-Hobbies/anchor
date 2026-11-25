@@ -95,6 +95,7 @@ struct DayTimetable: View {
         let linkedSession: FocusSession?
         let hasDifferentActiveSession: Bool
         let isCurrent: Bool
+        var outcome: PlannerOutcome? = nil
     }
 
     @Environment(\.anchorTheme) private var theme
@@ -106,6 +107,7 @@ struct DayTimetable: View {
     var windowEndHour: Int = 22
     var showsLivedTrace: Bool = true
     var dimsFinished: Bool = true
+    var onCheckIn: (PlanBlock) -> Void = { _ in }
     var onStart: (PlanBlock) -> Void = { _ in }
     var onOpenFocus: () -> Void = {}
     var onComplete: (PlanBlock) -> Void = { _ in }
@@ -194,6 +196,7 @@ struct DayTimetable: View {
                         entry: entry,
                         height: cardHeight(for: entry),
                         dimsFinished: dimsFinished,
+                        onCheckIn: { onCheckIn(entry.block) },
                         onStart: { onStart(entry.block) },
                         onOpenFocus: onOpenFocus,
                         onComplete: { onComplete(entry.block) },
@@ -321,6 +324,7 @@ private struct TimetableBlockCard: View {
     let entry: DayTimetable.Entry
     let height: CGFloat
     var dimsFinished: Bool = true
+    let onCheckIn: () -> Void
     let onStart: () -> Void
     let onOpenFocus: () -> Void
     let onComplete: () -> Void
@@ -457,6 +461,7 @@ private struct TimetableBlockCard: View {
 
     @ViewBuilder
     private var actionChoices: some View {
+        Button(entry.outcome.map { "Check in · " + $0.rawValue } ?? "Check in…") { choose(onCheckIn) }
         if entry.linkedSession?.isActive == true {
             Button("open timer") { choose(onOpenFocus) }
         } else {
@@ -487,6 +492,7 @@ private struct TimetableBlockCard: View {
     }
 
     private var stateSymbol: String {
+        if let outcome = entry.outcome { return outcome.symbol }
         if entry.linkedSession?.isActive == true { return "timer" }
         return switch block.state {
         case .planned: "play.circle.fill"
@@ -498,7 +504,14 @@ private struct TimetableBlockCard: View {
     }
 
     private var stateTint: Color {
-        switch block.state {
+        if let outcome = entry.outcome {
+            return switch outcome {
+            case .blocked: theme.caution
+            case .unsuccessful: theme.negative
+            case .successful: theme.positive
+            }
+        }
+        return switch block.state {
         case .completed: theme.positive
         case .skipped, .moved: theme.textTertiary
         default: theme.accent
@@ -519,6 +532,7 @@ private struct TimetableBlockCard: View {
     }
 
     private var actionLabel: String {
+        if let outcome = entry.outcome { return "\(outcome.rawValue). Actions for \(block.title)" }
         if entry.hasDifferentActiveSession { return "Actions for \(block.title); another session is active" }
         if entry.linkedSession?.isActive == true { return "Open timer for \(block.title)" }
         return "Actions for \(block.title)"

@@ -15,6 +15,9 @@ struct PlanScreen: View {
     @Query private var projects: [Project]
     private let controller: FocusController
     private let onOpenFocus: () -> Void
+    @State private var checkIns: [UUID: PlannerCheckIn] = [:]
+    @State private var checkingEntry: PlannerCheckIn?
+    @State private var checkInLoadFailed = false
     @State private var today = Date()
     @State private var lastCalendarDay = Date()
     @State private var showsCopyDay = false
@@ -61,7 +64,8 @@ struct PlanScreen: View {
                 projectName: projects.first { $0.id == block.projectID }?.name,
                 linkedSession: block.sessionID.flatMap { id in sessions.first { $0.id == id } },
                 hasDifferentActiveSession: controller.hasSession && controller.session?.id != block.sessionID,
-                isCurrent: isCurrent(block)
+                isCurrent: isCurrent(block),
+                outcome: checkIns[block.id]?.outcome
             )
         }
     }
@@ -73,6 +77,12 @@ struct PlanScreen: View {
                 dayHeader
 
                 dayControls
+                if checkInLoadFailed {
+                    Label("Couldn’t read saved check-ins on this device.", systemImage: "exclamationmark.triangle")
+                }
+                if !openBlockers.isEmpty {
+                    blockersSection
+                }
 
                 let calendarEvents = upcomingCalendarEvents(at: calendarReferenceTime)
                 if Calendar.current.isDateInToday(today), !calendarEvents.isEmpty {
@@ -122,6 +132,7 @@ struct PlanScreen: View {
                         windowEndHour: timetablePrefs.endHour,
                         showsLivedTrace: timetablePrefs.showsLivedTrace,
                         dimsFinished: timetablePrefs.dimsFinished,
+                        onCheckIn: openCheckIn,
                         onStart: start,
                         onOpenFocus: onOpenFocus,
                         onComplete: complete,
@@ -164,6 +175,17 @@ struct PlanScreen: View {
         .onChange(of: today) { _, _ in scrolledDay = nil }
         }
         .background(theme.canvas)
+        .onAppear { reloadCheckIns() }
+        .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
+        .sheet(item: $checkingEntry) { entry in
+            PlannerCheckInSheet(entry: entry, previous: checkIns[entry.id]) { record in
+                guard let store = checkInStore else { throw CocoaError(.fileWriteUnknown) }
+                try store.save(record)
+                checkIns[record.id] = record
+                NotificationCenter.default.post(name: Self.checkInsChanged, object: nil)
+            }
+            .anchorTheme()
+        }
         .sheet(isPresented: $showsCopyDay) {
             CopyDaySheet(sourceDay: today, entryCount: blocks.count) { destination in
                 do {
@@ -242,6 +264,59 @@ struct PlanScreen: View {
             }
         }
         .onChange(of: controller.hasSession) { reconcileSessions() }
+    }
+
+    private static let checkInsChanged = Notification.Name("anchor.planner.check-ins.changed")
+
+    private var checkInStore: PlannerCheckInStore? {
+        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
+        return PlannerCheckInStore(storeURL: config.url)
+    }
+
+    private func reloadCheckIns() {
+        do {
+            checkIns = try checkInStore?.load() ?? [:]
+            checkInLoadFailed = false
+        } catch { checkInLoadFailed = true }
+    }
+
+    private func openCheckIn(_ block: PlanBlock) {
+        checkingEntry = PlannerCheckIn(id: block.id, title: block.title, plannedStart: block.plannedStart,
+                                       outcome: .successful, reason: "")
+    }
+
+    private var openBlockers: [PlannerCheckIn] {
+        checkIns.values.filter { $0.outcome == .blocked }.sorted {
+            ($0.plannedStart, $0.title) < ($1.plannedStart, $1.title)
+        }
+    }
+
+    private var blockersSection: some View {
+        Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                Label("Open blockers", systemImage: "pause.circle").font(.headline)
+                ForEach(openBlockers) { item in
+                    Divider()
+                    Button {
+                        checkingEntry = item
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text(item.title).font(.subheadline.weight(.semibold))
+                                Text(item.reason).font(.subheadline)
+                                Text(item.plannedStart.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption).foregroundStyle(theme.textSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(theme.textSecondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Edit this check-in")
+                }
+            }
+        }
     }
 
     private var dayHeader: some View {
@@ -410,8 +485,9 @@ struct PlanScreen: View {
         let base = calendar.isDate(now, inSameDayAs: today) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
         let minute = calendar.component(.minute, from: base)
         let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: base) ?? base
-        let latestEnd = blocks.map { $0.plannedStart.addingTimeInterval(Double($0.plannedSeconds)) }.max()
-        return max(rounded, latestEnd ?? rounded)
+        return PlannerGap.suggestedStart(from: rounded, until: dayInterval.end,
+            occupied: allBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
+                .map { DateInterval(start: $0.plannedStart, end: $0.plannedEnd) })
     }
 
     private func isCurrent(_ block: PlanBlock) -> Bool {
@@ -421,6 +497,7 @@ struct PlanScreen: View {
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
         guard Calendar.current.isDateInToday(today), !blocks.isEmpty,
+              openBlockers.isEmpty,
               !upcomingCalendarEvents(at: Date()).contains(where: { $0.plannedStart < dayInterval.end }),
               scrolledDay != today else { return }
         scrolledDay = today
