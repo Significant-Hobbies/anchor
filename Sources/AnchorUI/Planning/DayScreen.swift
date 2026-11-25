@@ -8,6 +8,8 @@ struct PlanScreen: View {
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.modelContext) private var context
+    @Query private var removedOccurrences: [RemovedCalendarOccurrence]
+    @State private var removal: CalendarEventRemoval?
     @Query(sort: \PlanBlock.plannedStart) private var allBlocks: [PlanBlock]
     @Query(sort: \ScheduleTemplate.createdAt) private var templates: [ScheduleTemplate]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
@@ -76,10 +78,12 @@ struct PlanScreen: View {
     }
 
     private var visibleBlocks: [PlanBlock] {
-        guard let accounts = calendarCoordinator?.accounts, !accounts.isEmpty else { return allBlocks }
+        let removedKeys = Set(removedOccurrences.map(\.eventKey))
+        let accounts = calendarCoordinator?.accounts ?? []
         let selections = Dictionary(accounts.map { ($0.id, Set($0.selectedCalendarIDs)) },
                                     uniquingKeysWith: { first, _ in first })
         return allBlocks.filter { block in
+            if let key = block.externalEventKey, removedKeys.contains(key) { return false }
             guard block.state == .planned, block.sessionID == nil, block.actualStartedAt == nil,
                   !block.isTemplateOverride, let key = block.externalEventKey,
                   let source = GoogleCalendarEvent.linkedCalendar(key),
@@ -103,7 +107,7 @@ struct PlanScreen: View {
     }
 
     private var timetableEntries: [DayTimetable.Entry] {
-        blocks.sorted { $0.plannedStart < $1.plannedStart }.map { block in
+        visibleBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }.map { block in
             DayTimetable.Entry(
                 block: block,
                 projectName: projects.first { $0.id == block.projectID }?.name,
@@ -170,7 +174,7 @@ struct PlanScreen: View {
                         daySummary
                     }
 
-                    if blocks.isEmpty {
+                    if timetableEntries.isEmpty {
                         Card(padding: Space.lg) {
                             #if os(macOS)
                             HStack(spacing: Space.lg) {
@@ -208,6 +212,7 @@ struct PlanScreen: View {
                             onOpenFocus: onOpenFocus,
                             onComplete: complete,
                             onEdit: { editingBlock = $0 },
+                            onRemove: { removal = CalendarEventRemoval($0) },
                             onExplain: { explainingBlock = $0 },
                             onLogActual: { loggingBlock = $0 },
                             onAddAt: { editorSeed = EditorSeed(start: $0) }
@@ -229,7 +234,7 @@ struct PlanScreen: View {
                 .background(.bar)
         }
         .safeAreaInset(edge: .bottom) {
-            if viewMode == .day && !blocks.isEmpty {
+            if viewMode == .day && !timetableEntries.isEmpty {
                 Button("add an entry") { editorSeed = suggestedEntry }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Space.lg)
@@ -258,6 +263,7 @@ struct PlanScreen: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .modifier(CalendarEventRemovalDialog(request: $removal, onRemove: refresh))
         .onAppear { reloadCheckIns() }
         .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
         .sheet(isPresented: $showsCalendars, onDismiss: {
@@ -944,6 +950,7 @@ struct PlanBlockEditor: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @State private var removal: CalendarEventRemoval?
     @State private var title = ""
     @State private var details = ""
     @State private var selectedProjectID: UUID?
@@ -1031,13 +1038,20 @@ struct PlanBlockEditor: View {
                         .padding(Space.sm)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
-                } else if block?.externalEventKey != nil {
+                } else if let block, block.externalEventKey != nil {
+                    VStack(alignment: .leading, spacing: Space.sm) {
                     Label("imported from google calendar. editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(theme.textSecondary)
                         .padding(Space.sm)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
+                    Button("Remove from Anchor…", systemImage: "trash", role: .destructive) {
+                        removal = CalendarEventRemoval(block)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityIdentifier("anchor.plan.remove-calendar-event")
+                    }
                 }
                 if let saveError {
                     Label(saveError, systemImage: "exclamationmark.triangle.fill")
@@ -1165,6 +1179,10 @@ struct PlanBlockEditor: View {
                 }
             }
         }
+        .modifier(CalendarEventRemovalDialog(request: $removal) {
+            dismiss()
+            onSave()
+        })
         #if os(macOS)
         .frame(minWidth: 540, idealWidth: 620, minHeight: 460, idealHeight: 680)
         #endif

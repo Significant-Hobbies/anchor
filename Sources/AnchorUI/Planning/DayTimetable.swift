@@ -112,6 +112,7 @@ struct DayTimetable: View {
     var onOpenFocus: () -> Void = {}
     var onComplete: (PlanBlock) -> Void = { _ in }
     var onEdit: (PlanBlock) -> Void = { _ in }
+    var onRemove: (PlanBlock) -> Void = { _ in }
     var onExplain: (PlanBlock) -> Void = { _ in }
     var onLogActual: (PlanBlock) -> Void = { _ in }
     var onAddAt: (Date) -> Void = { _ in }
@@ -128,10 +129,12 @@ struct DayTimetable: View {
         (minCardHeight + 4) / hourHeight * 3600
     }
 
+    private var timedEntries: [Entry] { entries.filter { $0.block.plannedSeconds < 86_400 } }
+
     private var range: DateInterval {
         TimetableLayout.displayRange(
             for: day,
-            intervals: entries.map { entry in
+            intervals: timedEntries.map { entry in
                 let start = entry.block.plannedStart.timeIntervalSince(Calendar.current.startOfDay(for: day))
                 return (start, start + Double(entry.block.plannedSeconds))
             },
@@ -151,20 +154,38 @@ struct DayTimetable: View {
 
     private var placements: [UUID: TimetableLayout.Placement] {
         let placed = TimetableLayout.place(
-            entries.map { entry in
+            timedEntries.map { entry in
                 let start = entry.block.plannedStart.timeIntervalSince(range.start)
                 return (start, start + Double(entry.block.plannedSeconds))
             },
             minSpan: minCollisionSpan
         )
         var result: [UUID: TimetableLayout.Placement] = [:]
-        for (index, entry) in entries.enumerated() {
+        for (index, entry) in timedEntries.enumerated() {
             result[entry.id] = placed[index]
         }
         return result
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            ForEach(entries.filter { $0.block.plannedSeconds >= 86_400 }) { entry in
+                blockCard(entry, height: 70)
+                    .frame(height: 70)
+            }
+            grid
+        }
+    }
+
+    private func blockCard(_ entry: Entry, height: CGFloat) -> some View {
+        TimetableBlockCard(entry: entry, height: height, dimsFinished: dimsFinished,
+                           onCheckIn: { onCheckIn(entry.block) }, onStart: { onStart(entry.block) },
+                           onOpenFocus: onOpenFocus, onComplete: { onComplete(entry.block) },
+                           onEdit: { onEdit(entry.block) }, onRemove: { onRemove(entry.block) },
+                           onExplain: { onExplain(entry.block) }, onLogActual: { onLogActual(entry.block) })
+    }
+
+    private var grid: some View {
         GeometryReader { proxy in
             let gridX = railWidth + traceWidth
             let gridWidth = max(120, proxy.size.width - gridX - Space.xxs)
@@ -188,22 +209,11 @@ struct DayTimetable: View {
                     livedTraces
                 }
 
-                ForEach(entries) { entry in
+                ForEach(timedEntries) { entry in
                     let placement = placements[entry.id] ?? TimetableLayout.Placement(lane: 0, laneCount: 1)
                     let laneGap = Space.xxs
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
-                    TimetableBlockCard(
-                        entry: entry,
-                        height: cardHeight(for: entry),
-                        dimsFinished: dimsFinished,
-                        onCheckIn: { onCheckIn(entry.block) },
-                        onStart: { onStart(entry.block) },
-                        onOpenFocus: onOpenFocus,
-                        onComplete: { onComplete(entry.block) },
-                        onEdit: { onEdit(entry.block) },
-                        onExplain: { onExplain(entry.block) },
-                        onLogActual: { onLogActual(entry.block) }
-                    )
+                    blockCard(entry, height: cardHeight(for: entry))
                     .frame(width: laneWidth, height: cardHeight(for: entry), alignment: .topLeading)
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
@@ -240,7 +250,8 @@ struct DayTimetable: View {
     }
 
     private func cardHeight(for entry: Entry) -> CGFloat {
-        let span = Double(entry.block.plannedSeconds) / 3600 * hourHeight
+        let visibleSeconds = min(range.end, entry.block.plannedEnd).timeIntervalSince(max(range.start, entry.block.plannedStart))
+        let span = visibleSeconds / 3600 * hourHeight
         return max(minCardHeight, span - 4)
     }
 
@@ -264,7 +275,7 @@ struct DayTimetable: View {
     }
 
     private var livedTraces: some View {
-        ForEach(entries.filter { $0.block.actualStartedAt != nil }) { entry in
+        ForEach(timedEntries.filter { $0.block.actualStartedAt != nil }) { entry in
             let start = entry.block.actualStartedAt!
             let end = entry.block.actualEndedAt ?? Date()
             let top = max(0, offset(for: start))
@@ -329,13 +340,14 @@ private struct TimetableBlockCard: View {
     let onOpenFocus: () -> Void
     let onComplete: () -> Void
     let onEdit: () -> Void
+    let onRemove: () -> Void
     let onExplain: () -> Void
     let onLogActual: () -> Void
 
     private var block: PlanBlock { entry.block }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
             RoundedRectangle(cornerRadius: 1.5)
                 .fill(stateTint)
                 .frame(width: 3)
@@ -353,7 +365,8 @@ private struct TimetableBlockCard: View {
                     actionsButton
                 }
                 if height >= 56 {
-                    Text("\(block.plannedStart.formatted(date: .omitted, time: .shortened)) – \(block.plannedEnd.formatted(date: .omitted, time: .shortened))")
+                    let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated
+                    Text("\(block.plannedStart.formatted(date: dateStyle, time: .shortened)) – \(block.plannedEnd.formatted(date: dateStyle, time: .shortened))")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(theme.textTertiary)
                         .lineLimit(1)
@@ -484,6 +497,9 @@ private struct TimetableBlockCard: View {
             }
         }
         Button("explain a change") { choose(onExplain) }
+        if block.externalEventKey != nil {
+            Button("Remove from Anchor…", role: .destructive) { choose(onRemove) }
+        }
     }
 
     private func choose(_ action: () -> Void) {
