@@ -12,8 +12,10 @@ public struct CalendarSettings: View {
     @ObservedObject private var coordinator: CalendarSyncCoordinator
 
     private let inSheet: Bool
+    private let visibleInterval: DateInterval?
 
-    public init(coordinator: CalendarSyncCoordinator, inSheet: Bool = false) {
+    public init(coordinator: CalendarSyncCoordinator, inSheet: Bool = false, visibleInterval: DateInterval? = nil) {
+        self.visibleInterval = visibleInterval
         self.inSheet = inSheet
         _coordinator = ObservedObject(wrappedValue: coordinator)
     }
@@ -87,7 +89,13 @@ public struct CalendarSettings: View {
                         Task { await coordinator.refreshCalendars(accountID: account.id) }
                     }
                     Button("Sync now", systemImage: "arrow.triangle.2.circlepath") {
-                        Task { await coordinator.sync(context: context, blocks: planBlocks) }
+                        Task {
+                            if let visibleInterval {
+                                await coordinator.sync(context: context, window: visibleInterval)
+                            } else {
+                                await coordinator.sync(context: context, blocks: planBlocks)
+                            }
+                        }
                     }
                     Button("Disconnect", role: .destructive) {
                         Task {

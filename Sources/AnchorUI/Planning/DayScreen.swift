@@ -244,7 +244,7 @@ struct PlanScreen: View {
         }) {
             if let calendarCoordinator {
                 NavigationStack {
-                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true).padding(Space.lg) }
+                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true, visibleInterval: visibleInterval).padding(Space.lg) }
                         .background(theme.canvas)
                         .navigationTitle("Google Calendar")
                         #if os(iOS)
