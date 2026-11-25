@@ -185,9 +185,12 @@ struct PlanScreen: View {
         }) {
             if let calendarCoordinator {
                 NavigationStack {
-                    ScrollView { CalendarSettings(coordinator: calendarCoordinator).padding(Space.md) }
+                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true).padding(Space.lg) }
                         .background(theme.canvas)
-                        .navigationTitle("Calendar import")
+                        .navigationTitle("Google Calendar")
+                        #if os(iOS)
+                        .navigationBarTitleDisplayMode(.inline)
+                        #endif
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("Done") { showsCalendars = false }
