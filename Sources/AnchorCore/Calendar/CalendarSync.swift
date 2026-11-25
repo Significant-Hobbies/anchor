@@ -101,8 +101,8 @@ public enum CalendarSyncPolicy {
         }
 
         var seenKeys = Set<String>()
-        for event in events {
-            seenKeys.insert(event.linkKey)
+        for event in events where managedAccountIDs.contains(event.accountID) {
+            guard seenKeys.insert(event.linkKey).inserted else { continue }
             let linked = blocksByKey[event.linkKey] ?? []
 
             // Cancelled or all-day events cannot be represented: untouched
@@ -119,12 +119,12 @@ public enum CalendarSyncPolicy {
                 plan.creations.append(event)
                 continue
             }
-            if isUntouched(primary) {
-                if !matches(primary, event: event) {
+            if !matches(primary, event: event) {
+                if isUntouched(primary) {
                     plan.updates.append(CalendarBlockUpdate(blockID: primary.id, event: event))
+                } else {
+                    plan.detachments.append(primary.id)
                 }
-            } else {
-                plan.detachments.append(primary.id)
             }
             for duplicate in linked.dropFirst() {
                 if isUntouched(duplicate) { plan.deletions.append(duplicate.id) }
@@ -173,15 +173,21 @@ public struct CalendarSyncService: Sendable {
     public func sync(
         accounts: [CalendarSyncAccount],
         blocks: [PlanBlockRecord],
-        now: Date = Date()
+        now: Date = Date(),
+        window: DateInterval? = nil
     ) async -> CalendarSyncReport {
-        let window = CalendarSyncPolicy.syncWindow(now: now, calendar: calendar)
-        var report = CalendarSyncReport(syncedAt: now)
-        var events: [GoogleCalendarEvent] = []
+        let window = window ?? CalendarSyncPolicy.syncWindow(now: now, calendar: calendar)
+        let batch = await fetch(accounts: accounts, window: window)
+        return batch.reconcile(blocks: blocks, now: now)
+    }
 
+    public func fetch(accounts: [CalendarSyncAccount], window: DateInterval) async -> CalendarEventBatch {
+        var batch = CalendarEventBatch(window: window)
         for account in accounts {
             do {
-                for calendarID in account.selectedCalendarIDs {
+                var events: [GoogleCalendarEvent] = []
+                for calendarID in account.selectedCalendarIDs.sorted() {
+                    try Task.checkCancellation()
                     events += try await store.events(
                         accessToken: account.accessToken,
                         accountID: account.id,
@@ -189,18 +195,34 @@ public struct CalendarSyncService: Sendable {
                         window: window
                     )
                 }
+                // Only a complete account response can establish which events vanished.
+                batch.events += events
+                batch.managedAccountIDs.insert(account.id)
             } catch {
-                report.failedAccounts.insert(account.id)
+                batch.failedAccountIDs.insert(account.id)
             }
         }
+        return batch
+    }
+}
 
-        let managedIDs = Set(accounts.map(\.id)).subtracting(report.failedAccounts)
+/// Keep the network result separate from reconciliation so a long request cannot
+/// overwrite edits made while it was fetching, or act on a disconnected account.
+public struct CalendarEventBatch: Sendable {
+    fileprivate var window: DateInterval
+    fileprivate var events: [GoogleCalendarEvent] = []
+    fileprivate var managedAccountIDs: Set<String> = []
+    fileprivate var failedAccountIDs: Set<String> = []
+
+    public func reconcile(blocks: [PlanBlockRecord], eligibleAccountIDs: Set<String>? = nil, now: Date) -> CalendarSyncReport {
         let plan = CalendarSyncPolicy.plan(
             events: events,
             blocks: blocks,
             window: window,
-            managedAccountIDs: managedIDs
+            managedAccountIDs: managedAccountIDs.intersection(eligibleAccountIDs ?? managedAccountIDs)
         )
+        var report = CalendarSyncReport(syncedAt: now)
+        report.failedAccounts = failedAccountIDs.intersection(eligibleAccountIDs ?? failedAccountIDs)
         report.creations = plan.creations
         report.updates = plan.updates
         report.deletions = plan.deletions

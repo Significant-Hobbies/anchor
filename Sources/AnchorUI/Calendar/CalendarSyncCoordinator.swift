@@ -43,6 +43,8 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     @Published public private(set) var accounts: [ConnectedGoogleAccount] = []
     @Published public private(set) var availableCalendars: [String: [GoogleCalendarInfo]] = [:]
     @Published public private(set) var status: String?
+    @Published public private(set) var connectionIssue: String?
+    @Published public private(set) var calendarListIssues: [String: String] = [:]
     @Published public private(set) var isConnecting = false
 
     private let authRunner: any GoogleAuthSessionRunner
@@ -51,7 +53,9 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     private let credentialStore: any GoogleCredentialStore
     private let service: CalendarSyncService
     private let clientID: String
+    private var calendarListRequests: [String: UUID] = [:]
     private var isSyncing = false
+    private var syncWaiters: [CheckedContinuation<Void, Never>] = []
 
     public override init() {
         let store = URLSessionGoogleCalendarStore()
@@ -101,10 +105,11 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     /// credentials and calendar list without duplicating the account.
     public func connect() async {
         guard !clientID.isEmpty else {
-            status = "Google sign-in is not configured in this build yet."
+            connectionIssue = "Google sign-in is not configured in this build yet."
             return
         }
         guard !isConnecting else { return }
+        connectionIssue = nil
         isConnecting = true
         defer { isConnecting = false }
         do {
@@ -132,6 +137,14 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             } else {
                 identity = try await calendarStore.accountIdentity(accessToken: tokens.accessToken)
             }
+            let calendars: [GoogleCalendarInfo]
+            do {
+                calendars = try await calendarStore.calendars(accessToken: tokens.accessToken)
+            } catch {
+                connectionIssue = "Couldn’t load calendars for \(identity.displayName). "
+                    + Self.connectionMessage(for: error)
+                return
+            }
             try await credentialStore.save(
                 GoogleCredentials(
                     accessToken: tokens.accessToken,
@@ -140,9 +153,11 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
                 ),
                 accountID: identity.id
             )
-            let calendars = (try? await calendarStore.calendars(accessToken: tokens.accessToken)) ?? []
+            calendarListRequests.removeValue(forKey: identity.id)
+            calendarListIssues.removeValue(forKey: identity.id)
             availableCalendars[identity.id] = calendars
-            var account = accounts.first(where: { $0.id == identity.id })
+            let previous = accounts.first(where: { $0.id == identity.id })
+            var account = previous
                 ?? ConnectedGoogleAccount(
                     id: identity.id,
                     email: identity.email,
@@ -151,17 +166,20 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             account.email = identity.email
             account.displayName = identity.displayName
             let fetchedIDs = Set(calendars.map(\.id))
-            let kept = account.selectedCalendarIDs.filter { fetchedIDs.contains($0) }
-            account.selectedCalendarIDs = kept.isEmpty
-                ? calendars.filter(\.isPrimary).map(\.id)
-                : kept
+            account.selectedCalendarIDs = previous?.selectedCalendarIDs.filter { fetchedIDs.contains($0) }
+                ?? calendars.filter(\.isPrimary).map(\.id)
             upsert(account)
-            status = nil
+            connectionIssue = nil
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
-            status = nil
+            connectionIssue = nil
         } catch {
-            status = "Google sign-in could not be completed. Nothing was connected."
+            connectionIssue = Self.connectionMessage(for: error)
         }
+    }
+
+    private static func connectionMessage(for error: Error) -> String {
+        if let googleError = error as? GoogleCalendarError { return googleError.connectionMessage }
+        return "Google sign-in could not be completed. Check your connection and try again."
     }
 
     /// Stops imports for the account: revokes the grant (best-effort), drops
@@ -176,6 +194,8 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         accounts.removeAll { $0.id == accountID }
         persistAccounts()
         availableCalendars.removeValue(forKey: accountID)
+        calendarListRequests.removeValue(forKey: accountID)
+        calendarListIssues.removeValue(forKey: accountID)
 
         let prefix = GoogleCalendarEvent.linkPrefix(accountID: accountID)
         var detached = false
@@ -206,23 +226,46 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     /// Refreshes the calendar list for a connected account — used after
     /// connect and by the settings surface on appear.
     public func refreshCalendars(accountID: String) async {
-        guard let token = try? await accessToken(for: accountID) else { return }
-        availableCalendars[accountID] = (try? await calendarStore.calendars(accessToken: token)) ?? []
+        guard accounts.contains(where: { $0.id == accountID }) else { return }
+        let request = UUID()
+        calendarListRequests[accountID] = request
+        do {
+            let token = try await accessToken(for: accountID)
+            let calendars = try await calendarStore.calendars(accessToken: token)
+            guard calendarListRequests[accountID] == request else { return }
+            availableCalendars[accountID] = calendars
+            calendarListIssues.removeValue(forKey: accountID)
+        } catch {
+            guard calendarListRequests[accountID] == request, !Task.isCancelled else { return }
+            calendarListIssues[accountID] = "Couldn’t refresh calendars. " + Self.connectionMessage(for: error)
+        }
     }
 
     // MARK: - Sync
 
-    /// One import pass over every connected account. Access tokens are
-    /// refreshed lazily; an account that cannot authenticate is skipped and
-    /// its blocks are left completely untouched.
-    public func sync(context: ModelContext, blocks: [PlanBlock]) async {
-        guard isConfigured, !accounts.isEmpty, !isSyncing else { return }
-        isSyncing = true
-        defer { isSyncing = false }
+    public func sync(context: ModelContext, blocks _: [PlanBlock]) async {
+        _ = await sync(context: context, window: CalendarSyncPolicy.syncWindow(now: Date()))
+    }
 
+    /// Import the displayed period. Each caller awaits its own period, even when
+    /// a rolling import or another window is already in flight.
+    @discardableResult
+    public func sync(context: ModelContext, window: DateInterval) async -> String? {
+        guard isConfigured, !accounts.isEmpty, !Task.isCancelled else { return nil }
+        if isSyncing {
+            await withCheckedContinuation { syncWaiters.append($0) }
+        }
+        isSyncing = true
+        defer {
+            if syncWaiters.isEmpty { isSyncing = false }
+            else { syncWaiters.removeFirst().resume() }
+        }
+        guard !Task.isCancelled else { return nil }
+
+        let requested = accounts.filter { !$0.selectedCalendarIDs.isEmpty }
         var syncAccounts: [CalendarSyncAccount] = []
-        var unauthenticated = 0
-        for account in accounts where !account.selectedCalendarIDs.isEmpty {
+        var unauthenticated: Set<String> = []
+        for account in requested {
             do {
                 let token = try await accessToken(for: account.id)
                 syncAccounts.append(CalendarSyncAccount(
@@ -231,30 +274,49 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
                     selectedCalendarIDs: Set(account.selectedCalendarIDs)
                 ))
             } catch {
-                unauthenticated += 1
+                unauthenticated.insert(account.id)
             }
         }
 
-        let report = await service.sync(
-            accounts: syncAccounts,
-            blocks: blocks.map { $0.snapshot() }
-        )
-        apply(report: report, to: blocks, context: context)
-        defaults.set(report.syncedAt, forKey: Self.lastSyncKey)
-
-        let skipped = report.failedAccounts.count + unauthenticated
-        status = if skipped > 0 {
-            "\(skipped) calendar account\(skipped == 1 ? "" : "s") could not be reached; its blocks were left alone."
-        } else if report.creations.isEmpty && report.updates.isEmpty
-            && report.deletions.isEmpty && report.detachments.isEmpty {
-            "Calendars are up to date."
-        } else {
-            "Imported \(report.creations.count) event\(report.creations.count == 1 ? "" : "s") from Google Calendar."
+        let batch = await service.fetch(accounts: syncAccounts, window: window)
+        guard !Task.isCancelled else { return nil }
+        let eligible = Set(requested.filter { accounts.contains($0) }.map(\.id))
+        guard !eligible.isEmpty else { return nil }
+        guard !context.hasChanges else {
+            return syncFailure("Calendar import paused while planner edits are being saved. Try again.")
         }
+
+        let report: CalendarSyncReport
+        do {
+            let linked = FetchDescriptor<PlanBlock>(predicate: #Predicate { $0.externalEventKey != nil })
+            let blocks = try context.fetch(linked)
+            report = batch.reconcile(blocks: blocks.map { $0.snapshot() }, eligibleAccountIDs: eligible, now: Date())
+            try apply(report: report, to: blocks, context: context)
+        } catch {
+            context.rollback()
+            return syncFailure("Anchor could not save the calendar import. Try again.")
+        }
+
+        let skipped = report.failedAccounts.union(unauthenticated.intersection(eligible)).count
+        if skipped < eligible.count { defaults.set(report.syncedAt, forKey: Self.lastSyncKey) }
+        if skipped > 0 {
+            return syncFailure("Couldn’t reach \(skipped) calendar account\(skipped == 1 ? "" : "s"). Previously imported entries were kept for those accounts.")
+        }
+        if report.creations.isEmpty && report.updates.isEmpty && report.deletions.isEmpty && report.detachments.isEmpty {
+            status = "Calendars are up to date."
+        } else {
+            status = "Imported \(report.creations.count) event\(report.creations.count == 1 ? "" : "s") from Google Calendar."
+        }
+        return nil
     }
 
-    private func apply(report: CalendarSyncReport, to blocks: [PlanBlock], context: ModelContext) {
-        let byID = Dictionary(uniqueKeysWithValues: blocks.map { ($0.id, $0) })
+    private func syncFailure(_ message: String) -> String {
+        status = message
+        return message
+    }
+
+    private func apply(report: CalendarSyncReport, to blocks: [PlanBlock], context: ModelContext) throws {
+        let byID = Dictionary(blocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for event in report.creations {
             context.insert(PlanBlock(
                 title: event.title,
@@ -277,7 +339,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         for blockID in report.detachments {
             byID[blockID]?.externalEventKey = nil
         }
-        try? context.save()
+        if context.hasChanges { try context.save() }
     }
 
     // MARK: - Tokens and persistence

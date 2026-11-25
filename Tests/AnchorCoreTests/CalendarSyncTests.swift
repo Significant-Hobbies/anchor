@@ -116,6 +116,14 @@ struct CalendarSyncTests {
         #expect(plan.updates.isEmpty && plan.deletions.isEmpty)
     }
 
+    @Test("Revisiting a period keeps a completed matching event linked instead of importing a duplicate")
+    func preservesMatchingCompletedLink() {
+        let meeting = event("Meeting")
+        let plan = CalendarSyncPolicy.plan(events: [meeting], blocks: [block(for: meeting, state: .completed)],
+                                           window: window, managedAccountIDs: ["acct-1"])
+        #expect(plan == CalendarSyncPlan())
+    }
+
     @Test("All-day events are not imported")
     func skipsAllDay() {
         let plan = CalendarSyncPolicy.plan(
@@ -195,6 +203,21 @@ struct CalendarSyncTests {
             now: Date(timeIntervalSince1970: 1_704_067_200)
         )
         #expect(report.creations.count == 2)
+    }
+
+    @Test("A later calendar failure discards the unfinished account without duplicating its earlier events")
+    func partialAccountResponseIsNotApplied() async {
+        let store = FixtureCalendarStore()
+        let existing = event("Already imported", calendar: "a")
+        store.eventsByKey["a"] = [existing, event("New", calendar: "a", id: "new")]
+        store.failCalendars = ["z"]
+        let report = await CalendarSyncService(store: store).sync(
+            accounts: [CalendarSyncAccount(id: "acct-1", accessToken: "a", selectedCalendarIDs: ["a", "z"])],
+            blocks: [block(for: existing)], window: window
+        )
+        #expect(report.failedAccounts == ["acct-1"])
+        #expect(report.creations.isEmpty && report.updates.isEmpty)
+        #expect(report.deletions.isEmpty && report.detachments.isEmpty)
     }
 
     // MARK: - OAuth pieces
@@ -336,6 +359,7 @@ private final class FixtureCalendarStore: GoogleCalendarStoreProtocol, @unchecke
     var eventsByAccount: [String: [GoogleCalendarEvent]] = [:]
     var eventsByKey: [String: [GoogleCalendarEvent]] = [:]
     var failAccounts: Set<String> = []
+    var failCalendars: Set<String> = []
 
     func accountIdentity(accessToken _: String) async throws -> GoogleAccountIdentity {
         GoogleAccountIdentity(id: "sub", email: "a@b.c", displayName: "A")
@@ -351,7 +375,7 @@ private final class FixtureCalendarStore: GoogleCalendarStoreProtocol, @unchecke
         calendarID: String,
         window _: DateInterval
     ) async throws -> [GoogleCalendarEvent] {
-        if failAccounts.contains(accountID) {
+        if failAccounts.contains(accountID) || failCalendars.contains(calendarID) {
             throw GoogleCalendarError.api(status: 401, message: "unauthorized")
         }
         return eventsByAccount[accountID] ?? eventsByKey[calendarID] ?? []
