@@ -225,7 +225,9 @@ struct PlanScreen: View {
         .safeAreaInset(edge: .bottom) {
             if viewMode == .day && !timetableEntries.isEmpty {
                 Button("add an entry") { editorSeed = suggestedEntry }
-                    .buttonStyle(PrimaryButtonStyle())
+                    .buttonStyle(PrimaryButtonStyle(expands: false))
+                    .frame(maxWidth: workspaceMaxWidth, alignment: .trailing)
+                    .frame(maxWidth: .infinity)
                     .padding(.horizontal, Space.lg)
                     .padding(.vertical, Space.xs)
                     .background(.bar)
