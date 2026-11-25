@@ -579,6 +579,17 @@ struct DayPlanTests {
 struct DayReviewTests {
     private let engine = DayReviewEngine(calendar: Fixture.calendar)
 
+    @Test("A long calendar event is measured per day and does not dominate Focus")
+    func longCalendarCommitment() {
+        let noon = Fixture.calendar.startOfDay(for: Fixture.day0).addingTimeInterval(43_200)
+        let summit = PlanBlockRecord(id: UUID(), title: "Summit", plannedStart: noon, plannedSeconds: 5 * 86_400,
+                                     externalEventKey: "a\u{1F}b\u{1F}c")
+        let middle = noon.addingTimeInterval(2 * 86_400)
+        #expect(engine.review(day: noon, blocks: [summit], sessions: [], divergences: []).plannedSeconds == 43_200)
+        #expect(engine.review(day: middle, blocks: [summit], sessions: [], divergences: []).plannedSeconds == 86_400)
+        #expect(ScheduledFocusResolver().nextBlock(from: [summit], now: noon, calendar: Fixture.calendar) == nil)
+    }
+
     @Test("Review compares planned and actual without an adherence score")
     func plannedVersusActual() {
         let session = Fixture.session(focused: 2_700, planned: 1_800)

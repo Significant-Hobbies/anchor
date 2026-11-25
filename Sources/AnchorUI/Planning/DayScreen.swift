@@ -1040,7 +1040,7 @@ struct PlanBlockEditor: View {
                         .background(theme.accent.opacity(0.08), in: .rect(cornerRadius: Radius.sm))
                 } else if let block, block.externalEventKey != nil {
                     VStack(alignment: .leading, spacing: Space.sm) {
-                    Label("imported from google calendar. editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
+                        Label("imported from google calendar. editing makes it yours — sync won't overwrite it.", systemImage: "calendar.badge.clock")
                         .font(.footnote.weight(.medium))
                         .foregroundStyle(theme.textSecondary)
                         .padding(Space.sm)
@@ -1573,7 +1573,7 @@ struct DayReviewScreen: View {
     private var review: DayReviewEngine.Review {
         let interval = Calendar.current.dateInterval(of: .day, for: selectedDay)
             ?? DateInterval(start: selectedDay, duration: 86_400)
-        let dayBlocks = blocks.filter { interval.contains($0.plannedStart) }.map { $0.snapshot() }
+        let dayBlocks = blocks.filter { $0.plannedStart < interval.end && $0.plannedEnd > interval.start }.map { $0.snapshot() }
         let daySessions = sessions.filter { interval.contains($0.startedAt) }.map { $0.snapshot() }
         let dayDivergences = divergences.filter { interval.contains($0.occurredAt) }.map { $0.snapshot() }
         let profile = profiles.first?.snapshot() ?? BehaviorProfileRecord()

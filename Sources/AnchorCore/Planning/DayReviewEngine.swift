@@ -169,7 +169,7 @@ public extension ModelContext {
         let start = calendar.startOfDay(for: day)
         let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
         return try fetch(FetchDescriptor<PlanBlock>())
-            .filter { $0.plannedStart >= start && $0.plannedStart < end }
+            .filter { $0.plannedStart < end && $0.plannedEnd > start }
             .sorted { $0.plannedStart < $1.plannedStart }
             .map { $0.snapshot() }
     }
@@ -346,10 +346,14 @@ public struct DayReviewEngine: Sendable {
         var unobservedCompletedBlocks = 0
         var gaps: [Gap] = []
 
+        let start = calendar.startOfDay(for: day)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
         for block in blocks {
-            let plannedSeconds = Double(block.plannedSeconds)
+            let blockEnd = block.plannedStart.addingTimeInterval(Double(block.plannedSeconds))
+            let plannedSeconds = min(end, blockEnd).timeIntervalSince(max(start, block.plannedStart))
+            guard plannedSeconds > 0 else { continue }
             let session = block.sessionID.flatMap { sessionsByID[$0] }
-            let storedActual = storedActualSeconds(block)
+            let storedActual = storedActualSeconds(block, from: start, until: end)
             let actualDurationKnown = session != nil || storedActual != nil
             let actualSeconds = session?.focusedSeconds ?? storedActual ?? 0
             planned += plannedSeconds
@@ -423,9 +427,10 @@ public struct DayReviewEngine: Sendable {
         )
     }
 
-    private func storedActualSeconds(_ block: PlanBlockRecord) -> Double? {
-        guard let start = block.actualStartedAt, let end = block.actualEndedAt else { return nil }
-        return max(0, end.timeIntervalSince(start))
+    private func storedActualSeconds(_ block: PlanBlockRecord, from dayStart: Date, until dayEnd: Date) -> Double? {
+        guard let start = block.actualStartedAt, let end = block.actualEndedAt,
+              start < dayEnd, end > dayStart else { return nil }
+        return max(0, min(end, dayEnd).timeIntervalSince(max(start, dayStart)))
     }
 
     private func capturedInterruptionCause(

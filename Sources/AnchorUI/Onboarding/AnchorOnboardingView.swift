@@ -118,7 +118,11 @@ public struct AnchorOnboardingView: View {
                 rehearsal = OnboardingRehearsal()
             } else {
                 restoreProfile()
+                prepareHabitDrafts()
                 unifiedStep = UnifiedStep(rawValue: savedUnifiedStep) ?? .welcome
+                if habitDrafts.isEmpty && (unifiedStep == .schedule || unifiedStep == .replacements) {
+                    moveUnified(to: .account)
+                }
                 restore()
             }
         }
@@ -241,7 +245,7 @@ public struct AnchorOnboardingView: View {
                 Button(desiredDirections.isEmpty ? "continue without choosing" : "show me how anchor protects it") {
                     if persistProfile() {
                         prepareHabitDrafts()
-                        moveUnified(to: .replacements)
+                        moveUnified(to: habitDrafts.isEmpty ? .account : .replacements)
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
@@ -307,7 +311,7 @@ public struct AnchorOnboardingView: View {
 
             VStack(spacing: Space.sm) {
                 Button(habitDrafts.contains(where: \.isSelected) ? "shape these habits" : "continue without habits") {
-                    moveUnified(to: .schedule)
+                    moveUnified(to: habitDrafts.contains(where: \.isSelected) ? .schedule : .account)
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 Button("back") { moveUnified(to: .directions) }
@@ -488,7 +492,9 @@ public struct AnchorOnboardingView: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button("back") { moveUnified(to: .schedule) }
+            Button("back") {
+                moveUnified(to: habitDrafts.isEmpty ? .directions : (habitDrafts.contains(where: \.isSelected) ? .schedule : .replacements))
+            }
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .frame(maxWidth: .infinity)
         }

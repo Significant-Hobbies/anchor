@@ -60,6 +60,7 @@ public struct ScheduledFocusResolver: Sendable {
         let open = blocks
             .filter { block in
                 (day?.contains(block.plannedStart) ?? calendar.isDate(block.plannedStart, inSameDayAs: now))
+                    && (block.externalEventKey == nil || block.plannedSeconds < 86_400 || block.state == .inProgress)
                     && block.state != .completed
                     && block.state != .skipped
                     && block.state != .moved
