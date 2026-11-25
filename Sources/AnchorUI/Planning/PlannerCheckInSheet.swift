@@ -1,6 +1,31 @@
 #if !os(watchOS)
 import AnchorCore
+import SwiftData
 import SwiftUI
+
+extension ModelContext {
+    var plannerCheckInStore: PlannerCheckInStore? {
+        guard let config = container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
+        return PlannerCheckInStore(storeURL: config.url)
+    }
+
+    func savePlannerCheckIn(_ record: PlannerCheckIn) throws {
+        guard let store = plannerCheckInStore else { throw CocoaError(.fileWriteUnknown) }
+        try store.save(record)
+        NotificationCenter.default.post(name: .plannerCheckInsChanged, object: nil)
+    }
+}
+
+extension Notification.Name {
+    static let plannerCheckInsChanged = Notification.Name("anchor.planner.check-ins.changed")
+}
+
+extension PlannerCheckIn {
+    init(block: PlanBlock) {
+        self.init(id: block.id, title: block.title, plannedStart: block.plannedStart,
+                  outcome: .successful, reason: "")
+    }
+}
 
 struct PlannerCheckInSheet: View {
     @Environment(\.dismiss) private var dismiss

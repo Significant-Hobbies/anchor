@@ -20,6 +20,9 @@ public struct FocusScreen: View {
     @State private var isChangingActivity = false
     @State private var actualIntent = ""
     @State private var loadError: String?
+    @State private var checkInBlock: PlanBlock?
+    @State private var previousCheckIn: PlannerCheckIn?
+    @State private var checkInReadFailed = false
 
     public init(controller: FocusController) {
         self.controller = controller
@@ -88,6 +91,31 @@ public struct FocusScreen: View {
                 .transition(.opacity)
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if !controller.hasSession, !showsAdHocComposer, let block = lastFinishedBlock {
+                Button("Check in on \(block.title)", systemImage: "checkmark.circle") {
+                    do {
+                        guard let store = context.plannerCheckInStore else { throw CocoaError(.fileReadUnknown) }
+                        previousCheckIn = try store.load().records[block.id]
+                        checkInBlock = block
+                    } catch { checkInReadFailed = true }
+                }
+                .buttonStyle(QuietButtonStyle(expands: false))
+                .accessibilityIdentifier("anchor.focus.check-in")
+                .padding(.horizontal, Space.md)
+                .padding(.vertical, Space.xs)
+            }
+        }
+        .sheet(item: $checkInBlock) { block in
+            PlannerCheckInSheet(entry: PlannerCheckIn(block: block), previous: previousCheckIn,
+                                onSave: context.savePlannerCheckIn)
+                .anchorTheme()
+        }
+        .alert("Couldn’t open this check-in", isPresented: $checkInReadFailed) {
+            Button("OK") {}
+        } message: {
+            Text("Check that Anchor can access its local planner store and try again.")
+        }
         .animation(Motion.gentle, value: controller.hasSession)
         .task {
             refreshSchedule()
@@ -111,6 +139,12 @@ public struct FocusScreen: View {
         .onChange(of: controller.hasSession) { _, hasSession in
             if !hasSession { refreshSchedule() }
         }
+    }
+
+    private var lastFinishedBlock: PlanBlock? {
+        guard let latest = sessions.first, latest.state == .finished,
+              let endedAt = latest.endedAt, Calendar.current.isDateInToday(endedAt) else { return nil }
+        return blocks.first { $0.sessionID == latest.id }
     }
 
     private var scheduledBlock: PlanBlock? {

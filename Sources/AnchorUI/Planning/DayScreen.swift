@@ -265,7 +265,7 @@ struct PlanScreen: View {
         #endif
         .modifier(CalendarEventRemovalDialog(request: $removal, onRemove: refresh))
         .onAppear { reloadCheckIns() }
-        .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
+        .onReceive(NotificationCenter.default.publisher(for: .plannerCheckInsChanged)) { _ in reloadCheckIns() }
         .sheet(isPresented: $showsCalendars, onDismiss: {
             refreshRequest = UUID()
         }) {
@@ -291,10 +291,8 @@ struct PlanScreen: View {
         }
         .sheet(item: $checkingEntry) { entry in
             PlannerCheckInSheet(entry: entry, previous: checkIns[entry.id]) { record in
-                guard let store = checkInStore else { throw CocoaError(.fileWriteUnknown) }
-                try store.save(record)
+                try context.savePlannerCheckIn(record)
                 checkIns[record.id] = record
-                NotificationCenter.default.post(name: Self.checkInsChanged, object: nil)
             }
             .anchorTheme()
         }
@@ -388,24 +386,16 @@ struct PlanScreen: View {
         .onChange(of: controller.hasSession) { reconcileSessions() }
     }
 
-    private static let checkInsChanged = Notification.Name("anchor.planner.check-ins.changed")
-
-    private var checkInStore: PlannerCheckInStore? {
-        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
-        return PlannerCheckInStore(storeURL: config.url)
-    }
-
     private func reloadCheckIns() {
         do {
-            let result = try checkInStore?.load()
+            let result = try context.plannerCheckInStore?.load()
             checkIns = result?.records ?? [:]
             checkInLoadFailed = result?.hasUnreadableFiles ?? false
         } catch { checkInLoadFailed = true }
     }
 
     private func openCheckIn(_ block: PlanBlock) {
-        checkingEntry = PlannerCheckIn(id: block.id, title: block.title, plannedStart: block.plannedStart,
-                                       outcome: .successful, reason: "")
+        checkingEntry = PlannerCheckIn(block: block)
     }
 
     private var openBlockers: [PlannerCheckIn] {
