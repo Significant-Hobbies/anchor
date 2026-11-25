@@ -737,7 +737,7 @@ struct DayReviewTests {
 
     @Test("A logged entry is observed lived time, not an invented session")
     func loggedEntryCountsAsObserved() {
-        let start = Fixture.day0.addingTimeInterval(5_400)
+        let start = Fixture.calendar.startOfDay(for: Fixture.day0).addingTimeInterval(5_400)
         let block = PlanBlockRecord(
             id: UUID(),
             title: "Logged lunch walk",
