@@ -21,6 +21,7 @@ struct PlanScreen: View {
     @State private var editorSeed: EditorSeed?
     @State private var showsCustomize = false
     @State private var editingBlock: PlanBlock?
+    @State private var editingCalendarEvent: PlanBlock?
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
@@ -74,7 +75,7 @@ struct PlanScreen: View {
                 dayControls
 
                 let calendarEvents = upcomingCalendarEvents(at: calendarReferenceTime)
-                if !calendarEvents.isEmpty {
+                if Calendar.current.isDateInToday(today), !calendarEvents.isEmpty {
                     upcomingCalendarSection(calendarEvents)
                 }
 
@@ -183,8 +184,10 @@ struct PlanScreen: View {
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
-            PlanBlockEditor(initialDay: block.plannedStart, block: block) { refresh() }
-                .anchorTheme()
+            blockEditor(block)
+        }
+        .sheet(item: $editingCalendarEvent) { event in
+            blockEditor(event)
         }
         .sheet(isPresented: $showsCustomize) {
             TimetableOptionsSheet(routineCount: activeTemplates.count, onChange: refresh)
@@ -251,6 +254,11 @@ struct PlanScreen: View {
         )
     }
 
+    private func blockEditor(_ block: PlanBlock) -> some View {
+        PlanBlockEditor(initialDay: block.plannedStart, block: block) { refresh() }
+            .anchorTheme()
+    }
+
     private func upcomingCalendarSection(_ events: [PlanBlock]) -> some View {
         let previewCount = 3
         return Card {
@@ -263,7 +271,7 @@ struct PlanScreen: View {
                 ForEach(events.prefix(showsAllCalendarEvents ? events.count : previewCount)) { event in
                     Divider()
                     Button {
-                        editingBlock = event
+                        editingCalendarEvent = event
                     } label: {
                         HStack(spacing: Space.sm) {
                             VStack(alignment: .leading, spacing: Space.xxs) {
@@ -413,7 +421,7 @@ struct PlanScreen: View {
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
         guard Calendar.current.isDateInToday(today), !blocks.isEmpty,
-              upcomingCalendarEvents(at: Date()).isEmpty,
+              !upcomingCalendarEvents(at: Date()).contains(where: { $0.plannedStart < dayInterval.end }),
               scrolledDay != today else { return }
         scrolledDay = today
         DispatchQueue.main.async {
