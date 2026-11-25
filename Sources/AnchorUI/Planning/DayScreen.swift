@@ -13,6 +13,8 @@ struct PlanScreen: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @Query(sort: \AnchorPreferences.updatedAt, order: .reverse) private var preferences: [AnchorPreferences]
     @Query private var projects: [Project]
+    private let calendarCoordinator: CalendarSyncCoordinator?
+    @State private var showsCalendars = false
     private let controller: FocusController
     private let onOpenFocus: () -> Void
     @State private var checkIns: [UUID: PlannerCheckIn] = [:]
@@ -33,7 +35,8 @@ struct PlanScreen: View {
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
 
-    init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
+    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, onOpenFocus: @escaping () -> Void) {
+        self.calendarCoordinator = calendarCoordinator
         self.controller = controller
         self.onOpenFocus = onOpenFocus
     }
@@ -177,6 +180,26 @@ struct PlanScreen: View {
         .background(theme.canvas)
         .onAppear { reloadCheckIns() }
         .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
+        .sheet(isPresented: $showsCalendars, onDismiss: {
+            Task { await calendarCoordinator?.sync(context: context, blocks: allBlocks) }
+        }) {
+            if let calendarCoordinator {
+                NavigationStack {
+                    ScrollView { CalendarSettings(coordinator: calendarCoordinator).padding(Space.md) }
+                        .background(theme.canvas)
+                        .navigationTitle("Calendar import")
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showsCalendars = false }
+                            }
+                        }
+                }
+                #if os(macOS)
+                .frame(minWidth: 490, minHeight: 340)
+                #endif
+                .anchorTheme()
+            }
+        }
         .sheet(item: $checkingEntry) { entry in
             PlannerCheckInSheet(entry: entry, previous: checkIns[entry.id]) { record in
                 guard let store = checkInStore else { throw CocoaError(.fileWriteUnknown) }
@@ -399,6 +422,7 @@ struct PlanScreen: View {
                         logTimeButton
                     }
                     HStack {
+                        calendarsButton
                         customizeButton
                         Spacer(minLength: 0)
                     }
@@ -408,10 +432,18 @@ struct PlanScreen: View {
                 HStack(spacing: Space.xs) {
                     copyDayButton
                     logTimeButton
+                    calendarsButton
                     customizeButton
                 }
                 .buttonStyle(QuietButtonStyle(expands: false))
             }
+        }
+    }
+
+    @ViewBuilder private var calendarsButton: some View {
+        if calendarCoordinator != nil {
+            Button("calendars", systemImage: "calendar") { showsCalendars = true }
+                .accessibilityIdentifier("anchor.today.calendars")
         }
     }
 
