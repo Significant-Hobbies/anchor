@@ -567,7 +567,7 @@ public struct RootView: View {
         Group {
             switch tab {
             case .focus: FocusScreen(controller: controller)
-            case .today: TodayScreen(controller: controller) { navigation.select(.focus) }
+            case .today: TodayScreen(controller: controller, calendarCoordinator: calendarCoordinator) { navigation.select(.focus) }
             case .habits: HabitsScreen()
             case .history: HistoryScreen()
             }

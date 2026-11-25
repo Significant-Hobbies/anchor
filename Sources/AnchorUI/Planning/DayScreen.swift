@@ -13,8 +13,13 @@ struct PlanScreen: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @Query(sort: \AnchorPreferences.updatedAt, order: .reverse) private var preferences: [AnchorPreferences]
     @Query private var projects: [Project]
+    private let calendarCoordinator: CalendarSyncCoordinator?
+    @State private var showsCalendars = false
     private let controller: FocusController
     private let onOpenFocus: () -> Void
+    @State private var checkIns: [UUID: PlannerCheckIn] = [:]
+    @State private var checkingEntry: PlannerCheckIn?
+    @State private var checkInLoadFailed = false
     @State private var today = Date()
     @State private var lastCalendarDay = Date()
     @State private var showsCopyDay = false
@@ -30,7 +35,8 @@ struct PlanScreen: View {
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
 
-    init(controller: FocusController, onOpenFocus: @escaping () -> Void) {
+    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, onOpenFocus: @escaping () -> Void) {
+        self.calendarCoordinator = calendarCoordinator
         self.controller = controller
         self.onOpenFocus = onOpenFocus
     }
@@ -61,7 +67,8 @@ struct PlanScreen: View {
                 projectName: projects.first { $0.id == block.projectID }?.name,
                 linkedSession: block.sessionID.flatMap { id in sessions.first { $0.id == id } },
                 hasDifferentActiveSession: controller.hasSession && controller.session?.id != block.sessionID,
-                isCurrent: isCurrent(block)
+                isCurrent: isCurrent(block),
+                outcome: checkIns[block.id]?.outcome
             )
         }
     }
@@ -73,6 +80,12 @@ struct PlanScreen: View {
                 dayHeader
 
                 dayControls
+                if checkInLoadFailed {
+                    Label("Some saved check-ins could not be read on this device.", systemImage: "exclamationmark.triangle")
+                }
+                if !openBlockers.isEmpty {
+                    blockersSection
+                }
 
                 let calendarEvents = upcomingCalendarEvents(at: calendarReferenceTime)
                 if Calendar.current.isDateInToday(today), !calendarEvents.isEmpty {
@@ -95,7 +108,7 @@ struct PlanScreen: View {
                         HStack(spacing: Space.lg) {
                             emptyDayCopy
                             Spacer(minLength: Space.lg)
-                            Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                            Button("add the first entry") { editorSeed = suggestedEntry }
                                 .buttonStyle(PrimaryButtonStyle(expands: false))
                         }
                         #else
@@ -103,12 +116,12 @@ struct PlanScreen: View {
                             HStack(spacing: Space.lg) {
                                 emptyDayCopy
                                 Spacer(minLength: Space.lg)
-                                Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("add the first entry") { editorSeed = suggestedEntry }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                             }
                             VStack(alignment: .leading, spacing: Space.md) {
                                 emptyDayCopy
-                                Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("add the first entry") { editorSeed = suggestedEntry }
                                 .buttonStyle(PrimaryButtonStyle())
                             }
                         }
@@ -122,6 +135,7 @@ struct PlanScreen: View {
                         windowEndHour: timetablePrefs.endHour,
                         showsLivedTrace: timetablePrefs.showsLivedTrace,
                         dimsFinished: timetablePrefs.dimsFinished,
+                        onCheckIn: openCheckIn,
                         onStart: start,
                         onOpenFocus: onOpenFocus,
                         onComplete: complete,
@@ -139,7 +153,7 @@ struct PlanScreen: View {
         }
         .safeAreaInset(edge: .bottom) {
             if !blocks.isEmpty {
-                Button("add an entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                Button("add an entry") { editorSeed = suggestedEntry }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Space.lg)
                     .padding(.vertical, Space.xs)
@@ -164,6 +178,37 @@ struct PlanScreen: View {
         .onChange(of: today) { _, _ in scrolledDay = nil }
         }
         .background(theme.canvas)
+        .onAppear { reloadCheckIns() }
+        .onReceive(NotificationCenter.default.publisher(for: Self.checkInsChanged)) { _ in reloadCheckIns() }
+        .sheet(isPresented: $showsCalendars, onDismiss: {
+            Task { await calendarCoordinator?.sync(context: context, blocks: allBlocks) }
+        }) {
+            if let calendarCoordinator {
+                NavigationStack {
+                    ScrollView { CalendarSettings(coordinator: calendarCoordinator).padding(Space.md) }
+                        .background(theme.canvas)
+                        .navigationTitle("Calendar import")
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Done") { showsCalendars = false }
+                            }
+                        }
+                }
+                #if os(macOS)
+                .frame(minWidth: 490, minHeight: 340)
+                #endif
+                .anchorTheme()
+            }
+        }
+        .sheet(item: $checkingEntry) { entry in
+            PlannerCheckInSheet(entry: entry, previous: checkIns[entry.id]) { record in
+                guard let store = checkInStore else { throw CocoaError(.fileWriteUnknown) }
+                try store.save(record)
+                checkIns[record.id] = record
+                NotificationCenter.default.post(name: Self.checkInsChanged, object: nil)
+            }
+            .anchorTheme()
+        }
         .sheet(isPresented: $showsCopyDay) {
             CopyDaySheet(sourceDay: today, entryCount: blocks.count) { destination in
                 do {
@@ -180,7 +225,7 @@ struct PlanScreen: View {
         }
         .onChange(of: today) { refresh() }
         .sheet(item: $editorSeed) { seed in
-            PlanBlockEditor(initialDay: today, suggestedStart: seed.start) { refresh() }
+            PlanBlockEditor(initialDay: today, suggestedStart: seed.start, suggestedMinutes: seed.minutes, dayIsFull: seed.dayIsFull) { refresh() }
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
@@ -242,6 +287,69 @@ struct PlanScreen: View {
             }
         }
         .onChange(of: controller.hasSession) { reconcileSessions() }
+    }
+
+    private static let checkInsChanged = Notification.Name("anchor.planner.check-ins.changed")
+
+    private var checkInStore: PlannerCheckInStore? {
+        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
+        return PlannerCheckInStore(storeURL: config.url)
+    }
+
+    private func reloadCheckIns() {
+        do {
+            let result = try checkInStore?.load()
+            checkIns = result?.records ?? [:]
+            checkInLoadFailed = result?.hasUnreadableFiles ?? false
+        } catch { checkInLoadFailed = true }
+    }
+
+    private func openCheckIn(_ block: PlanBlock) {
+        checkingEntry = PlannerCheckIn(id: block.id, title: block.title, plannedStart: block.plannedStart,
+                                       outcome: .successful, reason: "")
+    }
+
+    private var openBlockers: [PlannerCheckIn] {
+        let blocked = checkIns.values.filter { $0.outcome == .blocked }
+        guard !blocked.isEmpty else { return [] }
+        let blocksByID = Dictionary(allBlocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return blocked.map { record in
+            guard let block = blocksByID[record.id] else { return record }
+            var current = record
+            current.title = block.title
+            current.plannedStart = block.plannedStart
+            return current
+        }.sorted {
+            ($0.plannedStart, $0.title) < ($1.plannedStart, $1.title)
+        }
+    }
+
+    private var blockersSection: some View {
+        Card {
+            VStack(alignment: .leading, spacing: Space.sm) {
+                Label("Open blockers", systemImage: "pause.circle").font(.headline)
+                ForEach(openBlockers) { item in
+                    Divider()
+                    Button {
+                        checkingEntry = item
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text(item.title).font(.subheadline.weight(.semibold))
+                                Text(item.reason).font(.subheadline)
+                                Text(item.plannedStart.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption).foregroundStyle(theme.textSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(theme.textSecondary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Edit this check-in")
+                }
+            }
+        }
     }
 
     private var dayHeader: some View {
@@ -324,6 +432,7 @@ struct PlanScreen: View {
                         logTimeButton
                     }
                     HStack {
+                        calendarsButton
                         customizeButton
                         Spacer(minLength: 0)
                     }
@@ -333,10 +442,18 @@ struct PlanScreen: View {
                 HStack(spacing: Space.xs) {
                     copyDayButton
                     logTimeButton
+                    calendarsButton
                     customizeButton
                 }
                 .buttonStyle(QuietButtonStyle(expands: false))
             }
+        }
+    }
+
+    @ViewBuilder private var calendarsButton: some View {
+        if calendarCoordinator != nil {
+            Button("calendars", systemImage: "calendar") { showsCalendars = true }
+                .accessibilityIdentifier("anchor.today.calendars")
         }
     }
 
@@ -404,14 +521,18 @@ struct PlanScreen: View {
         .accessibilityIdentifier("anchor.today.completion")
     }
 
-    private var suggestedStart: Date {
+    private var suggestedEntry: EditorSeed {
         let calendar = Calendar.current
         let now = Date()
         let base = calendar.isDate(now, inSameDayAs: today) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
         let minute = calendar.component(.minute, from: base)
-        let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: base) ?? base
-        let latestEnd = blocks.map { $0.plannedStart.addingTimeInterval(Double($0.plannedSeconds)) }.max()
-        return max(rounded, latestEnd ?? rounded)
+        let wholeMinute = calendar.dateInterval(of: .minute, for: base)?.start ?? base
+        let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: wholeMinute) ?? wholeMinute
+        let opening = PlannerGap.opening(from: rounded, until: dayInterval.end,
+            occupied: allBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
+                .map { DateInterval(start: $0.plannedStart, end: $0.plannedEnd) })
+        if let opening { return EditorSeed(start: opening.start, minutes: Int(opening.duration / 60)) }
+        return EditorSeed(start: min(rounded, dayInterval.end.addingTimeInterval(-60)), dayIsFull: true)
     }
 
     private func isCurrent(_ block: PlanBlock) -> Bool {
@@ -421,6 +542,7 @@ struct PlanScreen: View {
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
         guard Calendar.current.isDateInToday(today), !blocks.isEmpty,
+              openBlockers.isEmpty,
               !upcomingCalendarEvents(at: Date()).contains(where: { $0.plannedStart < dayInterval.end }),
               scrolledDay != today else { return }
         scrolledDay = today
@@ -498,6 +620,8 @@ struct PlanScreen: View {
 private struct EditorSeed: Identifiable {
     let id = UUID()
     let start: Date
+    var minutes = 30
+    var dayIsFull = false
 }
 
 /// How Today draws its timetable. The choices live on `AnchorPreferences`, so
@@ -700,6 +824,7 @@ struct PlanBlockEditor: View {
     private let block: PlanBlock?
     private let template: ScheduleTemplate?
     private let placingHabit: ScheduleTemplate?
+    private let fullDaySuggestedStart: Date?
     private let isBehaviorHabit: Bool
     private let initialDay: Date
     private let onSave: () -> Void
@@ -707,6 +832,8 @@ struct PlanBlockEditor: View {
     init(
         initialDay: Date,
         suggestedStart: Date? = nil,
+        suggestedMinutes: Int = 30,
+        dayIsFull: Bool = false,
         block: PlanBlock? = nil,
         template: ScheduleTemplate? = nil,
         placingHabit: ScheduleTemplate? = nil,
@@ -736,7 +863,7 @@ struct PlanBlockEditor: View {
         _details = State(initialValue: block?.details ?? sourceTemplate?.details ?? "")
         _selectedProjectID = State(initialValue: block?.projectID ?? sourceTemplate?.projectID)
         _plannedStart = State(initialValue: suggested)
-        _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? 1_800) / 60))
+        _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? suggestedMinutes * 60) / 60))
         _kind = State(initialValue: startsBehaviorHabit ? .routine : (block?.kind ?? sourceTemplate?.kind ?? .focus))
         _flexibility = State(initialValue: block?.flexibility ?? sourceTemplate?.flexibility ?? .flexible)
         _repeats = State(initialValue: template != nil || startsRecurring || startsBehaviorHabit)
@@ -748,6 +875,7 @@ struct PlanBlockEditor: View {
         self.template = template
         self.placingHabit = placingHabit
         self.isBehaviorHabit = startsBehaviorHabit || template?.isBehaviorHabit == true
+        self.fullDaySuggestedStart = dayIsFull ? suggestedStart : nil
         self.initialDay = initialDay
         self.onSave = onSave
     }
@@ -756,6 +884,10 @@ struct PlanBlockEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.lg) {
+                if plannedStart == fullDaySuggestedStart {
+                    Label("No suggested opening from this time. Choose a different start or day.", systemImage: "calendar.badge.clock")
+                        .font(.callout).foregroundStyle(theme.caution)
+                }
                 if block?.templateID != nil {
                     Label("this changes today only. your usual week stays intact.", systemImage: "calendar.badge.clock")
                         .font(.footnote.weight(.medium))
