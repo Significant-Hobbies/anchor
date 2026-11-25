@@ -526,7 +526,8 @@ struct PlanScreen: View {
         let now = Date()
         let base = calendar.isDate(now, inSameDayAs: today) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
         let minute = calendar.component(.minute, from: base)
-        let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: base) ?? base
+        let wholeMinute = calendar.dateInterval(of: .minute, for: base)?.start ?? base
+        let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: wholeMinute) ?? wholeMinute
         let opening = PlannerGap.opening(from: rounded, until: dayInterval.end,
             occupied: allBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
                 .map { DateInterval(start: $0.plannedStart, end: $0.plannedEnd) })
