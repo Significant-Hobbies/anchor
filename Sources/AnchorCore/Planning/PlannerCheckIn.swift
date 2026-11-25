@@ -40,19 +40,26 @@ public struct PlannerCheckInStore {
         directory = storeURL.appendingPathExtension("planner-check-ins")
     }
 
-    public func load() throws -> [UUID: PlannerCheckIn] {
+    public func load() throws -> (records: [UUID: PlannerCheckIn], hasUnreadableFiles: Bool) {
         let files: [URL]
         do {
             files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
         } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
-            return [:]
+            return ([:], false)
         }
         var records: [UUID: PlannerCheckIn] = [:]
+        var hasUnreadableFiles = false
         for file in files where file.pathExtension == "json" {
-            let record = try JSONDecoder().decode(PlannerCheckIn.self, from: Data(contentsOf: file))
-            records[record.id] = record
+            do {
+                let record = try JSONDecoder().decode(PlannerCheckIn.self, from: Data(contentsOf: file))
+                guard UUID(uuidString: file.deletingPathExtension().lastPathComponent) == record.id else {
+                    hasUnreadableFiles = true
+                    continue
+                }
+                records[record.id] = record
+            } catch { hasUnreadableFiles = true }
         }
-        return records
+        return (records, hasUnreadableFiles)
     }
 
     public func save(_ record: PlannerCheckIn) throws {
@@ -67,18 +74,28 @@ public struct PlannerCheckInStore {
         try folder.setResourceValues(values)
         let file = folder.appendingPathComponent(record.id.uuidString + ".json")
         try JSONEncoder().encode(record).write(to: file, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     }
 }
 
 public enum PlannerGap {
-    /// First opening for the editor's default 30-minute block. Keep the editor
-    /// on the chosen day even when no full opening remains.
-    public static func suggestedStart(from start: Date, until end: Date, occupied: [DateInterval]) -> Date {
+    /// Prefer a full half hour, otherwise use the longest remaining opening
+    /// that fits the editor's five-minute duration increments.
+    public static func opening(from start: Date, until end: Date, occupied: [DateInterval]) -> DateInterval? {
         var candidate = start
-        for interval in occupied.sorted(by: { $0.start < $1.start }) where interval.end > candidate {
-            if candidate.addingTimeInterval(1800) <= interval.start { break }
-            candidate = interval.end
+        var best: DateInterval?
+        func consider(until boundary: Date) {
+            let seconds = min(1800, floor(boundary.timeIntervalSince(candidate) / 300) * 300)
+            if seconds >= 300 && seconds > (best?.duration ?? 0) {
+                best = DateInterval(start: candidate, duration: seconds)
+            }
         }
-        return candidate.addingTimeInterval(1800) <= end ? candidate : min(start, end.addingTimeInterval(-60))
+        for interval in occupied.sorted(by: { $0.start < $1.start }) where interval.end > candidate {
+            consider(until: min(interval.start, end))
+            if best?.duration == 1800 || interval.start >= end { return best }
+            candidate = max(candidate, interval.end)
+        }
+        consider(until: end)
+        return best
     }
 }

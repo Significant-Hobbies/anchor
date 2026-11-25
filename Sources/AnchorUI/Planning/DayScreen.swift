@@ -81,7 +81,7 @@ struct PlanScreen: View {
 
                 dayControls
                 if checkInLoadFailed {
-                    Label("Couldn’t read saved check-ins on this device.", systemImage: "exclamationmark.triangle")
+                    Label("Some saved check-ins could not be read on this device.", systemImage: "exclamationmark.triangle")
                 }
                 if !openBlockers.isEmpty {
                     blockersSection
@@ -108,7 +108,7 @@ struct PlanScreen: View {
                         HStack(spacing: Space.lg) {
                             emptyDayCopy
                             Spacer(minLength: Space.lg)
-                            Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                            Button("add the first entry") { editorSeed = suggestedEntry }
                                 .buttonStyle(PrimaryButtonStyle(expands: false))
                         }
                         #else
@@ -116,12 +116,12 @@ struct PlanScreen: View {
                             HStack(spacing: Space.lg) {
                                 emptyDayCopy
                                 Spacer(minLength: Space.lg)
-                                Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("add the first entry") { editorSeed = suggestedEntry }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                             }
                             VStack(alignment: .leading, spacing: Space.md) {
                                 emptyDayCopy
-                                Button("add the first entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                                Button("add the first entry") { editorSeed = suggestedEntry }
                                 .buttonStyle(PrimaryButtonStyle())
                             }
                         }
@@ -153,7 +153,7 @@ struct PlanScreen: View {
         }
         .safeAreaInset(edge: .bottom) {
             if !blocks.isEmpty {
-                Button("add an entry") { editorSeed = EditorSeed(start: suggestedStart) }
+                Button("add an entry") { editorSeed = suggestedEntry }
                     .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal, Space.lg)
                     .padding(.vertical, Space.xs)
@@ -225,7 +225,7 @@ struct PlanScreen: View {
         }
         .onChange(of: today) { refresh() }
         .sheet(item: $editorSeed) { seed in
-            PlanBlockEditor(initialDay: today, suggestedStart: seed.start) { refresh() }
+            PlanBlockEditor(initialDay: today, suggestedStart: seed.start, suggestedMinutes: seed.minutes, dayIsFull: seed.dayIsFull) { refresh() }
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
@@ -298,8 +298,9 @@ struct PlanScreen: View {
 
     private func reloadCheckIns() {
         do {
-            checkIns = try checkInStore?.load() ?? [:]
-            checkInLoadFailed = false
+            let result = try checkInStore?.load()
+            checkIns = result?.records ?? [:]
+            checkInLoadFailed = result?.hasUnreadableFiles ?? false
         } catch { checkInLoadFailed = true }
     }
 
@@ -309,7 +310,16 @@ struct PlanScreen: View {
     }
 
     private var openBlockers: [PlannerCheckIn] {
-        checkIns.values.filter { $0.outcome == .blocked }.sorted {
+        let blocked = checkIns.values.filter { $0.outcome == .blocked }
+        guard !blocked.isEmpty else { return [] }
+        let blocksByID = Dictionary(allBlocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return blocked.map { record in
+            guard let block = blocksByID[record.id] else { return record }
+            var current = record
+            current.title = block.title
+            current.plannedStart = block.plannedStart
+            return current
+        }.sorted {
             ($0.plannedStart, $0.title) < ($1.plannedStart, $1.title)
         }
     }
@@ -511,15 +521,17 @@ struct PlanScreen: View {
         .accessibilityIdentifier("anchor.today.completion")
     }
 
-    private var suggestedStart: Date {
+    private var suggestedEntry: EditorSeed {
         let calendar = Calendar.current
         let now = Date()
         let base = calendar.isDate(now, inSameDayAs: today) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
         let minute = calendar.component(.minute, from: base)
         let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: base) ?? base
-        return PlannerGap.suggestedStart(from: rounded, until: dayInterval.end,
+        let opening = PlannerGap.opening(from: rounded, until: dayInterval.end,
             occupied: allBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
                 .map { DateInterval(start: $0.plannedStart, end: $0.plannedEnd) })
+        if let opening { return EditorSeed(start: opening.start, minutes: Int(opening.duration / 60)) }
+        return EditorSeed(start: min(rounded, dayInterval.end.addingTimeInterval(-60)), dayIsFull: true)
     }
 
     private func isCurrent(_ block: PlanBlock) -> Bool {
@@ -607,6 +619,8 @@ struct PlanScreen: View {
 private struct EditorSeed: Identifiable {
     let id = UUID()
     let start: Date
+    var minutes = 30
+    var dayIsFull = false
 }
 
 /// How Today draws its timetable. The choices live on `AnchorPreferences`, so
@@ -809,6 +823,7 @@ struct PlanBlockEditor: View {
     private let block: PlanBlock?
     private let template: ScheduleTemplate?
     private let placingHabit: ScheduleTemplate?
+    private let dayIsFull: Bool
     private let isBehaviorHabit: Bool
     private let initialDay: Date
     private let onSave: () -> Void
@@ -816,6 +831,8 @@ struct PlanBlockEditor: View {
     init(
         initialDay: Date,
         suggestedStart: Date? = nil,
+        suggestedMinutes: Int = 30,
+        dayIsFull: Bool = false,
         block: PlanBlock? = nil,
         template: ScheduleTemplate? = nil,
         placingHabit: ScheduleTemplate? = nil,
@@ -845,7 +862,7 @@ struct PlanBlockEditor: View {
         _details = State(initialValue: block?.details ?? sourceTemplate?.details ?? "")
         _selectedProjectID = State(initialValue: block?.projectID ?? sourceTemplate?.projectID)
         _plannedStart = State(initialValue: suggested)
-        _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? 1_800) / 60))
+        _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? suggestedMinutes * 60) / 60))
         _kind = State(initialValue: startsBehaviorHabit ? .routine : (block?.kind ?? sourceTemplate?.kind ?? .focus))
         _flexibility = State(initialValue: block?.flexibility ?? sourceTemplate?.flexibility ?? .flexible)
         _repeats = State(initialValue: template != nil || startsRecurring || startsBehaviorHabit)
@@ -857,6 +874,7 @@ struct PlanBlockEditor: View {
         self.template = template
         self.placingHabit = placingHabit
         self.isBehaviorHabit = startsBehaviorHabit || template?.isBehaviorHabit == true
+        self.dayIsFull = dayIsFull
         self.initialDay = initialDay
         self.onSave = onSave
     }
@@ -865,6 +883,10 @@ struct PlanBlockEditor: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.lg) {
+                if dayIsFull {
+                    Label("No open slot remains. Choose a time to overlap another entry or select a different day.", systemImage: "calendar.badge.clock")
+                        .font(.callout).foregroundStyle(theme.caution)
+                }
                 if block?.templateID != nil {
                     Label("this changes today only. your usual week stays intact.", systemImage: "calendar.badge.clock")
                         .font(.footnote.weight(.medium))

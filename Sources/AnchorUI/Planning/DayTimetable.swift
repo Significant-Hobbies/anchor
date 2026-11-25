@@ -492,8 +492,8 @@ private struct TimetableBlockCard: View {
     }
 
     private var stateSymbol: String {
+        if entry.linkedSession?.isActive == true || block.state == .inProgress { return "timer" }
         if let outcome = entry.outcome { return outcome.symbol }
-        if entry.linkedSession?.isActive == true { return "timer" }
         return switch block.state {
         case .planned: "play.circle.fill"
         case .inProgress: "timer"
@@ -532,9 +532,12 @@ private struct TimetableBlockCard: View {
     }
 
     private var actionLabel: String {
+        if entry.linkedSession?.isActive == true || block.state == .inProgress {
+            let outcome = entry.outcome.map { ". " + $0.rawValue } ?? ""
+            return "Timer active. Actions for \(block.title)\(outcome)"
+        }
         if let outcome = entry.outcome { return "\(outcome.rawValue). Actions for \(block.title)" }
         if entry.hasDifferentActiveSession { return "Actions for \(block.title); another session is active" }
-        if entry.linkedSession?.isActive == true { return "Open timer for \(block.title)" }
         return "Actions for \(block.title)"
     }
 }
