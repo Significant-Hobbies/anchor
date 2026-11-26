@@ -22,7 +22,9 @@ struct PlannerStartReminderSettings: View {
                 }
                 .accessibilityIdentifier("anchor.planner.reminder-lead")
                 if lead >= 0 {
-                    Text("For upcoming entries on this device, including selected calendars.")
+                    Text(authorization == .authorized && !alertsDisabled
+                         ? "Alerts are on for upcoming entries and selected calendars on this device."
+                         : "For upcoming entries on this device, including selected calendars.")
                         .font(.caption).foregroundStyle(.secondary)
                     if authorization == .notDetermined {
                         Button("Allow notifications") {

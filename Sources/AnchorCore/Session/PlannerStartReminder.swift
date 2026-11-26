@@ -106,7 +106,14 @@ extension SystemSessionCompletionNotifier {
         guard nextStartReminderUpdate == nil else { return }
         let ids = Set(desired.map(\.identifier))
         let stale = ours.map(\.identifier).filter { !ids.contains($0) }
-        if !stale.isEmpty { center.removePendingNotificationRequests(withIdentifiers: stale) }
+        if !stale.isEmpty {
+            center.removePendingNotificationRequests(withIdentifiers: stale)
+            // A canceled alert never fired. Re-enabling this calendar or its reminders
+            // inside the lead window must still allow the at-start fallback.
+            for id in stale where scheduled[id].map({ $0.fire > now }) == true {
+                scheduled.removeValue(forKey: id)
+            }
+        }
         let existing = Dictionary(uniqueKeysWithValues: ours.map { ($0.identifier, $0) })
         for request in desired {
             if let old = existing[request.identifier], old.content.title == request.content.title,
