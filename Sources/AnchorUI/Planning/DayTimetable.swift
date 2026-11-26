@@ -11,6 +11,16 @@ enum TimetableLayout {
         var laneCount: Int
     }
 
+    static func selection(from startY: CGFloat, to endY: CGFloat, hourHeight: CGFloat, range: DateInterval) -> DateInterval {
+        let quarter: TimeInterval = 15 * 60
+        func snap(_ y: CGFloat) -> TimeInterval {
+            min(range.duration, max(0, (y / hourHeight * 4).rounded() * quarter))
+        }
+        let start = min(range.duration - quarter, snap(min(startY, endY)))
+        let end = max(start + quarter, snap(max(startY, endY)))
+        return DateInterval(start: range.start.addingTimeInterval(start), duration: end - start)
+    }
+
     /// Greedy lane packing inside each overlap cluster. A new cluster begins
     /// when an interval starts at or after the running latest end, so separate
     /// clusters never share lanes. Results are keyed by input index.
@@ -115,7 +125,8 @@ struct DayTimetable: View {
     var onRemove: (PlanBlock) -> Void = { _ in }
     var onExplain: (PlanBlock) -> Void = { _ in }
     var onLogActual: (PlanBlock) -> Void = { _ in }
-    var onAddAt: (Date) -> Void = { _ in }
+    var onAddAt: (DateInterval) -> Void = { _ in }
+    @GestureState private var selection: DateInterval?
 
     static let nowAnchorID = "anchor.timetable.now"
 
@@ -192,17 +203,9 @@ struct DayTimetable: View {
             ZStack(alignment: .topLeading) {
                 hourMarks(width: proxy.size.width)
 
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { location in
-                        onAddAt(date(forYOffset: location.y))
-                    }
+                selectionSurface
                     .frame(width: gridWidth, height: totalHeight)
                     .offset(x: gridX)
-                    // Deliberately not an accessibility element: a full-grid
-                    // overlay swallows hit-tests for the block cards beneath
-                    // it. Tap-to-add stays mouse/trackpad-only; explicit Add
-                    // controls cover everyone else.
                     .accessibilityHidden(true)
 
                 if showsLivedTrace {
@@ -219,6 +222,20 @@ struct DayTimetable: View {
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
                         y: cardTop(for: entry)
                     )
+                }
+
+                if let selection {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(theme.accent.opacity(0.22))
+                        .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(theme.accent) }
+                        .overlay(alignment: .topLeading) {
+                            Text("\(selection.start.formatted(date: .omitted, time: .shortened)) – \(selection.end.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption2.monospacedDigit()).padding(.horizontal, 4)
+                        }
+                        .frame(width: gridWidth, height: selection.duration / 3600 * hourHeight)
+                        .offset(x: gridX, y: offset(for: selection.start))
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
 
                 if Calendar.current.isDateInToday(day) {
@@ -240,9 +257,30 @@ struct DayTimetable: View {
         CGFloat(date.timeIntervalSince(range.start) / 3600) * hourHeight
     }
 
-    private func date(forYOffset y: CGFloat) -> Date {
-        let snapped = (y / hourHeight * 3600 / 900).rounded() * 900
-        return range.start.addingTimeInterval(snapped)
+    private func interval(for drag: DragGesture.Value) -> DateInterval {
+        TimetableLayout.selection(from: drag.startLocation.y, to: drag.location.y, hourHeight: hourHeight, range: range)
+    }
+
+    private var selectionSurface: some View {
+        let surface = Color.clear.contentShape(Rectangle())
+        #if os(macOS)
+        return surface.gesture(DragGesture(minimumDistance: 0)
+            .updating($selection) { drag, selected, _ in selected = interval(for: drag) }
+            .onEnded { onAddAt(interval(for: $0)) })
+        #else
+        // A finger swipe scrolls immediately. A deliberate hold starts a selection.
+        let draw = LongPressGesture(minimumDuration: 0.3)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .updating($selection) { value, selected, _ in
+                if case .second(true, let drag?) = value { selected = interval(for: drag) }
+            }
+            .onEnded { value in
+                if case .second(true, let drag?) = value { onAddAt(interval(for: drag)) }
+            }
+        return surface.gesture(draw.exclusively(before: SpatialTapGesture().onEnded { tap in
+            onAddAt(TimetableLayout.selection(from: tap.location.y, to: tap.location.y, hourHeight: hourHeight, range: range))
+        }))
+        #endif
     }
 
     private func cardTop(for entry: Entry) -> CGFloat {

@@ -188,25 +188,24 @@ struct PlanScreen: View {
                             }
                             #endif
                         }
-                    } else {
-                        DayTimetable(
-                            day: today,
-                            entries: timetableEntries,
-                            windowStartHour: timetablePrefs.startHour,
-                            windowEndHour: timetablePrefs.endHour,
-                            showsLivedTrace: timetablePrefs.showsLivedTrace,
-                            dimsFinished: timetablePrefs.dimsFinished,
-                            onCheckIn: openCheckIn,
-                            onStart: start,
-                            onOpenFocus: onOpenFocus,
-                            onComplete: complete,
-                            onEdit: { editingBlock = $0 },
-                            onRemove: { removal = CalendarEventRemoval($0) },
-                            onExplain: { explainingBlock = $0 },
-                            onLogActual: { loggingBlock = $0 },
-                            onAddAt: { editorSeed = EditorSeed(start: $0) }
-                        )
                     }
+                    DayTimetable(
+                        day: today,
+                        entries: timetableEntries,
+                        windowStartHour: timetablePrefs.startHour,
+                        windowEndHour: timetablePrefs.endHour,
+                        showsLivedTrace: timetablePrefs.showsLivedTrace,
+                        dimsFinished: timetablePrefs.dimsFinished,
+                        onCheckIn: openCheckIn,
+                        onStart: start,
+                        onOpenFocus: onOpenFocus,
+                        onComplete: complete,
+                        onEdit: { editingBlock = $0 },
+                        onRemove: { removal = CalendarEventRemoval($0) },
+                        onExplain: { explainingBlock = $0 },
+                        onLogActual: { loggingBlock = $0 },
+                        onAddAt: { editorSeed = EditorSeed(start: $0.start, minutes: Int($0.duration / 60)) }
+                    )
 
                 }
             }
@@ -433,12 +432,20 @@ struct PlanScreen: View {
         }
     }
 
+    private var timetableHint: String {
+        #if os(macOS)
+        "Drag across an open time to add an entry in 15-minute steps."
+        #else
+        "Touch and hold an open time, then drag in 15-minute steps."
+        #endif
+    }
+
     private var dayHeader: some View {
         DoodleScene(
             "TodayDoodle",
             eyebrow: today.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
             title: "Draw the day",
-            message: "Everything this day asks of you, laid out on the clock.",
+            message: timetableHint,
             compact: true
         )
     }
@@ -949,6 +956,7 @@ struct PlanBlockEditor: View {
     private let block: PlanBlock?
     private let template: ScheduleTemplate?
     private let placingHabit: ScheduleTemplate?
+    private let maximumMinutes: Int
     private let fullDaySuggestedStart: Date?
     private let isBehaviorHabit: Bool
     private let initialDay: Date
@@ -988,7 +996,9 @@ struct PlanBlockEditor: View {
         _details = State(initialValue: block?.details ?? sourceTemplate?.details ?? "")
         _selectedProjectID = State(initialValue: block?.projectID ?? sourceTemplate?.projectID)
         _plannedStart = State(initialValue: suggested)
-        _minutes = State(initialValue: max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? suggestedMinutes * 60) / 60))
+        let initialMinutes = max(5, (block?.plannedSeconds ?? sourceTemplate?.plannedSeconds ?? suggestedMinutes * 60) / 60)
+        _minutes = State(initialValue: initialMinutes)
+        maximumMinutes = max(240, initialMinutes)
         _kind = State(initialValue: startsBehaviorHabit ? .routine : (block?.kind ?? sourceTemplate?.kind ?? .focus))
         _flexibility = State(initialValue: block?.flexibility ?? sourceTemplate?.flexibility ?? .flexible)
         _repeats = State(initialValue: template != nil || startsRecurring || startsBehaviorHabit)
@@ -1100,7 +1110,7 @@ struct PlanBlockEditor: View {
                                 }
                                 VStack(alignment: .leading, spacing: Space.xxs) {
                                     Text("DURATION").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
-                                    Stepper("\(minutes) min", value: $minutes, in: 5...240, step: 5)
+                                    Stepper("\(minutes) min", value: $minutes, in: 5...maximumMinutes, step: 5)
                                         .font(.subheadline.weight(.semibold))
                                         .monospacedDigit()
                                 }
