@@ -30,12 +30,18 @@ final class AnchorIOSUITests: XCTestCase {
             XCTFail("Tapping the entry title must open the keyboard before typing")
             return
         }
+        // Fresh simulator keyboards can present Apple's QuickPath introduction
+        // over the app. Finish that system prompt before exercising entry input.
+        let keyboardIntroduction = app.staticTexts[
+            "Speed up your typing by sliding your finger across the letters to compose a word."
+        ]
+        if keyboardIntroduction.waitForExistence(timeout: 2) {
+            app.buttons["Continue"].tap()
+            XCTAssertTrue(keyboardIntroduction.waitForNonExistence(timeout: 3))
+        }
         title.typeText("Read the next chapter")
-        let enteredTitle = app.textFields.matching(
-            NSPredicate(format: "value == %@", "Read the next chapter")
-        ).firstMatch
-        XCTAssertTrue(enteredTitle.waitForExistence(timeout: 3),
-                      "The entry title must contain the intended text before saving")
+        XCTAssertEqual(title.value as? String, "Read the next chapter",
+                       "The entry title must contain the intended text before saving")
         app.buttons.ci("Save").tap()
         XCTAssertTrue(app.staticTexts.ci("Read the next chapter").waitForExistence(timeout: 4))
         app.buttons.ci("anchor.today.copy-day").tap()
