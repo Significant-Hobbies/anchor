@@ -56,10 +56,9 @@ public struct ScheduledFocusResolver: Sendable {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> PlanBlockRecord? {
-        let day = calendar.dateInterval(of: .day, for: now)
         let open = blocks
             .filter { block in
-                (day?.contains(block.plannedStart) ?? calendar.isDate(block.plannedStart, inSameDayAs: now))
+                calendar.isDate(block.plannedStart, inSameDayAs: now)
                     && (block.externalEventKey == nil || block.plannedSeconds < 86_400 || block.state == .inProgress)
                     && block.state != .completed
                     && block.state != .skipped
@@ -72,7 +71,6 @@ public struct ScheduledFocusResolver: Sendable {
             $0.plannedStart <= now
                 && now < $0.plannedStart.addingTimeInterval(TimeInterval($0.plannedSeconds))
         }) { return current }
-        if let upcoming = open.first(where: { $0.plannedStart > now }) { return upcoming }
-        return open.last
+        return open.first { $0.plannedStart > now }
     }
 }

@@ -575,7 +575,7 @@ struct DayPlanTests {
         }
     }
 
-    @Test("Focus resolves the active, current, upcoming, then last unfinished block")
+    @Test("Focus resolves the active, current and upcoming blocks and lets expired plans pass")
     func scheduledFocusResolution() {
         let resolver = ScheduledFocusResolver()
         let now = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: Date(timeIntervalSince1970: 1_704_067_200))!
@@ -592,7 +592,8 @@ struct DayPlanTests {
         var completedCurrent = current
         completedCurrent.state = .completed
         #expect(resolver.nextBlock(from: [early, completedCurrent, upcoming], now: now, calendar: calendar)?.id == upcoming.id)
-        #expect(resolver.nextBlock(from: [early], now: now, calendar: calendar)?.id == early.id)
+        #expect(resolver.nextBlock(from: [early], now: now, calendar: calendar) == nil)
+        #expect(resolver.nextBlock(from: [current], now: current.plannedStart.addingTimeInterval(1800), calendar: calendar) == nil)
     }
 }
 
