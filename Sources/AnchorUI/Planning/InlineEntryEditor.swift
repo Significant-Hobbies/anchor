@@ -11,6 +11,12 @@ struct InlineEntryEditor: View {
     let cancel: () -> Void
     let options: () -> Void
 
+    #if os(macOS)
+    private let actionSize: CGFloat = 24
+    #else
+    private let actionSize: CGFloat = 44
+    #endif
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: Space.xs) {
@@ -20,13 +26,13 @@ struct InlineEntryEditor: View {
                     .focused($focused)
                     .submitLabel(.done)
                     .onSubmit(save)
-                Button(action: save) { Image(systemName: "checkmark") }
+                Button(action: save) { actionIcon("checkmark") }
                     .accessibilityLabel("Save")
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 Menu {
                     Button("More options…", action: options)
                     Button("Cancel", action: cancel)
-                } label: { Image(systemName: "ellipsis.circle") }
+                } label: { actionIcon("ellipsis.circle") }
                 #if os(macOS)
                 .menuStyle(.borderlessButton)
                 #endif
@@ -54,6 +60,12 @@ struct InlineEntryEditor: View {
         #if os(macOS)
         .onExitCommand(perform: cancel)
         #endif
+    }
+
+    private func actionIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .frame(width: actionSize, height: actionSize)
+            .contentShape(Rectangle())
     }
 }
 #endif

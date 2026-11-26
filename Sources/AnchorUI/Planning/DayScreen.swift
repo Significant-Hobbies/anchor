@@ -666,6 +666,9 @@ struct PlanScreen: View {
     }
 
     private func beginDraft(_ seed: EditorSeed) {
+        if let previous = editorSeed, !Calendar.current.isDate(previous.start, inSameDayAs: seed.start) {
+            draftTitle = ""
+        }
         draftError = nil
         editorSeed = seed
     }
