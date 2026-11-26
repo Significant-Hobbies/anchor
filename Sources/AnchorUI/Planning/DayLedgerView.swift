@@ -12,6 +12,7 @@ struct DayLedgerView: View {
     let blocks: [PlanBlock]
     let sessions: [FocusSession]
     let allBlocks: [PlanBlock]
+    var hidesCalendarPlans = false
     @Environment(\.modelContext) private var context
     @Environment(\.anchorTheme) private var theme
     @State private var saved: [DayLedgerEntry] = []
@@ -73,7 +74,9 @@ struct DayLedgerView: View {
                 Button("Reload entries", action: reload)
             }
             if !unavailable {
-                let localPlanIDs = Set(comparison.plans.map(\.id))
+                let hiddenPlanIDs = hidesCalendarPlans ? Set(blocks.filter { $0.externalEventKey != nil }.map(\.id)) : []
+                let visiblePlans = comparison.plans.filter { !hiddenPlanIDs.contains($0.id) }
+                let localPlanIDs = Set(visiblePlans.map(\.id))
                 let actualByID = Dictionary(allActuals.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
                 let planByID = Dictionary(allPlans.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
                 pair {
@@ -82,11 +85,11 @@ struct DayLedgerView: View {
                     Text("What happened").font(.headline)
                 }
                 Divider()
-                if comparison.plans.isEmpty && comparison.actuals.isEmpty {
-                    pair { Text("Nothing planned") } right: { Text("Log an actual entry.") }
+                if visiblePlans.isEmpty && comparison.actuals.isEmpty {
+                    pair { Text(comparison.plans.isEmpty ? "Nothing planned" : "Calendar events hidden") } right: { Text("Log an actual entry.") }
                         .font(.callout).foregroundStyle(theme.textSecondary)
                 }
-                ForEach(comparison.plans) { plan in
+                ForEach(visiblePlans) { plan in
                     let actual = actualByID[plan.id]
                     pair {
                         Button {
@@ -113,7 +116,8 @@ struct DayLedgerView: View {
                 ForEach(comparison.actuals.filter { !localPlanIDs.contains($0.id) }) { actual in
                     let source = planByID[actual.id]
                     pair {
-                        Text(source.map { "Planned " + $0.start.formatted(date: .abbreviated, time: .omitted) } ?? (actual.sourcePlanID == nil ? "Unplanned" : "Original plan unavailable"))
+                        Text(hiddenPlanIDs.contains(actual.id) ? "Calendar plan" :
+                             source.map { "Planned " + $0.start.formatted(date: .abbreviated, time: .omitted) } ?? (actual.sourcePlanID == nil ? "Unplanned" : "Original plan unavailable"))
                             .font(.caption).foregroundStyle(theme.textSecondary)
                     } right: {
                         actualButton(actual, plan: source, day: period)

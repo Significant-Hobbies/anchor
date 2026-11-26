@@ -132,7 +132,8 @@ struct PlanScreen: View {
                     }
                 } else if viewMode == .day {
                     dayControls
-                    DayLedgerView(day: today, blocks: dayDisplayBlocks, sessions: sessions, allBlocks: allBlocks)
+                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
+                                  hidesCalendarPlans: !showsDayCalendarEvents)
                     Button(showsDayCalendarEvents ? "Hide calendar events" : "Show calendar events",
                            systemImage: "calendar") {
                         showsDayCalendarEvents.toggle()
