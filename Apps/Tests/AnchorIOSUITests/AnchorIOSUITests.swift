@@ -213,7 +213,8 @@ final class AnchorIOSUITests: XCTestCase {
         app.descendants(matching: .any).ci("Entry actions").firstMatch.tap()
         app.descendants(matching: .any).ci("More options…").firstMatch.tap()
         XCTAssertTrue(app.switches.ci("Repeat weekly").exists)
-        app.buttons.ci("Save").tap()
+        XCTAssertEqual(app.textFields["anchor.plan.editor.title"].value as? String, "Morning walk")
+        app.buttons["anchor.plan.editor.save"].tap()
 
         XCTAssertTrue(app.staticTexts.ci("Morning walk").waitForExistence(timeout: 4))
     }

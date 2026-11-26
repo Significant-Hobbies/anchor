@@ -80,8 +80,8 @@ final class AnchorMacUITests: XCTestCase {
         app.descendants(matching: .any).ci("More options…").firstMatch.click()
         XCTAssertTrue(app.switches.ci("Repeat weekly").exists || app.checkBoxes.ci("Repeat weekly").exists)
         let sheet = app.sheets.firstMatch
-        XCTAssertEqual(sheet.textFields.ci("What will you do?").value as? String, "Mac schedule acceptance")
-        sheet.buttons.ci("Save").click()
+        XCTAssertEqual(sheet.textFields["anchor.plan.editor.title"].value as? String, "Mac schedule acceptance")
+        sheet.buttons["anchor.plan.editor.save"].click()
 
         XCTAssertTrue(app.staticTexts.ci("Mac schedule acceptance").waitForExistence(timeout: 4))
         let actions = app.descendants(matching: .any)["anchor.today.block-actions"].firstMatch
@@ -132,7 +132,7 @@ final class AnchorMacUITests: XCTestCase {
         app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         app.descendants(matching: .any).ci("More options…").firstMatch.click()
         app.checkBoxes.ci("Repeat weekly").click()
-        app.sheets.firstMatch.buttons.ci("Save").click()
+        app.sheets.firstMatch.buttons["anchor.plan.editor.save"].click()
         XCTAssertTrue(app.staticTexts.ci("Mac weekly planning").waitForExistence(timeout: 4))
 
         XCTAssertFalse(app.otherElements["anchor.today.daily-check-in"].exists)
@@ -305,7 +305,7 @@ final class AnchorMacUITests: XCTestCase {
         app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         app.descendants(matching: .any).ci("More options…").firstMatch.click()
         app.checkBoxes.ci("Repeat weekly").click()
-        app.sheets.firstMatch.buttons.ci("Save").click()
+        app.sheets.firstMatch.buttons["anchor.plan.editor.save"].click()
         app.buttons.ci("anchor.today.customize").click()
         let usualWeek = app.buttons.ci("anchor.timetable.routines")
         XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))

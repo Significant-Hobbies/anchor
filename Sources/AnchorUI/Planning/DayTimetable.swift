@@ -277,9 +277,9 @@ struct DayTimetable: View {
                     InlineEntryEditor(seed: draft, title: draftTitle, error: draftError,
                                       save: onSaveDraft, cancel: onCancelDraft, options: onDraftOptions)
                         .frame(width: gridWidth)
-                        .id(draft.id)
                         .padding(.top, max(0, offset(for: draft.start)))
                         .padding(.leading, gridX)
+                        .id(draft.id)
                 }
             }
         }

@@ -259,19 +259,13 @@ struct PlanScreen: View {
         .onChange(of: blocks.isEmpty) { _, isEmpty in
             if !isEmpty, scrolledDay == nil { scrollToNow(proxy) }
         }
-        // A save can land while a sheet is mid-dismissal; re-anchor once it
-        // has fully closed so the new or edited card isn't left below the fold.
+        // A toolbar draft can start offscreen. Its bottom edge is the editor's
+        // bottom edge, including when the software keyboard resizes the timetable.
         .onChange(of: visibleDraft?.id) { _, id in
             if let id, visibleDraft?.revealInGrid == true {
-                DispatchQueue.main.async { proxy.scrollTo(id, anchor: .center) }
+                DispatchQueue.main.async { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
-        #if os(iOS)
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
-            guard advancedDraft == nil, let draft = visibleDraft, draft.revealInGrid else { return }
-            proxy.scrollTo(draft.id, anchor: .center)
-        }
-        #endif
         .onChange(of: editingBlock != nil || loggingBlock != nil || explainingBlock != nil) { _, anyOpen in
             if !anyOpen {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -1165,6 +1159,7 @@ struct PlanBlockEditor: View {
                     VStack(alignment: .leading, spacing: Space.md) {
                         editorLabel("Intention", detail: "The thing that deserves a place")
                         TextField("What will you do?", text: $title, axis: .vertical)
+                            .accessibilityIdentifier("anchor.plan.editor.title")
                             .textFieldStyle(.plain)
                             .font(.system(size: 23, weight: .semibold, design: .rounded))
                             .foregroundStyle(theme.textPrimary)
@@ -1276,6 +1271,7 @@ struct PlanBlockEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("save", action: save)
+                        .accessibilityIdentifier("anchor.plan.editor.save")
                         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (repeats && weekdays.isEmpty))
                 }
             }
