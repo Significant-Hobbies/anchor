@@ -22,14 +22,11 @@ struct PlannerStartReminderSettings: View {
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
-            Picker("Entry reminders", selection: $lead) {
-                Text("Off").tag(-1)
-                Text("At start time").tag(0)
-                ForEach([1, 5, 10, 15, 30], id: \.self) { minutes in
-                    Text("\(minutes) min before").tag(minutes)
-                }
-            }
-            .accessibilityIdentifier("anchor.planner.reminder-lead")
+            #if os(iOS)
+            LabeledContent("Entry reminders") { leadPicker.labelsHidden() }
+            #else
+            leadPicker
+            #endif
             if lead >= 0 {
                 if !compact {
                     Text(authorization == .authorized && !alertsDisabled
@@ -57,6 +54,17 @@ struct PlannerStartReminderSettings: View {
                 }
             }
         }
+    }
+
+    private var leadPicker: some View {
+        Picker("Entry reminders", selection: $lead) {
+            Text("Off").tag(-1)
+            Text("At start time").tag(0)
+            ForEach([1, 5, 10, 15, 30], id: \.self) { minutes in
+                Text("\(minutes) min before").tag(minutes)
+            }
+        }
+        .accessibilityIdentifier("anchor.planner.reminder-lead")
     }
 
     private func refresh() async {
