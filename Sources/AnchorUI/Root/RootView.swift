@@ -155,7 +155,7 @@ public struct FocusScreen: View {
 
     private var scheduledBlock: PlanBlock? {
         if let alternativePlanID { return calendarVisibility.filter(blocks).first { $0.id == alternativePlanID } }
-        guard let record = ScheduledFocusResolver().nextBlock(from: calendarVisibility.filter(blocks).map { $0.snapshot() }, now: now) else {
+        guard let record = ScheduledFocusResolver().nextBlock(from: blocks.filter { $0.externalEventKey == nil }.map { $0.snapshot() }, now: now) else {
             return nil
         }
         return blocks.first { $0.id == record.id }

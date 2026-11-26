@@ -120,7 +120,7 @@ struct DayLedgerView: View {
                              source.map { "Planned " + $0.start.formatted(date: .abbreviated, time: .omitted) } ?? (actual.sourcePlanID == nil ? "Unplanned" : "Original plan unavailable"))
                             .font(.caption).foregroundStyle(theme.textSecondary)
                     } right: {
-                        actualButton(actual, plan: source, day: period)
+                        actualButton(actual, plan: hiddenPlanIDs.contains(actual.id) ? nil : source, day: period)
                     }
                     Divider()
                 }
