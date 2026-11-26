@@ -8,6 +8,21 @@ import UserNotifications
 struct PlannerStartReminderTests {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 
+    @MainActor
+    @Test func recurringEntryIsScheduledBeforeOpeningItsDay() throws {
+        let calendar = Calendar.current
+        let tomorrow = try #require(calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)))
+        let template = ScheduleTemplate(title: "Read", startMinutesFromMidnight: 600, plannedSeconds: 300)
+        let block = PlanBlock(template: template, day: tomorrow, calendar: calendar)
+        let projected = PlannerStartReminder.upcoming(blocks: [], templates: [template], now: now, calendar: calendar)
+        let original = try #require(projected.first { $0.start == block.plannedStart })
+        block.title = "Read chapter two"
+        let materialized = PlannerStartReminder.upcoming(blocks: [block], templates: [template], now: now, calendar: calendar)
+        #expect(materialized.filter { $0.key == original.key }.map(\.title) == ["Read chapter two"])
+        block.state = .completed
+        #expect(!PlannerStartReminder.upcoming(blocks: [block], templates: [template], now: now, calendar: calendar).contains { $0.key == original.key })
+    }
+
     @Test func ordersFutureAlertsAndLeavesCapacityForOtherNotifications() {
         let entries = (0..<5).map { PlannerStartReminder(id: UUID(), title: "Entry \($0)", start: now.addingTimeInterval(Double($0) * 120)) }
         let requests = PlannerReminderUpdate(entries: entries.reversed(), leadMinutes: 1).requests(now: now, otherPending: 58)

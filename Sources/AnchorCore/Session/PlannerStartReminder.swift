@@ -5,15 +5,66 @@ public struct PlannerStartReminder: Equatable, Sendable {
     public static let leadKey = "anchor.planner.start-reminder.lead-minutes"
     public static let defaultLead = 1
     static let prefix = "anchor.planner.start."
-    let id: UUID
+    let key: String
     let title: String
     let start: Date
 
     public init(id: UUID, title: String, start: Date) {
-        self.id = id
+        self.key = id.uuidString
         self.title = title
         self.start = start
     }
+    private init(key: String, title: String, start: Date) {
+        self.key = key
+        self.title = title
+        self.start = start
+    }
+
+    /// An unopened day can contain a usual-week entry even before Today materializes
+    /// its SwiftData block. Both representations share one notification identifier.
+    @MainActor
+    public static func upcoming(blocks: [PlanBlock], templates: [ScheduleTemplate],
+                                now: Date = .now, calendar: Calendar = .current) -> [Self] {
+        func occurrence(_ template: UUID, on day: Date) -> String {
+            let midnight = calendar.startOfDay(for: day)
+            return "\(template.uuidString).\(Int(midnight.timeIntervalSince1970))"
+        }
+
+        var represented = Set<String>()
+        var result: [Self] = []
+        for block in blocks {
+            let key: String
+            if let template = block.templateID {
+                key = occurrence(template, on: block.templateOccurrenceDay ?? block.plannedStart)
+                represented.insert(key)
+            } else {
+                key = block.id.uuidString
+            }
+            if block.state == .planned, block.plannedStart > now {
+                result.append(Self(key: key, title: block.title, start: block.plannedStart))
+            }
+        }
+        let routines = templates.filter { !$0.isArchived && !$0.isBehaviorHabit }
+        guard !routines.isEmpty else { return result }
+        var generated = 0
+        var day = calendar.startOfDay(for: now)
+        // A weekly routine may only occur once a week. Stop once we have enough
+        // projected occurrences to fill the OS queue, plus the final day's ties.
+        for _ in 0..<427 {
+            for routine in routines where routine.applies(to: day, calendar: calendar) {
+                let key = occurrence(routine.id, on: day)
+                guard !represented.contains(key),
+                      let start = calendar.date(byAdding: .minute, value: routine.startMinutesFromMidnight, to: day),
+                      start > now else { continue }
+                result.append(Self(key: key, title: routine.title, start: start))
+                generated += 1
+            }
+            guard generated < 60, let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return result
+    }
+
 }
 
 struct ScheduledPlannerReminder: Codable, Equatable {
@@ -37,7 +88,7 @@ public struct PlannerReminderUpdate: Equatable, Sendable {
             guard entry.start > now else { return nil }
             let fire = entry.start.addingTimeInterval(-lead)
             if fire > now { return (entry, fire) }
-            let previous = scheduled[PlannerStartReminder.prefix + entry.id.uuidString]
+            let previous = scheduled[PlannerStartReminder.prefix + entry.key]
             // A newly added entry can already be inside its lead window. Alert at
             // its start, unless an alert for this same occurrence already came due.
             if let previous, previous.start == entry.start, previous.fire <= now { return nil }
@@ -46,7 +97,7 @@ public struct PlannerReminderUpdate: Equatable, Sendable {
         // Leave room for the focus timer and other local alerts.
         let capacity = max(0, 60 - otherPending)
         return upcoming.sorted {
-            ($0.1, $0.0.id.uuidString) < ($1.1, $1.0.id.uuidString)
+            ($0.1, $0.0.key) < ($1.1, $1.0.key)
         }.prefix(capacity).map { entry, fire in
             let content = UNMutableNotificationContent()
             content.title = entry.title
@@ -56,7 +107,7 @@ public struct PlannerReminderUpdate: Equatable, Sendable {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = TimeZone(secondsFromGMT: 0)!
             let date = calendar.dateComponents([.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second], from: fire)
-            return UNNotificationRequest(identifier: PlannerStartReminder.prefix + entry.id.uuidString, content: content,
+            return UNNotificationRequest(identifier: PlannerStartReminder.prefix + entry.key, content: content,
                                          trigger: UNCalendarNotificationTrigger(dateMatching: date, repeats: false))
         }
     }

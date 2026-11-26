@@ -436,6 +436,7 @@ public struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var context
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \ScheduleTemplate.createdAt) private var reminderTemplates: [ScheduleTemplate]
     @Query(sort: \PlanBlock.plannedStart) private var planBlocks: [PlanBlock]
     @StateObject private var remindersCoordinator = RemindersSyncCoordinator()
     @StateObject private var calendarCoordinator = CalendarSyncCoordinator()
@@ -501,10 +502,8 @@ public struct RootView: View {
     }
 
     private var reminderUpdate: PlannerReminderUpdate {
-        let entries = calendarVisibility.filter(planBlocks).compactMap { block in
-            block.state == .planned && block.plannedStart > Date()
-                ? PlannerStartReminder(id: block.id, title: block.title, start: block.plannedStart) : nil
-        }
+        guard reminderLead >= 0 else { return PlannerReminderUpdate(entries: [], leadMinutes: reminderLead) }
+        let entries = PlannerStartReminder.upcoming(blocks: calendarVisibility.filter(planBlocks), templates: reminderTemplates)
         return PlannerReminderUpdate(entries: entries, leadMinutes: reminderLead)
     }
 
