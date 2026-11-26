@@ -257,7 +257,7 @@ struct PlanScreen: View {
                 .frame(maxWidth: workspaceMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 .background(theme.canvas)
-                .overlay(alignment: .bottom) { Divider() }
+                .overlay(alignment: .bottom) { Rectangle().fill(theme.hairline).frame(height: 0.5) }
         }
         .safeAreaInset(edge: .bottom) {
             if viewMode == .day && !timetableEntries.isEmpty {
