@@ -21,8 +21,8 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public var reminderExternalIdentifier: String?
     public var reminderLastSyncedAt: Date?
     public var externalEventKey: String?
-    /// True once the owner has personalized a sync- or template-managed block.
     public var isUnplannedTimeLog: Bool?
+    /// True once the owner has personalized a sync- or template-managed block.
     public var isTemplateOverride: Bool
 
     public init(

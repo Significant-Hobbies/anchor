@@ -153,7 +153,7 @@ struct PlanScreen: View {
                 }
 
                 if viewMode == .review {
-                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions)
+                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks)
                 } else if viewMode == .week {
                     WeekAgenda(days: visibleDays,
                                entries: visibleBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
@@ -635,7 +635,7 @@ struct PlanScreen: View {
 
     private var copyDayButton: some View {
         Button("copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
-            .disabled(blocks.isEmpty)
+            .disabled(!blocks.contains { !$0.isUnplannedTimeLog })
             .accessibilityIdentifier("anchor.today.copy-day")
     }
 
@@ -1698,7 +1698,7 @@ struct DayReviewScreen: View {
                     DatePicker("Day", selection: $selectedDay, displayedComponents: .date).labelsHidden()
                 }
 
-                DayLedgerView(day: selectedDay, blocks: calendarVisibility.filter(blocks), sessions: sessions)
+                DayLedgerView(day: selectedDay, blocks: calendarVisibility.filter(blocks), sessions: sessions, allBlocks: blocks)
 
                 Text("Timer and activity analysis").font(.headline)
                 DayComparison(

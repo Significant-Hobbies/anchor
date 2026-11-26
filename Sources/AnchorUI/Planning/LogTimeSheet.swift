@@ -223,6 +223,23 @@ struct LogTimeSheet: View {
         target.updatedAt = now
         do {
             try context.save()
+            // A recorded span edited on the timetable also updates an existing
+            // journal copy. Keep its independent title and reflection notes.
+            if !stillHappening, block != nil, let config = context.container.configurations.first, !config.isStoredInMemoryOnly {
+                do {
+                    let store = DayLedgerStore(storeURL: config.url)
+                    if let previous = try store.load().entries.first(where: { $0.id == target.id }) {
+                        var updated = previous
+                        updated.start = start
+                        updated.end = end
+                        try store.save(updated, replacing: previous)
+                        NotificationCenter.default.post(name: .actualEntriesChanged, object: nil)
+                    }
+                } catch {
+                    saveError = "Time was saved on the timetable. Save again to update the Review copy."
+                    return
+                }
+            }
             saveError = nil
             onSave()
             dismiss()

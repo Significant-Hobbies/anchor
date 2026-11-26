@@ -31,7 +31,7 @@ public struct DayLedgerEntry: Identifiable, Codable, Equatable, Sendable {
 public struct DayLedgerComparison {
     public let plans: [DayLedgerEntry]
     public let actuals: [DayLedgerEntry]
-    public let matched, changed, unrecorded, unplanned: Int
+    public let matched, changed, unrecorded, unplanned, unavailablePlans: Int
     public let plannedSeconds, recordedSeconds: Double
     public let linkedVarianceSeconds, unplannedSeconds: Double
 
@@ -50,6 +50,7 @@ public struct DayLedgerComparison {
         matched = same
         unrecorded = self.plans.count - same - different
         let extras = self.actuals.filter { $0.sourcePlanID == nil && !planIDs.contains($0.id) }
+        unavailablePlans = self.actuals.filter { $0.sourcePlanID != nil && !planIDs.contains($0.id) }.count
         unplanned = extras.count
         unplannedSeconds = extras.reduce(0) { $0 + $1.seconds(in: period) }
         // Actuals moved in from a plan outside the period also contribute here.
@@ -111,7 +112,19 @@ public struct DayLedgerStore {
         NSFileCoordinator().coordinate(writingItemAt: url, options: entry == nil ? .forDeleting : .forReplacing, error: &coordinationError) { destination in
             do {
                 let existing: DayLedgerEntry?
-                do { existing = try JSONDecoder().decode(DayLedgerEntry.self, from: Data(contentsOf: destination)) }
+                do {
+                    let data = try Data(contentsOf: destination)
+                    if let decoded = try? JSONDecoder().decode(DayLedgerEntry.self, from: data),
+                       decoded.id == id, decoded.end > decoded.start {
+                        existing = decoded
+                    } else {
+                        // Preserve the damaged original before replacing it with the owner's new record.
+                        guard previous == nil, entry != nil else { throw CocoaError(.fileReadCorruptFile) }
+                        let backup = destination.deletingPathExtension().appendingPathExtension(UUID().uuidString + ".unreadable")
+                        try data.write(to: backup, options: .withoutOverwriting)
+                        existing = nil
+                    }
+                }
                 catch let error as CocoaError where error.code == .fileReadNoSuchFile { existing = nil }
                 if existing == entry { return }
                 guard existing == previous else { throw CocoaError(.fileWriteFileExists) }

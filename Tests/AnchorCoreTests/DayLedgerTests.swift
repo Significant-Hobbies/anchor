@@ -31,6 +31,13 @@ struct DayLedgerTests {
         #expect(throws: CocoaError.self) { try store.remove(plan) }
         try store.remove(actual)
         #expect(try store.load().entries.isEmpty)
+        let damaged = url.appendingPathExtension("actual-entries").appendingPathComponent(plan.id.uuidString + ".json")
+        try Data("broken record".utf8).write(to: damaged)
+        try store.save(plan, replacing: nil)
+        #expect(try store.load().entries == [plan])
+        let files = try FileManager.default.contentsOfDirectory(at: damaged.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+        let backup = try #require(files.first { $0.pathExtension == "unreadable" })
+        #expect(try Data(contentsOf: backup) == Data("broken record".utf8))
     }
 
     @Test func separatesUnrecordedUnplannedAndChangedAndClipsAtMidnight() {

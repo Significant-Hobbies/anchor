@@ -3,7 +3,7 @@ import AnchorCore
 import SwiftData
 import SwiftUI
 
-private extension Notification.Name {
+extension Notification.Name {
     static let actualEntriesChanged = Notification.Name("anchor.actual-entries.changed")
 }
 
@@ -11,6 +11,7 @@ struct DayLedgerView: View {
     let day: Date
     let blocks: [PlanBlock]
     let sessions: [FocusSession]
+    let allBlocks: [PlanBlock]
     @Environment(\.modelContext) private var context
     @Environment(\.anchorTheme) private var theme
     @State private var saved: [DayLedgerEntry] = []
@@ -36,7 +37,7 @@ struct DayLedgerView: View {
 
     private var actuals: [DayLedgerEntry] {
         var entries = Dictionary(saved.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let linked = Dictionary(blocks.filter { !$0.isUnplannedTimeLog }.compactMap { block in block.sessionID.map { ($0, block.id) } }, uniquingKeysWith: { first, _ in first })
+        let linked = Dictionary(allBlocks.filter { !$0.isUnplannedTimeLog }.compactMap { block in block.sessionID.map { ($0, block.id) } }, uniquingKeysWith: { first, _ in first })
         for session in sessions {
             let id = linked[session.id] ?? session.id
             if entries[id] == nil, let end = session.endedAt, end > session.startedAt {
@@ -54,7 +55,9 @@ struct DayLedgerView: View {
 
     var body: some View {
         let period = Calendar.current.dateInterval(of: .day, for: day)!
-        let allPlans = plans, allActuals = actuals
+        // Date pickers and slot labels expose minutes. Compare those same
+        // visible boundaries even when a timer or imported plan stores seconds.
+        let allPlans = plans.map(minutePrecision), allActuals = actuals.map(minutePrecision)
         let comparison = DayLedgerComparison(period: period, plans: allPlans, actuals: allActuals)
         VStack(alignment: .leading, spacing: Space.md) {
             HStack {
@@ -143,6 +146,15 @@ struct DayLedgerView: View {
         }
     }
 
+    private func minutePrecision(_ entry: DayLedgerEntry) -> DayLedgerEntry {
+        var result = entry
+        result.start = Date(timeIntervalSinceReferenceDate: floor(entry.start.timeIntervalSinceReferenceDate / 60) * 60)
+        let end = Date(timeIntervalSinceReferenceDate: floor(entry.end.timeIntervalSinceReferenceDate / 60) * 60)
+        // Sub-minute activity still belongs to the day where it occurred.
+        result.end = max(result.start.addingTimeInterval(1), end)
+        return result
+    }
+
     private func pair<Left: View, Right: View>(@ViewBuilder left: () -> Left,
                                                @ViewBuilder right: () -> Right) -> some View {
         HStack(alignment: .top, spacing: Space.md) {
@@ -198,8 +210,9 @@ struct DayLedgerView: View {
                 .foregroundStyle(theme.textSecondary)
             let delta = Int((data.linkedVarianceSeconds / 60).rounded())
             if delta != 0 {
-                Text("Recorded plan entries took \(abs(delta)) min " + (delta > 0 ? "more" : "less") + " than planned in this period.")
+                Text("Recorded slots spanned \(abs(delta)) min " + (delta > 0 ? "more" : "less") + " than planned in this period.")
             }
+            if data.unavailablePlans > 0 { Text("\(data.unavailablePlans) with original plan unavailable") }
             if data.unplanned > 0 {
                 Text("\(Int((data.unplannedSeconds / 60).rounded())) min went to unplanned entries.")
             }
