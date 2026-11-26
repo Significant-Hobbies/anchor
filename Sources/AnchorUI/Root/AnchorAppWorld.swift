@@ -6,7 +6,6 @@ import SwiftData
 import SwiftUI
 
 #if os(macOS)
-import AppKit
 import CoreGraphics
 import UserNotifications
 #endif
@@ -98,7 +97,7 @@ public final class AnchorAppWorld {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(60))
                     guard let self else { return }
-                    if !NSApp.isActive { self.refreshBackgroundPlannerReminders() }
+                    self.refreshBackgroundPlannerReminders()
                 }
             }
         }

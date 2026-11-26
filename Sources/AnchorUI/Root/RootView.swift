@@ -482,11 +482,15 @@ public struct RootView: View {
         }
         .task(id: scenePhase) {
             guard scenePhase == .active else { return }
+            #if os(macOS)
+            reconcileStartReminders(reminderUpdate)
+            #else
             // Refill the operating system’s finite queue as earlier reminders fire.
             while !Task.isCancelled {
                 reconcileStartReminders(reminderUpdate)
                 try? await Task.sleep(for: .seconds(60))
             }
+            #endif
         }
         .onChange(of: activeSessionSignature, initial: true) {
             controller.synchronizeActiveSessionFromStore()

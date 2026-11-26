@@ -840,10 +840,7 @@ struct EditorSeed: Identifiable {
     var revealInGrid = true
 }
 
-/// How Today draws its timetable. The choices live on `AnchorPreferences`, so
-/// they travel with the rest of the owner's private Anchor data, and they only
-/// shape the display — entries outside the chosen hours still expand the grid
-/// rather than disappear.
+/// Day bounds use AnchorPreferences. Grid increments and alerts are device preferences.
 struct TimetableOptionsSheet: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
