@@ -170,6 +170,12 @@ public struct FocusScreen: View {
                     message: "\(block.plannedStart.formatted(date: .omitted, time: .shortened)) · \(Format.duration(Double(block.plannedSeconds))). Everything else can wait at the edge."
                 ) {
                     VStack(spacing: Space.sm) {
+                        if isChangingActivity {
+                            TextField("Name the actual activity", text: $actualIntent, axis: .vertical)
+                                .textFieldStyle(.roundedBorder)
+                                .lineLimit(1...3)
+                                .accessibilityLabel("Name the actual activity")
+                        }
                         Button(isChangingActivity ? "start actual activity" : "start this block") {
                             start(block)
                         }
@@ -192,22 +198,6 @@ public struct FocusScreen: View {
                     Label(loadError, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote)
                         .foregroundStyle(theme.negative)
-                }
-
-                if isChangingActivity {
-                    Card(padding: Space.lg) {
-                        VStack(alignment: .leading, spacing: Space.sm) {
-                            Text("what are you actually doing?")
-                                .font(.headline)
-                                .foregroundStyle(theme.textPrimary)
-                            TextField("Name the actual activity", text: $actualIntent, axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(1...3)
-                            Text("Anchor will keep the planned block and record this as a deliberate change for tonight’s comparison.")
-                                .font(.footnote)
-                                .foregroundStyle(theme.textSecondary)
-                        }
-                    }
                 }
 
                 Text("Once started, Lock a distraction stays on top of the timer with quick interruption options.")
