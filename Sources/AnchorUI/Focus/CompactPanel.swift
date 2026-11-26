@@ -17,7 +17,6 @@ public struct CompactPanel: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
     @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
-    private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
 
     private let controller: FocusController
@@ -308,7 +307,7 @@ public struct CompactPanel: View {
 
     private var scheduledBlock: PlanBlock? {
         guard let record = ScheduledFocusResolver().nextBlock(
-            from: calendarVisibility.filter(blocks).map { $0.snapshot() },
+            from: blocks.filter { $0.externalEventKey == nil }.map { $0.snapshot() },
             now: now
         ) else { return nil }
         return blocks.first { $0.id == record.id }

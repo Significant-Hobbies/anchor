@@ -44,7 +44,7 @@ struct PlanScreen: View {
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
-    @SceneStorage("anchor.planner.show-calendar-events") private var showsDayCalendarEvents = false
+    @State private var showsDayCalendarEvents = false
     @State private var loadError: String?
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
@@ -113,7 +113,7 @@ struct PlanScreen: View {
     }
 
     private var timetableEntries: [DayTimetable.Entry] {
-        dayDisplayBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }.map { block in
+        visibleBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }.map { block in
             DayTimetable.Entry(
                 block: block,
                 projectName: projects.first { $0.id == block.projectID }?.name,
@@ -142,14 +142,10 @@ struct PlanScreen: View {
                     dayControls
                     DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
                                   hidesCalendarPlans: !showsDayCalendarEvents)
-                    Button(showsDayCalendarEvents ? "Hide calendar events" : "Show calendar events",
-                           systemImage: "calendar") {
-                        showsDayCalendarEvents.toggle()
-                        showsAllCalendarEvents = false
-                    }
-                    .buttonStyle(QuietButtonStyle(expands: false))
-                    .accessibilityIdentifier("anchor.today.show-calendar-events")
                 }
+                CalendarListButton(isExpanded: $showsDayCalendarEvents)
+                    .accessibilityIdentifier("anchor.today.show-calendar-events")
+                    .onChange(of: showsDayCalendarEvents) { showsAllCalendarEvents = false }
                 if isLoadingPeriod {
                     Label("Updating calendar events…", systemImage: "arrow.triangle.2.circlepath")
                         .font(.footnote).foregroundStyle(theme.textSecondary)
@@ -173,10 +169,11 @@ struct PlanScreen: View {
                 }
 
                 if viewMode == .review {
-                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks)
+                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
+                                  hidesCalendarPlans: !showsDayCalendarEvents)
                 } else if viewMode == .week {
                     WeekAgenda(days: visibleDays,
-                               entries: visibleBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
+                               entries: dayDisplayBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
                                openDay: { today = $0; viewMode = .day },
                                add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
                                edit: { editingBlock = $0 })
@@ -440,8 +437,9 @@ struct PlanScreen: View {
         let blocked = checkIns.values.filter { $0.outcome == .blocked && !removedIDs.contains($0.id.uuidString) }
         guard !blocked.isEmpty else { return [] }
         let blocksByID = Dictionary(allBlocks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return blocked.map { record in
+        return blocked.compactMap { record in
             guard let block = blocksByID[record.id] else { return record }
+            if block.externalEventKey != nil && !showsDayCalendarEvents { return nil }
             var current = record
             current.title = block.title
             current.plannedStart = block.plannedStart
@@ -1685,6 +1683,17 @@ struct DivergenceEditor: View {
     }
 }
 
+private struct CalendarListButton: View {
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        Button(isExpanded ? "Hide calendar list" : "Show calendar list", systemImage: "calendar") {
+            isExpanded.toggle()
+        }
+        .buttonStyle(QuietButtonStyle(expands: false))
+    }
+}
+
 struct DayReviewScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
@@ -1694,6 +1703,7 @@ struct DayReviewScreen: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @Query(sort: \DivergenceEvent.occurredAt) private var divergences: [DivergenceEvent]
     @Query private var profiles: [BehaviorProfile]
+    @State private var showsCalendarList = false
     @Binding var selectedDay: Date
     @State private var explainingGap: DayReviewEngine.Gap?
 
@@ -1708,13 +1718,19 @@ struct DayReviewScreen: View {
         let daySessions = sessions.filter { $0.startedAt >= interval.start && $0.startedAt < interval.end }.map { $0.snapshot() }
         let dayDivergences = divergences.filter { $0.occurredAt >= interval.start && $0.occurredAt < interval.end }.map { $0.snapshot() }
         let profile = profiles.first?.snapshot() ?? BehaviorProfileRecord()
-        return DayReviewEngine().review(
+        var result = DayReviewEngine().review(
             day: selectedDay,
             blocks: dayBlocks,
             sessions: daySessions,
             divergences: dayDivergences,
             profile: profile
         )
+        if !showsCalendarList {
+            let hidden = Set(dayBlocks.filter { $0.externalEventKey != nil }.map(\.id))
+            result.gaps.removeAll { hidden.contains($0.blockID) }
+            result.suggestions.removeAll { hidden.contains($0.blockID) }
+        }
+        return result
     }
 
     var body: some View {
@@ -1741,7 +1757,10 @@ struct DayReviewScreen: View {
                     DatePicker("Day", selection: $selectedDay, displayedComponents: .date).labelsHidden()
                 }
 
-                DayLedgerView(day: selectedDay, blocks: calendarVisibility.filter(blocks), sessions: sessions, allBlocks: blocks)
+                CalendarListButton(isExpanded: $showsCalendarList)
+                let review = self.review
+                DayLedgerView(day: selectedDay, blocks: calendarVisibility.filter(blocks), sessions: sessions, allBlocks: blocks,
+                              hidesCalendarPlans: !showsCalendarList)
 
                 Text("Timer and activity analysis").font(.headline)
                 DayComparison(
