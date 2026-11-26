@@ -16,8 +16,8 @@ public final class NoopSessionCompletionNotifier: SessionCompletionNotifying {
     public func cancel(sessionID: UUID) {}
 }
 
-/// Schedules one local notification for the exact wall-clock finish time.
-/// Permission is requested lazily when the first planned session starts.
+/// Delivers local focus-completion and planner-start alerts. Requests permission
+/// when an upcoming alert first needs it while the app is active.
 @MainActor
 public final class SystemSessionCompletionNotifier: NSObject, SessionCompletionNotifying,
     UNUserNotificationCenterDelegate

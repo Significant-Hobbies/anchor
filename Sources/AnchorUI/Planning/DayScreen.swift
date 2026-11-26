@@ -1,5 +1,6 @@
 #if !os(watchOS)
 import AnchorCore
+import SaaSMakerUI
 import SwiftData
 import SwiftUI
 
@@ -29,6 +30,8 @@ struct PlanScreen: View {
     @State private var refreshRequest = UUID()
     @State private var today = Date()
     @State private var lastCalendarDay = Date()
+    @State private var showsDatePicker = false
+    @AppStorage(TimetableStep.preferenceKey) private var gridStep = TimetableStep.five
     @State private var showsCopyDay = false
     @State private var editorSeed: EditorSeed?
     @State private var advancedSeed: EditorSeed?
@@ -195,6 +198,7 @@ struct PlanScreen: View {
                     DayTimetable(
                         day: today,
                         entries: timetableEntries,
+                        step: gridStep,
                         windowStartHour: timetablePrefs.startHour,
                         windowEndHour: timetablePrefs.endHour,
                         showsLivedTrace: timetablePrefs.showsLivedTrace,
@@ -213,7 +217,10 @@ struct PlanScreen: View {
                         onSaveDraft: saveDraft,
                         onCancelDraft: clearDraft,
                         onDraftOptions: { advancedSeed = editorSeed },
-                        onAddAt: { beginDraft(EditorSeed(start: $0.start, minutes: Int($0.duration / 60), revealInGrid: false)) }
+                        onAddAt: { interval, dragged in
+                            guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
+                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
+                        }
                     )
 
                 }
@@ -226,9 +233,10 @@ struct PlanScreen: View {
             periodNavigation
                 .padding(.horizontal, Space.lg)
                 .padding(.vertical, Space.xs)
-                .frame(maxWidth: workspaceMaxWidth)
+                .frame(maxWidth: workspaceMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
-                .background(.bar)
+                .background(theme.canvas)
+                .overlay(alignment: .bottom) { Divider() }
         }
         .safeAreaInset(edge: .bottom) {
             if viewMode == .day && !timetableEntries.isEmpty {
@@ -449,9 +457,9 @@ struct PlanScreen: View {
 
     private var timetableHint: String {
         #if os(macOS)
-        "Drag across an open time to add an entry in 15-minute steps."
+        "Drag across an open time to add an entry in \(gridStep.rawValue)-minute steps."
         #else
-        "Touch and hold an open time, then drag in 15-minute steps."
+        "Touch and hold an open time, then drag in \(gridStep.rawValue)-minute steps."
         #endif
     }
 
@@ -521,33 +529,58 @@ struct PlanScreen: View {
     }
 
     private var periodNavigation: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack { modePicker; Spacer(); dateNavigation }
-            VStack(alignment: .leading, spacing: Space.xs) { modePicker; dateNavigation }
+        SMAdaptiveActionBar(spacing: Space.sm) {
+            dateNavigation
+            modePicker
         }
     }
 
     private var modePicker: some View {
-        Picker("Calendar view", selection: $viewMode) {
-            Text("Day").tag(CalendarViewMode.day)
-            Text("Week").tag(CalendarViewMode.week)
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .frame(width: 150)
+        SMSegmentedControl("Calendar view", selection: $viewMode, segments: [
+            SMSegment(.day, title: "Day"), SMSegment(.week, title: "Week")
+        ], size: .compact)
         .accessibilityIdentifier("anchor.planner.view-mode")
     }
 
     private var dateNavigation: some View {
-        HStack(spacing: Space.sm) {
+        HStack(spacing: Space.xxs) {
             periodArrow(-1)
-            DatePicker("Day", selection: $today, displayedComponents: .date)
-                .labelsHidden().fixedSize()
+            Button { showsDatePicker.toggle() } label: {
+                HStack(spacing: Space.xxs) {
+                    Text(today, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "chevron.down").font(.caption2)
+                }
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, Space.xxs)
+                .frame(minHeight: periodHitSize)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Choose date")
+            .accessibilityValue(today.formatted(date: .complete, time: .omitted))
+            .popover(isPresented: $showsDatePicker) {
+                DatePicker("Day", selection: $today, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+                    .frame(width: 320)
+                    .padding(.vertical, Space.sm)
+                    .presentationCompactAdaptation(.popover)
+                    .onChange(of: today) { _, _ in showsDatePicker = false }
+            }
             periodArrow(1)
             Button("Today") { today = Date() }
-                .buttonStyle(.borderless)
+                .buttonStyle(QuietButtonStyle(expands: false))
                 .accessibilityLabel("Go to today")
         }
+    }
+
+    private var periodHitSize: CGFloat {
+        #if os(macOS)
+        28
+        #else
+        44
+        #endif
     }
 
     private func periodArrow(_ direction: Int) -> some View {
@@ -556,9 +589,11 @@ struct PlanScreen: View {
             today = Calendar.current.date(byAdding: component, value: direction, to: today) ?? today
         } label: {
             Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
-                .frame(minWidth: 30, minHeight: 32)
+                .font(.subheadline.weight(.medium))
+                .frame(minWidth: periodHitSize, minHeight: periodHitSize)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
         .accessibilityLabel((direction < 0 ? "Previous " : "Next ") + viewMode.rawValue)
     }
 
@@ -703,7 +738,7 @@ struct PlanScreen: View {
         let base = calendar.isDate(now, inSameDayAs: day) ? now : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
         let minute = calendar.component(.minute, from: base)
         let wholeMinute = calendar.dateInterval(of: .minute, for: base)?.start ?? base
-        let rounded = calendar.date(byAdding: .minute, value: (15 - minute % 15) % 15, to: wholeMinute) ?? wholeMinute
+        let rounded = calendar.date(byAdding: .minute, value: (gridStep.rawValue - minute % gridStep.rawValue) % gridStep.rawValue, to: wholeMinute) ?? wholeMinute
         let opening = PlannerGap.opening(from: rounded, until: dayInterval.end,
             occupied: visibleBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > base }
                 .map { DateInterval(start: $0.plannedStart, end: $0.plannedEnd) })
@@ -814,6 +849,7 @@ struct TimetableOptionsSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \AnchorPreferences.updatedAt, order: .reverse) private var preferences: [AnchorPreferences]
+    @AppStorage(TimetableStep.preferenceKey) private var gridStep = TimetableStep.five
     @State private var showsRoutines = false
     @State private var saveError: String?
 
@@ -840,6 +876,12 @@ struct TimetableOptionsSheet: View {
 
                     Card(padding: Space.lg) {
                         VStack(alignment: .leading, spacing: Space.md) {
+                            Picker("Grid step", selection: $gridStep) {
+                                ForEach(TimetableStep.allCases, id: \.self) { step in
+                                    Text("\(step.rawValue) minutes").tag(step)
+                                }
+                            }
+                            .accessibilityIdentifier("anchor.timetable.grid-step")
                             Stepper(value: startHourBinding, in: 0...23) {
                                 HStack {
                                     Text("Day starts")

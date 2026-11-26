@@ -21,7 +21,7 @@ let package = Package(
             url: "https://github.com/Significant-Hobbies/significanthobbies.git",
             revision: "bca98b34f38db4142583f7ff804b3bb86e764414"
         ),
-        .package(url: "https://github.com/sass-maker/ui-library", from: "0.1.14"),
+        .package(url: "https://github.com/sass-maker/ui-library", exact: "0.1.36"),
     ],
     targets: [
         .target(

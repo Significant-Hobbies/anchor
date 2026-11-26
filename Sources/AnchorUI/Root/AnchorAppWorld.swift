@@ -6,6 +6,7 @@ import SwiftData
 import SwiftUI
 
 #if os(macOS)
+import AppKit
 import CoreGraphics
 import UserNotifications
 #endif
@@ -91,8 +92,37 @@ public final class AnchorAppWorld {
             context: result.container.mainContext,
             controller: focusController
         )
+        if storeKind != .inMemory, !CloudKitSchemaSeed.isRequested,
+           AnchorExternalSyncPolicy.allowsSessionSynchronization() {
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(60))
+                    guard let self else { return }
+                    if !NSApp.isActive { self.refreshBackgroundPlannerReminders() }
+                }
+            }
+        }
         #endif
     }
+
+    #if os(macOS)
+    /// The menu-bar process can outlive every planner window.
+    private func refreshBackgroundPlannerReminders() {
+        let context = container.mainContext
+        guard let blocks = try? context.fetch(FetchDescriptor<PlanBlock>()),
+              let templates = try? context.fetch(FetchDescriptor<ScheduleTemplate>()),
+              let removals = try? context.fetch(FetchDescriptor<RemovedCalendarOccurrence>()) else { return }
+        let defaults = UserDefaults.standard
+        let visible = CalendarBlockVisibility.filter(
+            blocks, accountsData: defaults.data(forKey: CalendarSyncCoordinator.accountsKey) ?? Data(),
+            disconnectedData: defaults.data(forKey: CalendarSyncCoordinator.disconnectedAccountsKey) ?? Data(),
+            removed: Set(removals.map(\.eventKey))
+        )
+        let lead = defaults.object(forKey: PlannerStartReminder.leadKey) as? Int ?? PlannerStartReminder.defaultLead
+        let entries = lead < 0 ? [] : PlannerStartReminder.upcoming(blocks: visible, templates: templates)
+        notifier.reconcileStartReminders(PlannerReminderUpdate(entries: entries, leadMinutes: lead), canRequestPermission: false)
+    }
+    #endif
 }
 
 /// The identical product root used by the Mac and iPhone WindowGroups.

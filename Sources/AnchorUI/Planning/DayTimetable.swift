@@ -2,6 +2,14 @@
 import AnchorCore
 import SwiftData
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
+
+enum TimetableStep: Int, CaseIterable {
+    case five = 5, ten = 10, fifteen = 15, thirty = 30
+    static let preferenceKey = "anchor.timetable.grid-step-minutes"
+}
 
 /// Pure placement math for the day timetable, kept free of SwiftUI so the
 /// overlap lanes and visible hour range stay unit-testable.
@@ -11,13 +19,13 @@ enum TimetableLayout {
         var laneCount: Int
     }
 
-    static func selection(from startY: CGFloat, to endY: CGFloat, hourHeight: CGFloat, range: DateInterval) -> DateInterval {
-        let quarter: TimeInterval = 15 * 60
+    static func selection(from startY: CGFloat, to endY: CGFloat, hourHeight: CGFloat, range: DateInterval, step: TimetableStep) -> DateInterval {
+        let increment = TimeInterval(step.rawValue * 60)
         func snap(_ y: CGFloat) -> TimeInterval {
-            min(range.duration, max(0, (y / hourHeight * 4).rounded() * quarter))
+            min(range.duration, max(0, (y / hourHeight * 3600 / increment).rounded() * increment))
         }
-        let start = min(range.duration - quarter, snap(min(startY, endY)))
-        let end = max(start + quarter, snap(max(startY, endY)))
+        let start = min(range.duration - increment, snap(min(startY, endY)))
+        let end = max(start + increment, snap(max(startY, endY)))
         return DateInterval(start: range.start.addingTimeInterval(start), duration: end - start)
     }
 
@@ -113,6 +121,7 @@ struct DayTimetable: View {
     let day: Date
     let entries: [Entry]
     var hourHeight: CGFloat = 56
+    var step: TimetableStep = .five
     var windowStartHour: Int = 7
     var windowEndHour: Int = 22
     var showsLivedTrace: Bool = true
@@ -131,8 +140,12 @@ struct DayTimetable: View {
     var onSaveDraft: () -> Void = {}
     var onCancelDraft: () -> Void = {}
     var onDraftOptions: () -> Void = {}
-    var onAddAt: (DateInterval) -> Void = { _ in }
+    var onAddAt: (DateInterval, Bool) -> Void = { _, _ in }
+    #if os(macOS)
     @GestureState private var selection: DateInterval?
+    #else
+    @State private var selection: DateInterval?
+    #endif
 
     static let nowAnchorID = "anchor.timetable.now"
 
@@ -243,6 +256,8 @@ struct DayTimetable: View {
                         .overlay(alignment: .topLeading) {
                             Text("\(selection.start.formatted(date: .omitted, time: .shortened)) – \(selection.end.formatted(date: .omitted, time: .shortened))")
                                 .font(.caption2.monospacedDigit()).padding(.horizontal, 4)
+                                .background(theme.surfaceRaised, in: .rect(cornerRadius: 3))
+                                .fixedSize()
                         }
                         .frame(width: gridWidth, height: selection.duration / 3600 * hourHeight)
                         .offset(x: gridX, y: offset(for: selection.start))
@@ -278,28 +293,24 @@ struct DayTimetable: View {
     }
 
     private func interval(for drag: DragGesture.Value) -> DateInterval {
-        TimetableLayout.selection(from: drag.startLocation.y, to: drag.location.y, hourHeight: hourHeight, range: range)
+        TimetableLayout.selection(from: drag.startLocation.y, to: drag.location.y, hourHeight: hourHeight, range: range, step: step)
     }
 
     private var selectionSurface: some View {
-        let surface = Color.clear.contentShape(Rectangle())
         #if os(macOS)
+        let surface = Color.clear.contentShape(Rectangle())
         return surface.gesture(DragGesture(minimumDistance: 0)
             .updating($selection) { drag, selected, _ in selected = interval(for: drag) }
-            .onEnded { onAddAt(interval(for: $0)) })
+            .onEnded { drag in onAddAt(interval(for: drag), abs(drag.translation.height) >= 3) })
         #else
-        // A finger swipe scrolls immediately. A deliberate hold starts a selection.
-        let draw = LongPressGesture(minimumDuration: 0.3)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .updating($selection) { value, selected, _ in
-                if case .second(true, let drag?) = value { selected = interval(for: drag) }
-            }
-            .onEnded { value in
-                if case .second(true, let drag?) = value { onAddAt(interval(for: drag)) }
-            }
-        return surface.gesture(draw.exclusively(before: SpatialTapGesture().onEnded { tap in
-            onAddAt(TimetableLayout.selection(from: tap.location.y, to: tap.location.y, hourHeight: hourHeight, range: range))
-        }))
+        return TimetableTouchSurface { start, end in
+            selection = TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step)
+        } finish: { start, end, dragged in
+            selection = nil
+            onAddAt(TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step), dragged)
+        } cancel: {
+            selection = nil
+        }
         #endif
     }
 
@@ -369,6 +380,61 @@ struct DayTimetable: View {
         }
     }
 }
+
+#if os(iOS)
+/// Let UIKit arbitrate the open grid's touch gestures with the containing scroll view.
+/// A moving finger fails the hold recognizer so the scroll view takes over immediately.
+private struct TimetableTouchSurface: UIViewRepresentable {
+    let preview: (CGFloat, CGFloat) -> Void
+    let finish: (CGFloat, CGFloat, Bool) -> Void
+    let cancel: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(surface: self) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        let hold = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.hold(_:)))
+        hold.minimumPressDuration = 0.3
+        hold.allowableMovement = 8
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:)))
+        tap.require(toFail: hold)
+        view.addGestureRecognizer(hold)
+        view.addGestureRecognizer(tap)
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) { context.coordinator.surface = self }
+
+    final class Coordinator: NSObject {
+        var surface: TimetableTouchSurface
+        private var start: CGFloat = 0
+        init(surface: TimetableTouchSurface) { self.surface = surface }
+
+        @objc func tap(_ sender: UITapGestureRecognizer) {
+            let y = sender.location(in: sender.view).y
+            surface.finish(y, y, false)
+        }
+
+        @objc func hold(_ sender: UILongPressGestureRecognizer) {
+            let y = sender.location(in: sender.view).y
+            switch sender.state {
+            case .began:
+                start = y
+                surface.preview(start, y)
+            case .changed:
+                surface.preview(start, y)
+            case .ended:
+                surface.finish(start, y, true)
+            case .cancelled, .failed:
+                surface.cancel()
+            default:
+                break
+            }
+        }
+    }
+}
+#endif
 
 /// The hand-drawn vertical trace: the planned day sits on straight grid lines,
 /// while time that actually happened is drawn with this slight bend — the same

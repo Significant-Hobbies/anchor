@@ -11,11 +11,13 @@ struct TimetableLayoutTests {
         let start = Date(timeIntervalSinceReferenceDate: 0)
         let range = DateInterval(start: start, duration: 3_600)
         func select(_ a: CGFloat, _ b: CGFloat) -> DateInterval {
-            TimetableLayout.selection(from: a, to: b, hourHeight: 56, range: range)
+            TimetableLayout.selection(from: a, to: b, hourHeight: 56, range: range, step: .fifteen)
         }
         #expect(select(1, 13) == DateInterval(start: start, duration: 900))
         #expect(select(43, 13) == DateInterval(start: start.addingTimeInterval(900), duration: 1_800))
         #expect(select(13, 43) == select(43, 13))
+        let fiveMinuteSlot = TimetableLayout.selection(from: 9, to: 14, hourHeight: 56, range: range, step: .five)
+        #expect(fiveMinuteSlot == DateInterval(start: start.addingTimeInterval(600), duration: 300))
         #expect(select(-20, 80) == range)
         #expect(select(56, 56) == DateInterval(start: start.addingTimeInterval(2_700), duration: 900))
     }

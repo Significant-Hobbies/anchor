@@ -152,7 +152,8 @@ extension SystemSessionCompletionNotifier {
             #if os(iOS)
             allowed = allowed || status == .ephemeral
             #endif
-            if !allowed { desired = [] }
+            // Authorization can stay open past the original lead time.
+            desired = allowed ? update.requests(now: Date(), otherPending: pending.count - ours.count, scheduled: scheduled) : []
         }
         guard nextStartReminderUpdate == nil else { return }
         let ids = Set(desired.map(\.identifier))

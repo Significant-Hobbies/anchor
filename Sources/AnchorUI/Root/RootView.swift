@@ -508,7 +508,8 @@ public struct RootView: View {
     }
 
     private func reconcileStartReminders(_ update: PlannerReminderUpdate) {
-        guard !DemoData.isRequested else { return }
+        guard storeKind != .inMemory, !CloudKitSchemaSeed.isRequested,
+              AnchorExternalSyncPolicy.allowsSessionSynchronization() else { return }
         notifier?.reconcileStartReminders(update, canRequestPermission: scenePhase == .active)
     }
 

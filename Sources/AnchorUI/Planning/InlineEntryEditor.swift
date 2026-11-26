@@ -1,5 +1,8 @@
 #if !os(watchOS)
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct InlineEntryEditor: View {
     @Environment(\.anchorTheme) private var theme
@@ -20,12 +23,17 @@ struct InlineEntryEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: Space.xs) {
+                #if os(macOS)
+                MacEntryTitleField(title: $title, save: save, cancel: cancel)
+                    .frame(minHeight: 22)
+                #else
                 TextField("What will you do?", text: $title)
                     .textFieldStyle(.plain)
                     .font(.subheadline.weight(.semibold))
                     .focused($focused)
                     .submitLabel(.done)
                     .onSubmit(save)
+                #endif
                 Button(action: save) { actionIcon("checkmark") }
                     .accessibilityLabel("Save")
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -56,9 +64,8 @@ struct InlineEntryEditor: View {
         .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
         .overlay(alignment: .leading) { Capsule().fill(theme.accent).frame(width: 3).padding(.vertical, 4) }
         .overlay { RoundedRectangle(cornerRadius: Radius.sm).strokeBorder(theme.accent.opacity(0.6)) }
+        #if !os(macOS)
         .task(id: seed.id) { await Task.yield(); focused = true }
-        #if os(macOS)
-        .onExitCommand(perform: cancel)
         #endif
     }
 
@@ -68,4 +75,64 @@ struct InlineEntryEditor: View {
             .contentShape(Rectangle())
     }
 }
+#if os(macOS)
+/// AppKit's field editor receives Escape before the enclosing SwiftUI view.
+private struct MacEntryTitleField: NSViewRepresentable {
+    @Binding var title: String
+    let save: () -> Void
+    let cancel: () -> Void
+
+    final class TitleField: NSTextField {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            DispatchQueue.main.async { [weak self, weak window] in
+                guard let self, let window, self.window === window else { return }
+                window.makeFirstResponder(self)
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> TitleField {
+        let field = TitleField()
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.placeholderString = "What will you do?"
+        field.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: TitleField, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != title { field.stringValue = title }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: MacEntryTitleField
+        init(_ parent: MacEntryTitleField) { self.parent = parent }
+        func controlTextDidChange(_ notification: Notification) {
+            if let field = notification.object as? NSTextField { parent.title = field.stringValue }
+        }
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy command: Selector) -> Bool {
+            switch command {
+            case #selector(NSResponder.cancelOperation(_:)):
+                parent.cancel()
+            case #selector(NSResponder.insertNewline(_:)):
+                guard !textView.hasMarkedText() else { return false }
+                parent.title = textView.string
+                parent.save()
+            default:
+                return false
+            }
+            return true
+        }
+    }
+}
+#endif
 #endif
