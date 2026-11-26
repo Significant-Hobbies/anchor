@@ -2,6 +2,14 @@
 import AnchorCore
 import SwiftData
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
+
+enum TimetableStep: Int, CaseIterable {
+    case five = 5, ten = 10, fifteen = 15, thirty = 30
+    static let preferenceKey = "anchor.timetable.grid-step-minutes"
+}
 
 /// Pure placement math for the day timetable, kept free of SwiftUI so the
 /// overlap lanes and visible hour range stay unit-testable.
@@ -9,6 +17,16 @@ enum TimetableLayout {
     struct Placement: Sendable, Equatable {
         var lane: Int
         var laneCount: Int
+    }
+
+    static func selection(from startY: CGFloat, to endY: CGFloat, hourHeight: CGFloat, range: DateInterval, step: TimetableStep) -> DateInterval {
+        let increment = TimeInterval(step.rawValue * 60)
+        func snap(_ y: CGFloat) -> TimeInterval {
+            min(range.duration, max(0, (y / hourHeight * 3600 / increment).rounded() * increment))
+        }
+        let start = min(range.duration - increment, snap(min(startY, endY)))
+        let end = max(start + increment, snap(max(startY, endY)))
+        return DateInterval(start: range.start.addingTimeInterval(start), duration: end - start)
     }
 
     /// Greedy lane packing inside each overlap cluster. A new cluster begins
@@ -103,6 +121,7 @@ struct DayTimetable: View {
     let day: Date
     let entries: [Entry]
     var hourHeight: CGFloat = 56
+    var step: TimetableStep = .five
     var windowStartHour: Int = 7
     var windowEndHour: Int = 22
     var showsLivedTrace: Bool = true
@@ -115,7 +134,18 @@ struct DayTimetable: View {
     var onRemove: (PlanBlock) -> Void = { _ in }
     var onExplain: (PlanBlock) -> Void = { _ in }
     var onLogActual: (PlanBlock) -> Void = { _ in }
-    var onAddAt: (Date) -> Void = { _ in }
+    var draft: EditorSeed? = nil
+    var draftTitle: Binding<String> = .constant("")
+    var draftError: String? = nil
+    var onSaveDraft: () -> Void = {}
+    var onCancelDraft: () -> Void = {}
+    var onDraftOptions: () -> Void = {}
+    var onAddAt: (DateInterval, Bool) -> Void = { _, _ in }
+    #if os(macOS)
+    @GestureState private var selection: DateInterval?
+    #else
+    @State private var selection: DateInterval?
+    #endif
 
     static let nowAnchorID = "anchor.timetable.now"
 
@@ -132,12 +162,18 @@ struct DayTimetable: View {
     private var timedEntries: [Entry] { entries.filter { $0.block.plannedSeconds < 86_400 } }
 
     private var range: DateInterval {
-        TimetableLayout.displayRange(
+        let midnight = Calendar.current.startOfDay(for: day)
+        var intervals = timedEntries.map { entry in
+            let start = entry.block.plannedStart.timeIntervalSince(midnight)
+            return (start, start + Double(entry.block.plannedSeconds))
+        }
+        if let draft {
+            let start = draft.start.timeIntervalSince(midnight)
+            intervals.append((start, start + Double(draft.minutes * 60)))
+        }
+        return TimetableLayout.displayRange(
             for: day,
-            intervals: timedEntries.map { entry in
-                let start = entry.block.plannedStart.timeIntervalSince(Calendar.current.startOfDay(for: day))
-                return (start, start + Double(entry.block.plannedSeconds))
-            },
+            intervals: intervals,
             now: Date(),
             windowStartHour: windowStartHour,
             windowEndHour: windowEndHour
@@ -192,17 +228,9 @@ struct DayTimetable: View {
             ZStack(alignment: .topLeading) {
                 hourMarks(width: proxy.size.width)
 
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { location in
-                        onAddAt(date(forYOffset: location.y))
-                    }
+                selectionSurface
                     .frame(width: gridWidth, height: totalHeight)
                     .offset(x: gridX)
-                    // Deliberately not an accessibility element: a full-grid
-                    // overlay swallows hit-tests for the block cards beneath
-                    // it. Tap-to-add stays mouse/trackpad-only; explicit Add
-                    // controls cover everyone else.
                     .accessibilityHidden(true)
 
                 if showsLivedTrace {
@@ -221,6 +249,22 @@ struct DayTimetable: View {
                     )
                 }
 
+                if let selection {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(theme.accent.opacity(0.22))
+                        .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(theme.accent) }
+                        .overlay(alignment: .topLeading) {
+                            Text("\(selection.start.formatted(date: .omitted, time: .shortened)) – \(selection.end.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption2.monospacedDigit()).padding(.horizontal, 4)
+                                .background(theme.surfaceRaised, in: .rect(cornerRadius: 3))
+                                .fixedSize()
+                        }
+                        .frame(width: gridWidth, height: selection.duration / 3600 * hourHeight)
+                        .offset(x: gridX, y: offset(for: selection.start))
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+
                 if Calendar.current.isDateInToday(day) {
                     Color.clear
                         .frame(height: 1)
@@ -229,9 +273,17 @@ struct DayTimetable: View {
                         .allowsHitTesting(false)
                     nowLine(width: proxy.size.width)
                 }
+                if let draft {
+                    InlineEntryEditor(seed: draft, title: draftTitle, error: draftError,
+                                      save: onSaveDraft, cancel: onCancelDraft, options: onDraftOptions)
+                        .frame(width: gridWidth)
+                        .id(draft.id)
+                        .padding(.top, max(0, offset(for: draft.start)))
+                        .padding(.leading, gridX)
+                }
             }
         }
-        .frame(height: totalHeight)
+        .frame(height: max(totalHeight, draft.map { offset(for: $0.start) + 92 } ?? 0))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("anchor.today.timetable")
     }
@@ -240,9 +292,26 @@ struct DayTimetable: View {
         CGFloat(date.timeIntervalSince(range.start) / 3600) * hourHeight
     }
 
-    private func date(forYOffset y: CGFloat) -> Date {
-        let snapped = (y / hourHeight * 3600 / 900).rounded() * 900
-        return range.start.addingTimeInterval(snapped)
+    private func interval(for drag: DragGesture.Value) -> DateInterval {
+        TimetableLayout.selection(from: drag.startLocation.y, to: drag.location.y, hourHeight: hourHeight, range: range, step: step)
+    }
+
+    private var selectionSurface: some View {
+        #if os(macOS)
+        let surface = Color.clear.contentShape(Rectangle())
+        return surface.gesture(DragGesture(minimumDistance: 0)
+            .updating($selection) { drag, selected, _ in selected = interval(for: drag) }
+            .onEnded { drag in onAddAt(interval(for: drag), abs(drag.translation.height) >= 3) })
+        #else
+        return TimetableTouchSurface { start, end in
+            selection = TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step)
+        } finish: { start, end, dragged in
+            selection = nil
+            onAddAt(TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step), dragged)
+        } cancel: {
+            selection = nil
+        }
+        #endif
     }
 
     private func cardTop(for entry: Entry) -> CGFloat {
@@ -311,6 +380,61 @@ struct DayTimetable: View {
         }
     }
 }
+
+#if os(iOS)
+/// Let UIKit arbitrate the open grid's touch gestures with the containing scroll view.
+/// A moving finger fails the hold recognizer so the scroll view takes over immediately.
+private struct TimetableTouchSurface: UIViewRepresentable {
+    let preview: (CGFloat, CGFloat) -> Void
+    let finish: (CGFloat, CGFloat, Bool) -> Void
+    let cancel: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(surface: self) }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        let hold = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.hold(_:)))
+        hold.minimumPressDuration = 0.3
+        hold.allowableMovement = 8
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:)))
+        tap.require(toFail: hold)
+        view.addGestureRecognizer(hold)
+        view.addGestureRecognizer(tap)
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) { context.coordinator.surface = self }
+
+    final class Coordinator: NSObject {
+        var surface: TimetableTouchSurface
+        private var start: CGFloat = 0
+        init(surface: TimetableTouchSurface) { self.surface = surface }
+
+        @objc func tap(_ sender: UITapGestureRecognizer) {
+            let y = sender.location(in: sender.view).y
+            surface.finish(y, y, false)
+        }
+
+        @objc func hold(_ sender: UILongPressGestureRecognizer) {
+            let y = sender.location(in: sender.view).y
+            switch sender.state {
+            case .began:
+                start = y
+                surface.preview(start, y)
+            case .changed:
+                surface.preview(start, y)
+            case .ended:
+                surface.finish(start, y, true)
+            case .cancelled, .failed:
+                surface.cancel()
+            default:
+                break
+            }
+        }
+    }
+}
+#endif
 
 /// The hand-drawn vertical trace: the planned day sits on straight grid lines,
 /// while time that actually happened is drawn with this slight bend — the same

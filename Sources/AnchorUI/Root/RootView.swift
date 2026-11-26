@@ -436,12 +436,16 @@ public struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var context
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \ScheduleTemplate.createdAt) private var reminderTemplates: [ScheduleTemplate]
     @Query(sort: \PlanBlock.plannedStart) private var planBlocks: [PlanBlock]
     @StateObject private var remindersCoordinator = RemindersSyncCoordinator()
     @StateObject private var calendarCoordinator = CalendarSyncCoordinator()
     // The product tour changed materially with the schedule/habit overhaul.
     // A versioned key ensures existing owners see this tour once as well.
     @AppStorage("anchor.product-tour.seen.v4") private var unifiedOnboardingSeen = false
+    private var calendarVisibility = CalendarBlockVisibility()
+    @AppStorage(PlannerStartReminder.leadKey) private var reminderLead = PlannerStartReminder.defaultLead
+    private let notifier: SystemSessionCompletionNotifier?
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
     @Bindable private var navigation: AnchorNavigationModel
@@ -451,8 +455,10 @@ public struct RootView: View {
     public init(
         controller: FocusController,
         storeKind: AnchorStore.StoreKind = .persistent,
-        navigation: AnchorNavigationModel
+        navigation: AnchorNavigationModel,
+        notifier: SystemSessionCompletionNotifier? = nil
     ) {
+        self.notifier = notifier
         self.controller = controller
         self.storeKind = storeKind
         _navigation = Bindable(wrappedValue: navigation)
@@ -471,6 +477,21 @@ public struct RootView: View {
                 Text(warning).font(.caption).padding().accessibilityIdentifier("anchor.private-notes.storage-warning")
             }
         }
+        .onChange(of: reminderUpdate, initial: true) { _, update in
+            reconcileStartReminders(update)
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            #if os(macOS)
+            reconcileStartReminders(reminderUpdate)
+            #else
+            // Refill the operating system’s finite queue as earlier reminders fire.
+            while !Task.isCancelled {
+                reconcileStartReminders(reminderUpdate)
+                try? await Task.sleep(for: .seconds(60))
+            }
+            #endif
+        }
         .onChange(of: activeSessionSignature, initial: true) {
             controller.synchronizeActiveSessionFromStore()
         }
@@ -482,6 +503,18 @@ public struct RootView: View {
             controller.synchronizeActiveSessionFromStore()
             syncExternal()
         }
+    }
+
+    private var reminderUpdate: PlannerReminderUpdate {
+        guard reminderLead >= 0 else { return PlannerReminderUpdate(entries: [], leadMinutes: reminderLead) }
+        let entries = PlannerStartReminder.upcoming(blocks: calendarVisibility.filter(planBlocks), templates: reminderTemplates)
+        return PlannerReminderUpdate(entries: entries, leadMinutes: reminderLead)
+    }
+
+    private func reconcileStartReminders(_ update: PlannerReminderUpdate) {
+        guard storeKind != .inMemory, !CloudKitSchemaSeed.isRequested,
+              AnchorExternalSyncPolicy.allowsSessionSynchronization() else { return }
+        notifier?.reconcileStartReminders(update, canRequestPermission: scenePhase == .active)
     }
 
     private func syncExternal() {

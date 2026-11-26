@@ -1,5 +1,5 @@
 {
-  "originHash" : "adf5a936539765e7d35fbd753c727f555a3e7000791dc63bcdfab14af86a03e8",
+  "originHash" : "e59df80da010d8790f827fbceb10a7c75dbdf666356789c65153a7bbac591af1",
   "pins" : [
     {
       "identity" : "significanthobbies",
@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sass-maker/ui-library",
       "state" : {
-        "revision" : "1c01ca58049ce7534117248e8dbd284bb5269e36",
-        "version" : "0.1.17"
+        "revision" : "5233bd8bbd3bf1b1fcd91218a479eff290a4cb3c",
+        "version" : "0.1.36"
       }
     }
   ],

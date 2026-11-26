@@ -374,42 +374,7 @@ private struct AnchorSMButton: View {
         Button(role: configuration.role, action: configuration.trigger) {
             configuration.label
         }
-        .buttonStyle(PlannerActionStyle(primary: kind == .brand, expands: expands,
-                                        destructive: isDestructive))
-    }
-}
-
-private struct PlannerActionStyle: ButtonStyle {
-    @Environment(\.anchorTheme) private var theme
-    @Environment(\.isEnabled) private var isEnabled
-    let primary: Bool
-    let expands: Bool
-    let destructive: Bool
-
-    #if os(macOS)
-    private let faceHeight: CGFloat = 28
-    private let targetHeight: CGFloat = 28
-    #else
-    private let faceHeight: CGFloat = 34
-    private let targetHeight: CGFloat = 44
-    #endif
-
-    func makeBody(configuration: Configuration) -> some View {
-        let palette = theme.smPalette
-        let shape = Capsule(style: .circular)
-        return configuration.label
-            .font(.custom(palette.displayFont, size: 13, relativeTo: .subheadline).weight(.semibold))
-            .textCase(palette.uiLowercase ? .lowercase : nil)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .frame(maxWidth: expands ? .infinity : nil, minHeight: faceHeight)
-            .foregroundStyle(primary ? theme.onAccent : theme.textPrimary)
-            .background(primary ? (destructive ? theme.negative : palette.brand) : theme.surfaceRaised, in: shape)
-            .overlay { if !primary { shape.strokeBorder(palette.border) } }
-            .opacity(isEnabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
-            .frame(minHeight: targetHeight)
-            .contentShape(Rectangle())
+        .buttonStyle(SMButtonStyle(kind, size: .planner, expands: expands, isDestructive: isDestructive))
     }
 }
 #else

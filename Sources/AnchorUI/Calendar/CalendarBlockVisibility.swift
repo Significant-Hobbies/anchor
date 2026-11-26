@@ -14,9 +14,14 @@ struct CalendarBlockVisibility: DynamicProperty {
     var removedBlockIDs: Set<String> { Set(removals.flatMap(\.removedBlockIDs)) }
 
     func filter(_ blocks: [PlanBlock]) -> [PlanBlock] {
+        Self.filter(blocks, accountsData: accountsData, disconnectedData: disconnectedData, removed: Set(removals.map(\.eventKey)))
+    }
+
+    static func filter(_ blocks: [PlanBlock], accountsData: Data, disconnectedData: Data,
+                       removed: Set<String>) -> [PlanBlock] {
         let accounts = (try? JSONDecoder().decode([ConnectedGoogleAccount].self, from: accountsData)) ?? []
         let disconnected = (try? JSONDecoder().decode(Set<String>.self, from: disconnectedData)) ?? []
-        return Self.filter(blocks, accounts: accounts, disconnected: disconnected, removed: Set(removals.map(\.eventKey)))
+        return Self.filter(blocks, accounts: accounts, disconnected: disconnected, removed: removed)
     }
 
     static func filter(_ blocks: [PlanBlock], accounts: [ConnectedGoogleAccount],
