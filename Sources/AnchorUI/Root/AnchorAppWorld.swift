@@ -21,6 +21,7 @@ public final class AnchorAppWorld {
     }
 
     public let container: ModelContainer
+    let notifier: SystemSessionCompletionNotifier
     public let controller: FocusController
     public let storeKind: AnchorStore.StoreKind
     public let platform: AnchorPlatformSync
@@ -58,17 +59,19 @@ public final class AnchorAppWorld {
             guard AnchorExternalSyncPolicy.allowsSessionSynchronization() else { return nil }
             return try? HubHistoryOwnershipStore(directory: AnchorStore.storeURL().deletingLastPathComponent()).owner()
         }
+        let notifier = SystemSessionCompletionNotifier()
+        self.notifier = notifier
         #if os(iOS)
         let focusController = FocusController(
             context: result.container.mainContext,
-            completionNotifier: SystemSessionCompletionNotifier(),
+            completionNotifier: notifier,
             liveActivityCoordinator: ActivityKitLiveActivityCoordinator(),
             hubOwner: hubOwner
         )
         #else
         let focusController = FocusController(
             context: result.container.mainContext,
-            completionNotifier: SystemSessionCompletionNotifier(),
+            completionNotifier: notifier,
             hubOwner: hubOwner
         )
         #endif
@@ -105,7 +108,8 @@ public struct AnchorProductRoot: View {
         RootView(
             controller: world.controller,
             storeKind: world.storeKind,
-            navigation: world.navigation
+            navigation: world.navigation,
+            notifier: world.notifier
         )
             .anchorAppearance()
             .environment(\.anchorPlatformSync, world.platform)

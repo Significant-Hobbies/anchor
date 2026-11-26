@@ -22,7 +22,9 @@ public final class NoopSessionCompletionNotifier: SessionCompletionNotifying {
 public final class SystemSessionCompletionNotifier: NSObject, SessionCompletionNotifying,
     UNUserNotificationCenterDelegate
 {
-    private let center: UNUserNotificationCenter
+    let center: UNUserNotificationCenter
+    var nextStartReminderUpdate: (PlannerReminderUpdate, Bool)?
+    var startReminderTask: Task<Void, Never>?
     private var schedulingTask: Task<Void, Never>?
     private var lastIdentifier: String?
 

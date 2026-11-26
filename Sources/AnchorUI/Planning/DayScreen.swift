@@ -879,6 +879,8 @@ struct TimetableOptionsSheet: View {
                         }
                     }
 
+                    PlannerStartReminderSettings()
+
                     Button { showsRoutines = true } label: {
                         HStack {
                             Label("Your usual week · \(routineCount) item\(routineCount == 1 ? "" : "s")", systemImage: "calendar.badge.clock")
