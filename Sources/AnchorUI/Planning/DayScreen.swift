@@ -1692,6 +1692,10 @@ struct DayReviewScreen: View {
     @Binding var selectedDay: Date
     @State private var explainingGap: DayReviewEngine.Gap?
 
+    init(selectedDay: Binding<Date>) {
+        _selectedDay = selectedDay
+    }
+
     private var review: DayReviewEngine.Review {
         let interval = Calendar.current.dateInterval(of: .day, for: selectedDay)
             ?? DateInterval(start: selectedDay, duration: 86_400)
