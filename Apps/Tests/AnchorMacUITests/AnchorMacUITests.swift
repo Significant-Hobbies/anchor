@@ -79,7 +79,9 @@ final class AnchorMacUITests: XCTestCase {
         app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         app.descendants(matching: .any).ci("More options…").firstMatch.click()
         XCTAssertTrue(app.switches.ci("Repeat weekly").exists || app.checkBoxes.ci("Repeat weekly").exists)
-        app.buttons.ci("Save").click()
+        let sheet = app.sheets.firstMatch
+        XCTAssertEqual(sheet.textFields.ci("What will you do?").value as? String, "Mac schedule acceptance")
+        sheet.buttons.ci("Save").click()
 
         XCTAssertTrue(app.staticTexts.ci("Mac schedule acceptance").waitForExistence(timeout: 4))
         let actions = app.descendants(matching: .any)["anchor.today.block-actions"].firstMatch
@@ -130,7 +132,7 @@ final class AnchorMacUITests: XCTestCase {
         app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         app.descendants(matching: .any).ci("More options…").firstMatch.click()
         app.checkBoxes.ci("Repeat weekly").click()
-        app.buttons.ci("Save").click()
+        app.sheets.firstMatch.buttons.ci("Save").click()
         XCTAssertTrue(app.staticTexts.ci("Mac weekly planning").waitForExistence(timeout: 4))
 
         XCTAssertFalse(app.otherElements["anchor.today.daily-check-in"].exists)
@@ -303,7 +305,7 @@ final class AnchorMacUITests: XCTestCase {
         app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         app.descendants(matching: .any).ci("More options…").firstMatch.click()
         app.checkBoxes.ci("Repeat weekly").click()
-        app.buttons.ci("Save").click()
+        app.sheets.firstMatch.buttons.ci("Save").click()
         app.buttons.ci("anchor.today.customize").click()
         let usualWeek = app.buttons.ci("anchor.timetable.routines")
         XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))
@@ -524,7 +526,11 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("Show me how Anchor protects it").click()
 
         XCTAssertTrue(app.staticTexts.ci("Turn that time into something concrete.").waitForExistence(timeout: 4))
-        app.buttons.ci("Shape these habits").click()
+        let shapeHabits = app.buttons.ci("Shape these habits")
+        if !shapeHabits.isHittable || !app.windows.firstMatch.frame.contains(shapeHabits.frame) {
+            app.scrollViews.firstMatch.swipeUp()
+        }
+        shapeHabits.click()
         XCTAssertTrue(app.staticTexts.ci("Choose when each habit is available.").waitForExistence(timeout: 4))
 
         let monday = app.buttons.ci("Monday")
@@ -694,7 +700,9 @@ final class AnchorMacUITests: XCTestCase {
         )
 
         // Finishing the open entry records its real span.
-        let inFlightActions = app.buttons.ci("Actions for In-flight entry")
+        let inFlightActions = app.buttons.matching(
+            NSPredicate(format: "identifier == %@ AND label ENDSWITH[c] %@", "anchor.today.block-actions", "Actions for In-flight entry")
+        ).firstMatch
         XCTAssertTrue(inFlightActions.waitForExistence(timeout: 3))
         inFlightActions.click()
         let finish = app.buttons.ci("Finish now")

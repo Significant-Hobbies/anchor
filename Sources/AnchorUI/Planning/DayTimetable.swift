@@ -139,7 +139,7 @@ struct DayTimetable: View {
     var draftError: String? = nil
     var onSaveDraft: () -> Void = {}
     var onCancelDraft: () -> Void = {}
-    var onDraftOptions: () -> Void = {}
+    var onDraftOptions: (String) -> Void = { _ in }
     var onAddAt: (DateInterval, Bool) -> Void = { _, _ in }
     #if os(macOS)
     @GestureState private var selection: DateInterval?

@@ -34,7 +34,7 @@ struct PlanScreen: View {
     @AppStorage(TimetableStep.preferenceKey) private var gridStep = TimetableStep.five
     @State private var showsCopyDay = false
     @State private var editorSeed: EditorSeed?
-    @State private var advancedSeed: EditorSeed?
+    @State private var advancedDraft: AdvancedDraft?
     @State private var draftTitle = ""
     @State private var draftError: String?
     @State private var showsCustomize = false
@@ -218,7 +218,9 @@ struct PlanScreen: View {
                         draftError: draftError,
                         onSaveDraft: saveDraft,
                         onCancelDraft: clearDraft,
-                        onDraftOptions: { advancedSeed = editorSeed },
+                        onDraftOptions: { title in
+                            if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
+                        },
                         onAddAt: { interval, dragged in
                             guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
                             beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
@@ -264,6 +266,12 @@ struct PlanScreen: View {
                 DispatchQueue.main.async { proxy.scrollTo(id, anchor: .center) }
             }
         }
+        #if os(iOS)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidShowNotification)) { _ in
+            guard advancedDraft == nil, let draft = visibleDraft, draft.revealInGrid else { return }
+            proxy.scrollTo(draft.id, anchor: .center)
+        }
+        #endif
         .onChange(of: editingBlock != nil || loggingBlock != nil || explainingBlock != nil) { _, anyOpen in
             if !anyOpen {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -337,9 +345,10 @@ struct PlanScreen: View {
             periodSyncError = error
             isLoadingPeriod = false
         }
-        .sheet(item: $advancedSeed) { seed in
+        .sheet(item: $advancedDraft) { draft in
+            let seed = draft.seed
             PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes,
-                            suggestedTitle: draftTitle, dayIsFull: seed.dayIsFull) { clearDraft(); refresh() }
+                            suggestedTitle: draft.title, dayIsFull: seed.dayIsFull) { clearDraft(); refresh() }
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
@@ -833,6 +842,12 @@ struct PlanScreen: View {
     }
 }
 
+
+private struct AdvancedDraft: Identifiable {
+    let seed: EditorSeed
+    let title: String
+    var id: UUID { seed.id }
+}
 
 struct EditorSeed: Identifiable {
     let id = UUID()

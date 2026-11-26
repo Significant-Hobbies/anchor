@@ -178,7 +178,7 @@ jobs:
         continue-on-error: true
         run: |
           python3 - <<'PYPROOF'
-          import hashlib, json, os, pathlib, plistlib, shutil, struct, subprocess
+          import hashlib, json, os, pathlib, plistlib, shutil, struct, subprocess, time
           root = pathlib.Path(os.environ["RUNNER_TEMP"])
           evidence = root / "anchor-native-evidence" / "phone-390"
           evidence.mkdir(parents=True, exist_ok=True)
@@ -189,6 +189,12 @@ jobs:
                   command += ["--json", json.dumps(payload)]
               command += ["--output", "json"]
               result = subprocess.run(command, check=False, capture_output=True, text=True)
+              if label == "ready" and result.returncode and "DAEMON_AUTO_START_FAILED" in result.stdout:
+                  # A busy simulator can take longer than the CLI's five-second
+                  # daemon startup window. Retry only this read-only readiness probe.
+                  (evidence / "ready-startup-attempt.txt").write_text(result.stdout + result.stderr)
+                  time.sleep(5)
+                  result = subprocess.run(command, check=False, capture_output=True, text=True)
               (evidence / (label + ".stdout.txt")).write_text(result.stdout)
               (evidence / (label + ".stderr.txt")).write_text(result.stderr)
               assert result.returncode == 0, label + " failed; inspect retained diagnostics"

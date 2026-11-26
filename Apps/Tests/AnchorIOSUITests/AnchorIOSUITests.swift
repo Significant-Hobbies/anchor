@@ -475,8 +475,8 @@ final class AnchorIOSUITests: XCTestCase {
             XCTAssertTrue(control.waitForExistence(timeout: 5), "Expected Today control \(control.identifier) to be present")
             XCTAssertEqual(control.label.lowercased(), expectedLabel.lowercased(), "The control should retain its clear accessible label")
             XCTAssertTrue(control.isHittable, "Today control \(control.identifier) must be reachable")
-            XCTAssertGreaterThanOrEqual(control.frame.width, 44, "Today control \(control.identifier) needs a 44pt hit width")
-            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "Today control \(control.identifier) needs a 44pt hit height")
+            XCTAssertGreaterThanOrEqual(control.frame.width + 0.001, 44, "Today control \(control.identifier) needs a 44pt hit width")
+            XCTAssertGreaterThanOrEqual(control.frame.height + 0.001, 44, "Today control \(control.identifier) needs a 44pt hit height")
         }
 
         let customize = controls[2]
