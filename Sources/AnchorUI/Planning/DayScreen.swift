@@ -43,7 +43,7 @@ struct PlanScreen: View {
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
-    @State private var scrolledDay: Date?
+    @SceneStorage("anchor.planner.show-calendar-events") private var showsDayCalendarEvents = false
     @State private var loadError: String?
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
@@ -87,8 +87,16 @@ struct PlanScreen: View {
         calendarVisibility.filter(allBlocks)
     }
 
+    private var dayDisplayBlocks: [PlanBlock] {
+        showsDayCalendarEvents ? visibleBlocks : visibleBlocks.filter { $0.externalEventKey == nil }
+    }
+
     private var blocks: [PlanBlock] {
-        visibleBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
+        dayDisplayBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
+    }
+
+    private var copyableBlocks: [PlanBlock] {
+        visibleBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
     }
 
     private func upcomingCalendarEvents(at now: Date) -> [PlanBlock] {
@@ -102,7 +110,7 @@ struct PlanScreen: View {
     }
 
     private var timetableEntries: [DayTimetable.Entry] {
-        visibleBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }.map { block in
+        dayDisplayBlocks.filter { $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }.map { block in
             DayTimetable.Entry(
                 block: block,
                 projectName: projects.first { $0.id == block.projectID }?.name,
@@ -127,8 +135,16 @@ struct PlanScreen: View {
                         calendarsButton.buttonStyle(.borderless)
                     }
                 } else if viewMode == .day {
-                    dayHeader
                     dayControls
+                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
+                                  hidesCalendarPlans: !showsDayCalendarEvents)
+                    Button(showsDayCalendarEvents ? "Hide calendar events" : "Show calendar events",
+                           systemImage: "calendar") {
+                        showsDayCalendarEvents.toggle()
+                        showsAllCalendarEvents = false
+                    }
+                    .buttonStyle(QuietButtonStyle(expands: false))
+                    .accessibilityIdentifier("anchor.today.show-calendar-events")
                 }
                 if isLoadingPeriod {
                     Label("Updating calendar events…", systemImage: "arrow.triangle.2.circlepath")
@@ -163,8 +179,12 @@ struct PlanScreen: View {
                 } else {
                     let calendarEvents = Calendar.current.isDateInToday(today) ? upcomingCalendarEvents(at: calendarReferenceTime)
                         : visibleBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
-                    if !calendarEvents.isEmpty {
-                        upcomingCalendarSection(calendarEvents)
+                    if showsDayCalendarEvents {
+                        if calendarEvents.isEmpty {
+                            Text("No calendar events in this period.").font(.callout).foregroundStyle(theme.textSecondary)
+                        } else {
+                            upcomingCalendarSection(calendarEvents)
+                        }
                     }
 
                     if !blocks.isEmpty {
@@ -197,6 +217,7 @@ struct PlanScreen: View {
                             #endif
                         }
                     }
+                    Text(timetableHint).font(.caption).foregroundStyle(theme.textSecondary)
                     DayTimetable(
                         day: today,
                         entries: timetableEntries,
@@ -240,7 +261,7 @@ struct PlanScreen: View {
                 .frame(maxWidth: workspaceMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 .background(theme.canvas)
-                .overlay(alignment: .bottom) { Divider() }
+                .overlay(alignment: .bottom) { Rectangle().fill(theme.hairline).frame(height: 0.5) }
         }
         .safeAreaInset(edge: .bottom) {
             if viewMode == .day && !timetableEntries.isEmpty {
@@ -252,12 +273,6 @@ struct PlanScreen: View {
                     .padding(.vertical, Space.xs)
                     .background(.bar)
             }
-        }
-        .onAppear { scrollToNow(proxy) }
-        // Blocks arrive through @Query after first layout — the onAppear pass
-        // can fire while the store is still empty, so retry once entries land.
-        .onChange(of: blocks.isEmpty) { _, isEmpty in
-            if !isEmpty, scrolledDay == nil { scrollToNow(proxy) }
         }
         // A toolbar draft can start offscreen. Its bottom edge is the editor's
         // bottom edge, including when the software keyboard resizes the timetable.
@@ -273,7 +288,7 @@ struct PlanScreen: View {
                 }
             }
         }
-        .onChange(of: today) { _, _ in scrolledDay = nil }
+        .onChange(of: today) { _, _ in showsAllCalendarEvents = false }
         }
         .background(theme.canvas)
         #if os(iOS)
@@ -313,9 +328,9 @@ struct PlanScreen: View {
             .anchorTheme()
         }
         .sheet(isPresented: $showsCopyDay) {
-            CopyDaySheet(sourceDay: today, entryCount: blocks.filter { !$0.isUnplannedTimeLog }.count) { destination in
+            CopyDaySheet(sourceDay: today, entryCount: copyableBlocks.count) { destination in
                 do {
-                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination, including: Set(blocks.map(\.id)))
+                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination, including: Set(copyableBlocks.map(\.id)))
                     today = destination
                     refresh()
                     return nil
@@ -466,16 +481,6 @@ struct PlanScreen: View {
         #else
         "Touch and hold an open time, then drag in \(gridStep.rawValue)-minute steps."
         #endif
-    }
-
-    private var dayHeader: some View {
-        DoodleScene(
-            "TodayDoodle",
-            eyebrow: today.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()),
-            title: "Draw the day",
-            message: timetableHint,
-            compact: true
-        )
     }
 
     private func blockEditor(_ block: PlanBlock) -> some View {
@@ -638,7 +643,7 @@ struct PlanScreen: View {
 
     private var copyDayButton: some View {
         Button("copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
-            .disabled(!blocks.contains { !$0.isUnplannedTimeLog })
+            .disabled(copyableBlocks.isEmpty)
             .accessibilityIdentifier("anchor.today.copy-day")
     }
 
@@ -684,7 +689,7 @@ struct PlanScreen: View {
     private var daySummary: some View {
         let completed = blocks.filter { $0.state == .completed }.count
         let active = blocks.filter { isCurrent($0) || $0.state == .inProgress }.count
-        let ahead = blocks.filter { $0.state == .planned && !isCurrent($0) }.count
+        let ahead = blocks.filter { $0.state == .planned && $0.plannedStart > calendarReferenceTime }.count
         return HStack(spacing: Space.xs) {
             Image(systemName: "scribble.variable")
                 .foregroundStyle(theme.accent)
@@ -726,7 +731,6 @@ struct PlanScreen: View {
         context.insert(block)
         do {
             try context.save()
-            scrolledDay = today
             clearDraft()
         } catch {
             context.delete(block)
@@ -754,23 +758,6 @@ struct PlanScreen: View {
     private func isCurrent(_ block: PlanBlock) -> Bool {
         let now = Date()
         return block.state == .inProgress || (now >= block.plannedStart && now < block.plannedStart.addingTimeInterval(Double(block.plannedSeconds)))
-    }
-
-    private func scrollToNow(_ proxy: ScrollViewProxy) {
-        guard viewMode == .day, Calendar.current.isDateInToday(today), !blocks.isEmpty, visibleDraft == nil,
-              openBlockers.isEmpty,
-              !upcomingCalendarEvents(at: Date()).contains(where: { $0.plannedStart < dayInterval.end }),
-              scrolledDay != today else { return }
-        scrolledDay = today
-        DispatchQueue.main.async {
-            proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
-            // A block landing while the editor sheet is still dismissing can
-            // have its scroll swallowed by the layout pass — retry once after
-            // the transition settles. Idempotent if the first scroll took.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
-            }
-        }
     }
 
     private func refresh() {
