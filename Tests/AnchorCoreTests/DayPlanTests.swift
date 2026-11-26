@@ -47,6 +47,27 @@ struct DayPlanTests {
         #expect(source.title == "Read")
     }
 
+    @Test("Standalone logs contribute observed time, survive mirror encoding and stay out of Copy Day")
+    func unplannedLogsStayUnplanned() throws {
+        let container = try AnchorStore.makeContainer(kind: .inMemory)
+        let context = ModelContext(container)
+        let day = Date(timeIntervalSince1970: 1_704_067_200)
+        let log = PlanBlock(title: "Helped a teammate", plannedStart: day, plannedSeconds: 1800)
+        log.isUnplannedTimeLog = true
+        log.begin(at: day)
+        log.complete(at: day.addingTimeInterval(1800))
+        context.insert(log)
+        try context.save()
+        let review = DayReviewEngine(calendar: calendar).review(
+            day: day, blocks: [log.snapshot()], sessions: [], divergences: []
+        )
+        #expect(review.plannedSeconds == 0 && review.actualSeconds == 1800)
+        let payload = try JSONDecoder().decode(PlanBlockPayload.self, from: JSONEncoder().encode(PlanBlockPayload(log)))
+        #expect(payload.isUnplannedTimeLog == true)
+        let tomorrow = try #require(calendar.date(byAdding: .day, value: 1, to: day))
+        #expect(try DayPlanService(context: context, calendar: calendar).copyDay(from: day, to: tomorrow).isEmpty)
+    }
+
     @Test("Recurring templates materialize once on matching days")
     func materializationIsIdempotent() throws {
         let container = try AnchorStore.makeContainer(kind: .inMemory)
