@@ -100,13 +100,13 @@ private struct AnchorNavigationCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Navigate") {
-            Button("Focus") { route(to: .focus) }
+            Button("Focus timer") { route(to: .focus) }
                 .keyboardShortcut("1", modifiers: .command)
             Button("Today") { route(to: .today) }
                 .keyboardShortcut("2", modifiers: .command)
             Button("Habits") { route(to: .habits) }
                 .keyboardShortcut("3", modifiers: .command)
-            Button("History") { route(to: .history) }
+            Button("Analysis") { route(to: .history) }
                 .keyboardShortcut("4", modifiers: .command)
         }
 

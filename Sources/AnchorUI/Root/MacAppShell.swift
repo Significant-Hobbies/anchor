@@ -115,12 +115,12 @@ private struct AnchorNavigationRail: View {
                 .padding(.bottom, metrics.compactHeight ? Space.md : Space.xl)
 
             VStack(spacing: metrics.navigationSpacing) {
-                ForEach(AnchorTab.allCases) { item in
+                ForEach(AnchorTab.destinations) { item in
                     MacRailDestination(
                         item: item,
                         presentation: metrics.presentation,
                         isSelected: !isSettingsSelected && selection == item,
-                        carriesLiveSession: item == .focus && controller.hasSession
+                        carriesLiveSession: item == .today && controller.hasSession
                     ) {
                         selection = item
                     }

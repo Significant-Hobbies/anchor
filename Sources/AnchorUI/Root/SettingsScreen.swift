@@ -11,23 +11,18 @@ import SwiftUI
 /// for you.
 public struct SettingsScreen: View {
     @Environment(\.anchorTheme) private var theme
-    @Environment(\.anchorWorkspaceMaxWidth) private var workspaceMaxWidth
     @Environment(\.modelContext) private var context
     @Environment(\.anchorPlatformSync) private var platform
     @Query private var goals: [Goal]
-    @Query(sort: \Project.createdAt) private var projects: [Project]
-    @Query(sort: \SavedTag.createdAt) private var savedTags: [SavedTag]
-    @Query private var behaviorProfiles: [BehaviorProfile]
     @Query(sort: \AnchorPreferences.updatedAt, order: .reverse)
     private var preferences: [AnchorPreferences]
-    @State private var showsBehaviorProfile = false
-    @State private var showsMetadataLibrary = false
+    @State private var detail: Detail?
     @State private var appearanceSaveError: String?
     private let storeKind: AnchorStore.StoreKind
     private let onShowOnboarding: (() -> Void)?
     #if os(macOS) || os(iOS)
     private let remindersCoordinator: RemindersSyncCoordinator
-    private let calendarCoordinator: CalendarSyncCoordinator
+    @ObservedObject private var calendarCoordinator: CalendarSyncCoordinator
     #endif
 
     public init(
@@ -44,138 +39,154 @@ public struct SettingsScreen: View {
         #endif
     }
 
+    private enum Detail: String, Identifiable {
+        case calendar = "Google Calendar"
+        case projects = "Projects & tags"
+        case patterns = "Patterns and replacements"
+        case privacy = "Account and privacy"
+        case data = "Data & continuity"
+
+        var id: Self { self }
+    }
+
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Space.xl) {
-                SettingsIntro()
-
-                if workspaceMaxWidth >= 900 {
-                    HStack(alignment: .top, spacing: Space.lg) {
-                        primarySettingsColumn
-                        secondarySettingsColumn
-                    }
-                } else {
-                    VStack(spacing: Space.lg) {
-                        personalPreferences
-                        projectPreferences
-                        hubPreferences
-                        privacyPreferences
-                        dataPreferences
+            VStack(alignment: .leading, spacing: Space.lg) {
+                #if os(macOS)
+                Text("Settings").font(.largeTitle.weight(.semibold))
+                #endif
+                Card(padding: Space.md) {
+                    VStack(alignment: .leading, spacing: Space.sm) {
+                        ViewThatFits(in: .horizontal) {
+                            HStack {
+                                Text("Appearance")
+                                Spacer(minLength: Space.md)
+                                appearancePicker.fixedSize()
+                            }
+                            VStack(alignment: .leading) {
+                                Text("Appearance")
+                                appearancePicker
+                            }
+                        }
+                        if let appearanceSaveError {
+                            Text(appearanceSaveError).font(.caption).foregroundStyle(theme.negative)
+                        }
+                        Divider()
+                        PlannerStartReminderSettings(compact: true)
+                        Divider()
                         RemindersSettings(coordinator: remindersCoordinator)
-                        CalendarSettings(coordinator: calendarCoordinator)
+                        Divider()
+                        HStack {
+                            Text("Google Calendar")
+                            Spacer()
+                            Button(calendarActionTitle, action: openCalendars)
+                                .disabled(calendarCoordinator.isConnecting)
+                                .accessibilityIdentifier("anchor.settings.calendars")
+                        }
+                        if let issue = calendarCoordinator.connectionIssue {
+                            Text(issue).font(.caption).foregroundStyle(theme.caution)
+                        }
+                    }
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("More settings").font(.subheadline.weight(.semibold))
+                        .foregroundStyle(theme.textSecondary).padding(.bottom, Space.xs)
+                    detailRow(.projects).accessibilityIdentifier("anchor.settings.manage-metadata")
+                    Divider()
+                    detailRow(.patterns)
+                    Divider()
+                    detailRow(.privacy)
+                    Divider()
+                    detailRow(.data)
+                    if let onShowOnboarding {
+                        Divider()
+                        Button(action: onShowOnboarding) {
+                            rowLabel("Replay onboarding", symbol: "arrow.counterclockwise")
+                        }.buttonStyle(.plain)
                     }
                 }
             }
             .padding(Space.lg)
-            #if os(macOS)
-            .frame(maxWidth: min(workspaceMaxWidth, 1_040))
-            #else
             .frame(maxWidth: 680)
-            #endif
             .frame(maxWidth: .infinity)
         }
         .background(theme.canvas)
-        .sheet(isPresented: $showsBehaviorProfile) {
-            BehaviorProfileEditor().anchorTheme()
-        }
-        .sheet(isPresented: $showsMetadataLibrary) {
-            MetadataLibraryEditor().anchorTheme()
-        }
-    }
-
-    private var primarySettingsColumn: some View {
-        VStack(spacing: Space.lg) {
-            personalPreferences
-            projectPreferences
-            privacyPreferences
-            dataPreferences
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
-    }
-
-    private var secondarySettingsColumn: some View {
-        VStack(spacing: Space.lg) {
-            hubPreferences
-            RemindersSettings(coordinator: remindersCoordinator)
-            CalendarSettings(coordinator: calendarCoordinator)
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
-    }
-
-    private var personalPreferences: some View {
-        PreferenceGroup("Personal", subtitle: "The choices that change how Anchor feels") {
-            VStack(alignment: .leading, spacing: Space.sm) {
-                HStack(spacing: Space.sm) {
-                    Image(systemName: "circle.lefthalf.filled")
-                        .foregroundStyle(theme.textSecondary)
-                        .frame(width: 36, height: 36)
-                        .background(theme.textSecondary.opacity(0.10), in: .circle)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Appearance")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(theme.textPrimary)
-                        Text(appearanceScopeLabel)
-                            .font(.caption)
-                            .foregroundStyle(theme.textSecondary)
+        .sheet(item: $detail) { selected in
+            switch selected {
+            case .projects:
+                MetadataLibraryEditor().anchorTheme()
+            case .patterns:
+                BehaviorProfileEditor().anchorTheme()
+            default:
+                NavigationStack {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Space.lg) {
+                            switch selected {
+                            case .calendar:
+                                CalendarSettings(coordinator: calendarCoordinator, inSheet: true)
+                            case .privacy:
+                                hubPreferences
+                                privacyPreferences
+                            case .data:
+                                dataPreferences
+                            default:
+                                EmptyView()
+                            }
+                        }.padding(Space.lg).frame(maxWidth: 680)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .navigationTitle(selected.rawValue)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { detail = nil }
+                        }
                     }
                 }
-
-                Picker("Appearance", selection: appearanceBinding) {
-                    ForEach(AnchorAppearance.allCases, id: \.self) { appearance in
-                        Text(appearance.label).tag(appearance)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(minHeight: 44)
-                .accessibilityLabel("Appearance")
-                .accessibilityIdentifier("anchor.settings.appearance")
-
-                Text(appearanceExplanation)
-                    .font(.caption)
-                    .foregroundStyle(theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Label(appearanceContinuityLabel, systemImage: appearanceContinuitySymbol)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(theme.textTertiary)
-
-                if let appearanceSaveError {
-                    Label(appearanceSaveError, systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(theme.negative)
-                }
+                #if os(macOS)
+                .frame(minWidth: 480, idealWidth: 560, minHeight: 420, idealHeight: 560)
+                #endif
+                .anchorTheme()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Space.md)
-
-            if let onShowOnboarding {
-                PreferenceDivider()
-                PreferenceActionRow(
-                    systemImage: "sparkles.rectangle.stack",
-                    title: "Replay onboarding",
-                    detail: "Run the current walkthrough again without changing your schedule or history.",
-                    action: onShowOnboarding
-                )
-            }
-
-            PreferenceDivider()
-            PreferenceActionRow(
-                systemImage: "arrow.triangle.branch",
-                title: "Edit patterns and replacements",
-                detail: behaviorProfileSummary
-            ) { showsBehaviorProfile = true }
         }
     }
 
-    private var behaviorProfileSummary: String {
-        let profile = behaviorProfiles.first
-        let patterns = profile?.selectedPatterns.count ?? 0
-        let directions = profile?.desiredDirections.count ?? 0
-        if patterns == 0 && directions == 0 {
-            return "Choose what tends to pull you and what you want that time to become."
+    private var appearancePicker: some View {
+        Picker("Appearance", selection: appearanceBinding) {
+            ForEach(AnchorAppearance.allCases, id: \.self) { Text($0.label).tag($0) }
         }
-        return "\(patterns) pattern\(patterns == 1 ? "" : "s") · \(directions) direction\(directions == 1 ? "" : "s")"
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel("Appearance")
+        .accessibilityHint(appearanceScopeLabel)
+        .accessibilityIdentifier("anchor.settings.appearance")
+    }
+
+    private var calendarActionTitle: String {
+        if calendarCoordinator.isConnecting { return "Connecting…" }
+        if !calendarCoordinator.isConfigured { return "Availability" }
+        return calendarCoordinator.accounts.isEmpty ? "Connect account" : "Manage accounts"
+    }
+
+    private func openCalendars() {
+        detail = .calendar
+        if calendarCoordinator.isConfigured && calendarCoordinator.accounts.isEmpty {
+            Task { await calendarCoordinator.connect() }
+        }
+    }
+
+    private func detailRow(_ destination: Detail) -> some View {
+        Button { detail = destination } label: { rowLabel(destination.rawValue) }
+            .buttonStyle(.plain)
+    }
+
+    private func rowLabel(_ title: String, symbol: String = "chevron.right") -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Image(systemName: symbol).font(.caption.weight(.medium)).foregroundStyle(theme.textTertiary)
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 
     private var privacyPreferences: some View {
@@ -204,17 +215,6 @@ public struct SettingsScreen: View {
         }
     }
 
-    private var projectPreferences: some View {
-        PreferenceGroup("Projects & tags", subtitle: "Reusable context for focus, history, and exports") {
-            PreferenceActionRow(
-                systemImage: "folder.badge.gearshape",
-                title: "Manage projects and tags",
-                detail: "\(projects.filter { !$0.isArchived }.count) project\(projects.filter { !$0.isArchived }.count == 1 ? "" : "s") · \(savedTags.filter { !$0.isArchived }.count) tag\(savedTags.filter { !$0.isArchived }.count == 1 ? "" : "s")"
-            ) { showsMetadataLibrary = true }
-            .accessibilityIdentifier("anchor.settings.manage-metadata")
-        }
-    }
-
     private var dataPreferences: some View {
         PreferenceGroup("Data & continuity", subtitle: storeKind.storageDescription) {
             PreferenceInfoRow(
@@ -222,6 +222,10 @@ public struct SettingsScreen: View {
                 title: "Anchor data",
                 detail: storageContinuitySummary
             )
+
+            PreferenceDivider()
+            PreferenceInfoRow(systemImage: "circle.lefthalf.filled", title: "Appearance",
+                              detail: appearanceExplanation + " " + appearanceContinuityLabel)
 
             PreferenceDivider()
             PreferenceInfoRow(
@@ -338,79 +342,6 @@ public struct SettingsScreen: View {
         }
     }
 
-}
-
-private struct SettingsIntro: View {
-    @Environment(\.anchorTheme) private var theme
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: Space.xxl) {
-                copy(
-                    showsEyebrow: true,
-                    titleFont: .system(.largeTitle, design: .rounded).weight(.semibold),
-                    messageFont: .body
-                )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                artwork.frame(width: 260)
-            }
-            .frame(minWidth: 620)
-
-            HStack(alignment: .center, spacing: Space.md) {
-                copy(
-                    showsEyebrow: false,
-                    titleFont: .system(.title, design: .rounded).weight(.semibold),
-                    messageFont: .subheadline
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
-                artwork.frame(width: 120)
-            }
-            .frame(minWidth: 440)
-
-            VStack(alignment: .leading, spacing: Space.sm) {
-                copy(
-                    showsEyebrow: false,
-                    titleFont: .system(.title, design: .rounded).weight(.semibold),
-                    messageFont: .subheadline
-                )
-                artwork
-                    .frame(maxWidth: 130, maxHeight: 65)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func copy(
-        showsEyebrow: Bool,
-        titleFont: Font,
-        messageFont: Font
-    ) -> some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            if showsEyebrow {
-                Text("SETTINGS")
-                    .font(.system(.caption, design: .rounded).weight(.semibold))
-                    .tracking(1.2)
-                    .foregroundStyle(theme.textTertiary)
-            }
-            Text("Make Anchor yours")
-                .font(titleFont)
-                .foregroundStyle(theme.textPrimary)
-            DrawnUnderline(width: 78)
-            Text("Appearance, privacy, continuity, and the few choices that should stay in your hands.")
-                .font(messageFont)
-                .foregroundStyle(theme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var artwork: some View {
-        Image("FocusDoodle")
-            .resizable()
-            .scaledToFit()
-            .frame(maxHeight: 150)
-            .accessibilityHidden(true)
-    }
 }
 
 #endif

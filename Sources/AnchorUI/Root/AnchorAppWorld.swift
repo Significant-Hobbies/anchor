@@ -43,7 +43,7 @@ public final class AnchorAppWorld {
         container = result.container
         storeKind = result.kind
         navigation = AnchorNavigationModel(
-            selectedTab: DemoData.initialTab.flatMap(AnchorTab.demoValue) ?? .focus
+            selectedTab: DemoData.initialTab.flatMap(AnchorTab.demoValue) ?? .today
         )
         if CloudKitSchemaSeed.isRequested {
             do {
@@ -162,16 +162,21 @@ public final class AnchorNavigationModel {
     public var selectedTab: AnchorTab
     public var showsSettings = false
 
-    public init(selectedTab: AnchorTab = .focus) {
-        self.selectedTab = selectedTab
+    public var showsFocus = false
+
+    public init(selectedTab: AnchorTab = .today) {
+        self.selectedTab = selectedTab == .focus ? .today : selectedTab
+        showsFocus = selectedTab == .focus
     }
 
     public func select(_ tab: AnchorTab) {
-        selectedTab = tab
+        selectedTab = tab == .focus ? .today : tab
+        showsFocus = tab == .focus
         showsSettings = false
     }
 
     public func showSettings() {
+        showsFocus = false
         showsSettings = true
     }
 }

@@ -4,6 +4,7 @@ import SwiftData
 import SwiftUI
 
 public struct TodayScreen: View {
+    @State private var day = Date()
     private let controller: FocusController
     private let onOpenFocus: () -> Void
 
@@ -16,7 +17,7 @@ public struct TodayScreen: View {
     }
 
     public var body: some View {
-        PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, onOpenFocus: onOpenFocus)
+        PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, day: $day, onOpenFocus: onOpenFocus)
     }
 }
 
@@ -35,7 +36,9 @@ public struct HabitsScreen: View {
     @State private var schedulingTemplate: ScheduleTemplate?
     @State private var progressionError: String?
 
-    public init() {}
+    private let plannerDay: Date
+
+    public init(plannerDay: Date = Date()) { self.plannerDay = plannerDay }
 
     private var activeTemplates: [ScheduleTemplate] {
         templates.filter(\.isActiveBehaviorHabit)
@@ -48,13 +51,6 @@ public struct HabitsScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
-                DoodleScene(
-                    "HabitsDoodle",
-                    eyebrow: "habits",
-                    title: "Habits",
-                    message: "Every habit you keep, and the time it belongs at."
-                )
-
                 if let progressionError {
                     Label(progressionError, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote)
@@ -63,7 +59,7 @@ public struct HabitsScreen: View {
 
                 VStack(alignment: .leading, spacing: Space.sm) {
                     HStack(alignment: .firstTextBaseline) {
-                        SectionHeader("Your habits", subtitle: "All of them — check one off or give it a time.")
+                        SectionHeader("Your habits", subtitle: plannerDay.formatted(date: .complete, time: .omitted))
                         Spacer(minLength: Space.sm)
                         Text("\(activeTemplates.count) active")
                             .font(.caption.weight(.bold).monospacedDigit())
@@ -154,15 +150,15 @@ public struct HabitsScreen: View {
         .background(theme.canvas)
         .sheet(isPresented: $showsProfile) { BehaviorProfileEditor().anchorTheme() }
         .sheet(isPresented: $showsNewHabit) {
-            PlanBlockEditor(initialDay: Date(), startsBehaviorHabit: true) {}
+            PlanBlockEditor(initialDay: plannerDay, startsBehaviorHabit: true) {}
                 .anchorTheme()
         }
         .sheet(item: $editingTemplate) { template in
-            PlanBlockEditor(initialDay: Date(), template: template) {}
+            PlanBlockEditor(initialDay: plannerDay, template: template) {}
                 .anchorTheme()
         }
         .sheet(item: $schedulingTemplate) { template in
-            PlanBlockEditor(initialDay: Date(), placingHabit: template) {}
+            PlanBlockEditor(initialDay: plannerDay, placingHabit: template) {}
                 .anchorTheme()
         }
     }
@@ -197,7 +193,7 @@ public struct HabitsScreen: View {
 
     private func habitTiming(_ template: ScheduleTemplate) -> String {
         guard template.habitUsesSuggestedTime else { return "Any time" }
-        let start = Calendar.current.startOfDay(for: Date())
+        let start = Calendar.current.startOfDay(for: plannerDay)
         let time = Calendar.current.date(byAdding: .minute, value: template.startMinutesFromMidnight, to: start) ?? start
         return "Suggested \(time.formatted(date: .omitted, time: .shortened))"
     }
@@ -206,18 +202,19 @@ public struct HabitsScreen: View {
         HabitPolicy().weeklyProgress(
             for: template.habitSchedule(),
             blocks: planBlocks.map { $0.snapshot() },
-            completions: habitCompletions.map { $0.snapshot() }
+            completions: habitCompletions.map { $0.snapshot() },
+            weekContaining: plannerDay
         )
     }
 
     private func habitCard(_ template: ScheduleTemplate) -> some View {
         let progress = weeklyProgress(for: template)
-        return VStack(alignment: .leading, spacing: Space.md) {
+        return VStack(alignment: .leading, spacing: Space.xs) {
             HStack(alignment: .top, spacing: Space.sm) {
                 Image(systemName: template.lifeDirection?.symbolName ?? "repeat")
                     .font(.headline)
                     .foregroundStyle(theme.accent)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 28, height: 28)
                     .background(theme.accent.opacity(0.12), in: .circle)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(template.title)
@@ -257,7 +254,7 @@ public struct HabitsScreen: View {
                 }
             }
         }
-        .padding(Space.md)
+        .padding(Space.sm)
         .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
         .overlay(RoundedRectangle(cornerRadius: Radius.lg).strokeBorder(theme.hairline))
         .accessibilityElement(children: .contain)
@@ -273,13 +270,13 @@ public struct HabitsScreen: View {
     private func completedBlock(_ template: ScheduleTemplate) -> PlanBlock? {
         planBlocks.first {
             $0.templateID == template.id && $0.state == .completed
-                && Calendar.current.isDate($0.templateOccurrenceDay ?? $0.plannedStart, inSameDayAs: Date())
+                && Calendar.current.isDate($0.templateOccurrenceDay ?? $0.plannedStart, inSameDayAs: plannerDay)
         }
     }
 
     private func isCompleted(_ template: ScheduleTemplate) -> Bool {
         let direct = habitCompletions.first {
-            $0.habitID == template.id && Calendar.current.isDate($0.day, inSameDayAs: Date())
+            $0.habitID == template.id && Calendar.current.isDate($0.day, inSameDayAs: plannerDay)
         }
         return direct?.isCompleted == true || completedBlock(template) != nil
     }
@@ -292,17 +289,17 @@ public struct HabitsScreen: View {
             }
             .buttonStyle(QuietButtonStyle(expands: false))
             .disabled(completedBlock(template) != nil)
-            .accessibilityHint(done ? "Tap to undo today's check-off" : "Record without scheduling a time")
+            .accessibilityHint(done ? "Undo this check-off" : "Record without scheduling a time")
             .accessibilityIdentifier("anchor.habits.complete")
             Button("schedule", systemImage: "calendar.badge.plus") { schedulingTemplate = template }
                 .buttonStyle(QuietButtonStyle(expands: false))
-                .disabled(!template.applies(to: Date()))
+                .disabled(!template.applies(to: plannerDay))
         }
     }
 
     private func setCompleted(_ completed: Bool, template: ScheduleTemplate) {
         do {
-            try HabitDayService(context: context).setCompleted(completed, habitID: template.id, on: Date())
+            try HabitDayService(context: context).setCompleted(completed, habitID: template.id, on: plannerDay)
             progressionError = nil
         } catch {
             context.rollback()
@@ -426,7 +423,11 @@ public struct HistoryScreen: View {
     @Environment(\.anchorTheme) private var theme
     @State private var section: Section = .day
 
-    public init(section: Section = .day) {
+    @State private var standaloneDay = Date()
+    private let day: Binding<Date>?
+
+    public init(section: Section = .day, day: Binding<Date>? = nil) {
+        self.day = day
         _section = State(initialValue: section)
     }
 
@@ -450,7 +451,7 @@ public struct HistoryScreen: View {
             .frame(maxWidth: 680)
 
             switch section {
-            case .day: DayReviewScreen()
+            case .day: DayReviewScreen(selectedDay: day ?? $standaloneDay)
             case .interruptions: LogScreen()
             case .trends: AnalyticsScreen()
             }
