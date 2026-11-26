@@ -25,7 +25,8 @@ public struct FocusScreen: View {
     @State private var previousCheckIn: PlannerCheckIn?
     @State private var checkInReadFailed = false
 
-    public init(controller: FocusController) {
+    public init(controller: FocusController, composeWhenIdle: Bool = false) {
+        _showsAdHocComposer = State(initialValue: composeWhenIdle)
         self.controller = controller
     }
 
@@ -382,6 +383,8 @@ private struct FocusPreludeStage<Actions: View>: View {
 public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
     case focus, today, habits, history
 
+    static let destinations: [AnchorTab] = [.today, .habits, .history]
+
     public var id: String { rawValue }
 
     public var label: String {
@@ -389,7 +392,7 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
         case .focus: "Focus"
         case .today: "Today"
         case .habits: "Habits"
-        case .history: "History"
+        case .history: "Analysis"
         }
     }
 
@@ -405,8 +408,8 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
     public static func demoValue(_ rawValue: String) -> AnchorTab? {
         switch rawValue {
         case "day": .today
-        case "log", "insights": .history
-        case "settings": .focus
+        case "analysis", "log", "insights": .history
+        case "settings": .today
         default: AnchorTab(rawValue: rawValue)
         }
     }
@@ -449,6 +452,7 @@ public struct RootView: View {
     private let controller: FocusController
     private let storeKind: AnchorStore.StoreKind
     @Bindable private var navigation: AnchorNavigationModel
+    @State private var plannerDay = Date()
     @State private var forcedOnboardingFinished = false
     @State private var presentsOnboarding = false
 
@@ -561,7 +565,7 @@ public struct RootView: View {
         .tint(theme.accent)
         #else
         TabView(selection: $navigation.selectedTab) {
-            ForEach(AnchorTab.allCases) { item in
+            ForEach(AnchorTab.destinations) { item in
                 NavigationStack {
                     screen(for: item)
                         .navigationTitle(item.label)
@@ -588,13 +592,30 @@ public struct RootView: View {
         .tint(theme.accent)
         #endif
         }
+        .onChange(of: controller.hasSession) { wasActive, isActive in
+            if wasActive && !isActive { navigation.showsFocus = false }
+        }
+        .sheet(isPresented: $navigation.showsFocus) {
+            NavigationStack {
+                FocusScreen(controller: controller, composeWhenIdle: !controller.hasSession)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Back to Today") { navigation.select(.today) }
+                        }
+                    }
+            }
+            #if os(macOS)
+            .frame(minWidth: 540, idealWidth: 760, minHeight: 480, idealHeight: 660)
+            #endif
+            .anchorTheme()
+        }
     }
 
     private var onboarding: some View {
         AnchorOnboardingView(isExistingOwnerOrientation: !sessions.isEmpty) {
-            finishOnboarding(openFocus: true)
+            finishOnboarding()
         } onOpenApp: {
-            finishOnboarding(openFocus: false)
+            finishOnboarding()
         }
     }
 
@@ -613,13 +634,13 @@ public struct RootView: View {
         )
     }
 
-    private func finishOnboarding(openFocus: Bool) {
+    private func finishOnboarding() {
         if !shouldForceOnboarding {
             unifiedOnboardingSeen = true
         }
         forcedOnboardingFinished = true
         presentsOnboarding = false
-        if openFocus { navigation.select(.focus) }
+        navigation.select(.today)
     }
 
     private var shouldForceOnboarding: Bool {
@@ -635,9 +656,9 @@ public struct RootView: View {
         Group {
             switch tab {
             case .focus: FocusScreen(controller: controller)
-            case .today: TodayScreen(controller: controller, calendarCoordinator: calendarCoordinator) { navigation.select(.focus) }
-            case .habits: HabitsScreen()
-            case .history: HistoryScreen()
+            case .today: PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, day: $plannerDay) { navigation.select(.focus) }
+            case .habits: HabitsScreen(plannerDay: plannerDay)
+            case .history: HistoryScreen(day: $plannerDay)
             }
         }
     }

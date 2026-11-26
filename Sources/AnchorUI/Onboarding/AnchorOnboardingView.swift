@@ -631,7 +631,7 @@ public struct AnchorOnboardingView: View {
                     Text(rehearsal.goal).font(.title3.weight(.semibold))
                         .foregroundStyle(theme.textPrimary)
                         .multilineTextAlignment(.center)
-                    Text("The practice interruption was discarded. Your real captures stay local and appear in History.")
+                    Text("The practice interruption was discarded. Your real captures stay local and appear in Analysis.")
                         .font(.footnote)
                         .foregroundStyle(theme.textSecondary)
                         .multilineTextAlignment(.center)
@@ -656,7 +656,7 @@ public struct AnchorOnboardingView: View {
                     .font(.footnote)
                     .foregroundStyle(theme.textSecondary)
                     .multilineTextAlignment(.center)
-                Button("open my focus") { complete() }
+                Button("open Today") { complete() }
                     .buttonStyle(PrimaryButtonStyle())
                     .keyboardShortcut(.return, modifiers: .command)
                 Button(isExistingOwnerOrientation ? "return without starting" : "open anchor without starting") { onOpenApp() }

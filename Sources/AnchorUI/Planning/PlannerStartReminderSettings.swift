@@ -10,45 +10,53 @@ struct PlannerStartReminderSettings: View {
     @State private var authorization: UNAuthorizationStatus?
     @State private var alertsDisabled = false
 
+    var compact = false
+
     var body: some View {
-        Card(padding: Space.lg) {
-            VStack(alignment: .leading, spacing: Space.sm) {
-                Picker("Entry reminders", selection: $lead) {
-                    Text("Off").tag(-1)
-                    Text("At start time").tag(0)
-                    ForEach([1, 5, 10, 15, 30], id: \.self) { minutes in
-                        Text("\(minutes) min before").tag(minutes)
-                    }
+        Group {
+            if compact { controls } else { Card(padding: Space.lg) { controls } }
+        }
+        .task(id: scenePhase) { if scenePhase == .active { await refresh() } }
+        .onChange(of: lead) { Task { await refresh() } }
+    }
+
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Picker("Entry reminders", selection: $lead) {
+                Text("Off").tag(-1)
+                Text("At start time").tag(0)
+                ForEach([1, 5, 10, 15, 30], id: \.self) { minutes in
+                    Text("\(minutes) min before").tag(minutes)
                 }
-                .accessibilityIdentifier("anchor.planner.reminder-lead")
-                if lead >= 0 {
+            }
+            .accessibilityIdentifier("anchor.planner.reminder-lead")
+            if lead >= 0 {
+                if !compact {
                     Text(authorization == .authorized && !alertsDisabled
-                         ? "Alerts are on for upcoming entries and selected calendars on this device."
-                         : "For upcoming entries on this device, including selected calendars.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    if authorization == .notDetermined {
-                        Button("Allow notifications") {
-                            Task {
-                                _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
-                                await refresh()
-                            }
+                     ? "Alerts are on for upcoming entries and selected calendars on this device."
+                     : "For upcoming entries on this device, including selected calendars.")
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+                if authorization == .notDetermined {
+                    Button("Allow notifications") {
+                        Task {
+                            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+                            await refresh()
                         }
-                    } else if authorization == .denied || alertsDisabled {
-                        Text("Turn on alerts for Anchor in notification settings.")
-                            .font(.caption)
-                        Button("Open notification settings") {
-                            #if os(iOS)
-                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
-                            #else
-                            if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") { openURL(url) }
-                            #endif
-                        }
+                    }
+                } else if authorization == .denied || alertsDisabled {
+                    Text("Turn on alerts for Anchor in notification settings.")
+                        .font(.caption)
+                    Button("Open notification settings") {
+                        #if os(iOS)
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
+                        #else
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") { openURL(url) }
+                        #endif
                     }
                 }
             }
         }
-        .task(id: scenePhase) { if scenePhase == .active { await refresh() } }
-        .onChange(of: lead) { Task { await refresh() } }
     }
 
     private func refresh() async {

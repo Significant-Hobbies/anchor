@@ -18,10 +18,8 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = storePath
         app.launch()
 
-        app.buttons.ci("Focus").click()
-        let adHoc = app.buttons.ci("anchor.focus.start-unplanned")
-        XCTAssertTrue(adHoc.waitForExistence(timeout: 5))
-        adHoc.click()
+        XCTAssertFalse(app.buttons.ci("Focus").exists)
+        app.buttons.ci("Start focus").click()
 
         let intention = app.textFields.ci("Ship the auth flow")
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
@@ -45,7 +43,7 @@ final class AnchorMacUITests: XCTestCase {
         decline.click()
 
         app.buttons.ci("End session").click()
-        app.buttons.ci("History").click()
+        app.buttons.ci("Analysis").click()
         app.radioButtons.ci("Interruptions").click()
         let parkedRow = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH[c] %@", "Synthetic interruption")
@@ -54,7 +52,7 @@ final class AnchorMacUITests: XCTestCase {
 
         app.terminate()
         app.launch()
-        app.buttons.ci("History").click()
+        app.buttons.ci("Analysis").click()
         app.radioButtons.ci("Interruptions").click()
         XCTAssertTrue(parkedRow.waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-build25-mac-interruption-reopened")
@@ -99,7 +97,7 @@ final class AnchorMacUITests: XCTestCase {
                 .firstMatch.waitForExistence(timeout: 3)
         )
 
-        app.buttons.ci("History").click()
+        app.buttons.ci("Analysis").click()
         XCTAssertTrue(app.radioButtons.ci("Day review").waitForExistence(timeout: 4))
         XCTAssertTrue(app.staticTexts.ci("Reviewing today").exists)
         let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
@@ -642,6 +640,11 @@ final class AnchorMacUITests: XCTestCase {
 
         app.buttons.ci("Settings").click()
 
+        XCTAssertTrue(app.radioButtons.ci("System").exists)
+        XCTAssertTrue(app.radioButtons.ci("Light").exists)
+        XCTAssertTrue(app.radioButtons.ci("Dark").exists)
+        app.radioButtons.ci("Dark").click()
+        app.buttons.ci("Account and privacy").click()
         XCTAssertTrue(app.staticTexts.ci("Significant Hobbies Hub").waitForExistence(timeout: 4))
         #if ANCHOR_LOCAL_ONLY
         XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
@@ -650,17 +653,11 @@ final class AnchorMacUITests: XCTestCase {
         #else
         XCTAssertTrue(app.staticTexts.ci("Bring Anchor into your Hub").exists)
         #endif
-        XCTAssertTrue(app.radioButtons.ci("System").exists)
-        XCTAssertTrue(app.radioButtons.ci("Light").exists)
-        XCTAssertTrue(app.radioButtons.ci("Dark").exists)
-        app.radioButtons.ci("Dark").click()
-        XCTAssertTrue(
-            app.staticTexts.ci("Uses the charcoal focus canvas on this device.")
-                .waitForExistence(timeout: 2)
-        )
-        XCTAssertTrue(app.staticTexts.ci("This build stores appearance on this device only").exists)
+        app.buttons.ci("Done").click()
+        app.buttons.ci("Data & continuity").click()
+        XCTAssertTrue(app.staticTexts.ci("Local library").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@", "charcoal focus canvas", "charcoal focus canvas")).firstMatch.exists)
         XCTAssertFalse(app.staticTexts.ci("Talk to your data").exists)
-        XCTAssertTrue(app.staticTexts.ci("Local library").exists)
     }
 
     @MainActor
@@ -749,7 +746,7 @@ final class AnchorMacUITests: XCTestCase {
         keepScreenshot(app, named: "anchor-timetable-logged")
 
         // Logged entries count as observed time — no "untimed" in the review.
-        app.buttons.ci("History").click()
+        app.buttons.ci("Analysis").click()
         let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
         XCTAssertTrue(comparison.waitForExistence(timeout: 3))
         XCTAssertFalse(String(describing: comparison.value).contains("untimed"))

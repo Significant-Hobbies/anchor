@@ -28,7 +28,7 @@ struct PlanScreen: View {
     @State private var periodSyncError: String?
     @State private var isLoadingPeriod = false
     @State private var refreshRequest = UUID()
-    @State private var today = Date()
+    @Binding private var today: Date
     @State private var lastCalendarDay = Date()
     @State private var showsDatePicker = false
     @AppStorage(TimetableStep.preferenceKey) private var gridStep = TimetableStep.five
@@ -48,7 +48,8 @@ struct PlanScreen: View {
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
 
-    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, onOpenFocus: @escaping () -> Void) {
+    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, day: Binding<Date>, onOpenFocus: @escaping () -> Void) {
+        _today = day
         self.calendarCoordinator = calendarCoordinator
         self.controller = controller
         self.onOpenFocus = onOpenFocus
@@ -135,6 +136,7 @@ struct PlanScreen: View {
                         calendarsButton.buttonStyle(.borderless)
                     }
                 } else if viewMode == .day {
+                    if controller.hasSession || Calendar.current.isDateInToday(today) { focusItem }
                     dayControls
                     DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
                                   hidesCalendarPlans: !showsDayCalendarEvents)
@@ -536,6 +538,40 @@ struct PlanScreen: View {
             }
         }
         .accessibilityIdentifier("anchor.today.upcoming-calendar")
+    }
+
+    @ViewBuilder
+    private var focusItem: some View {
+        if let session = controller.session, controller.hasSession {
+            focusRow(controller.isRunning ? "In focus" : "Paused", title: session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent,
+                     action: "Open timer", perform: onOpenFocus)
+        } else if let record = ScheduledFocusResolver().nextBlock(from: dayDisplayBlocks.map { $0.snapshot() }, now: calendarReferenceTime),
+                  let block = dayDisplayBlocks.first(where: { $0.id == record.id }) {
+            HStack {
+                focusRow((block.plannedStart > calendarReferenceTime ? "Up next" : "Now") + " · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
+                     title: block.title, action: "Start focus") { start(block) }
+                Menu {
+                    Button("Start an unplanned session", action: onOpenFocus)
+                } label: { Image(systemName: "ellipsis.circle") }
+                .menuIndicator(.hidden)
+                .accessibilityLabel("More focus actions")
+            }
+        } else {
+            Button("Start focus", systemImage: "scope", action: onOpenFocus)
+                .buttonStyle(QuietButtonStyle(expands: false))
+        }
+    }
+
+    private func focusRow(_ status: String, title: String, action: String, perform: @escaping () -> Void) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(status).font(.caption).foregroundStyle(theme.textSecondary)
+                Text(title).font(.headline)
+            }
+            Spacer()
+            Button(action, action: perform).buttonStyle(QuietButtonStyle(expands: false))
+        }
+        .accessibilityElement(children: .contain)
     }
 
     private var periodNavigation: some View {
@@ -1192,7 +1228,7 @@ struct PlanBlockEditor: View {
                                 .font(.caption)
                                 .foregroundStyle(theme.textTertiary)
                         } else {
-                            editorLabel("Time", detail: placingHabit == nil ? "A useful edge, not a promise carved in stone" : "Choose where this belongs today")
+                            editorLabel("Time", detail: placingHabit == nil ? "A useful edge, not a promise carved in stone" : "Choose a time for this day")
                             HStack(spacing: Space.lg) {
                                 VStack(alignment: .leading, spacing: Space.xxs) {
                                     Text("STARTS").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(theme.textTertiary)
@@ -1653,7 +1689,7 @@ struct DayReviewScreen: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     @Query(sort: \DivergenceEvent.occurredAt) private var divergences: [DivergenceEvent]
     @Query private var profiles: [BehaviorProfile]
-    @State private var selectedDay = Date()
+    @Binding var selectedDay: Date
     @State private var explainingGap: DayReviewEngine.Gap?
 
     private var review: DayReviewEngine.Review {
@@ -1677,9 +1713,9 @@ struct DayReviewScreen: View {
             VStack(alignment: .leading, spacing: Space.lg) {
                 DoodleScene(
                     "HistoryDoodle",
-                    eyebrow: "history",
-                    title: "Read the real day",
-                    message: "Compare what you drew with what happened. Keep the lesson, not the score.",
+                    eyebrow: "analysis",
+                    title: "Day analysis",
+                    message: "Compare your plan with recorded time, interruptions, and changes.",
                     compact: true
                 )
 

@@ -42,7 +42,7 @@ struct DrawnDayLanguageTests {
         }
     }
 
-    @Test("Preference primitives stay product-agnostic and Settings adapts as one screen")
+    @Test("Preference primitives stay product-agnostic and Settings exposes its quick controls")
     func settingsUsesExtractionReadyPrimitives() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -58,9 +58,9 @@ struct DrawnDayLanguageTests {
         #expect(!components.contains("import AnchorCore"))
         #expect(components.contains("public struct PreferenceGroup"))
         #expect(components.contains("public struct PreferenceActionRow"))
-        #expect(settings.contains("if workspaceMaxWidth >= 900"))
-        #expect(settings.contains("primarySettingsColumn"))
-        #expect(settings.contains("secondarySettingsColumn"))
+        #expect(settings.contains("PlannerStartReminderSettings(compact: true)"))
+        #expect(settings.contains("RemindersSettings(coordinator: remindersCoordinator)"))
+        #expect(settings.contains("anchor.settings.calendars"))
     }
 
     @Test("Onboarding and Settings share one optional private Hub account experience")

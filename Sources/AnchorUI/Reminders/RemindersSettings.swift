@@ -17,65 +17,58 @@ public struct RemindersSettings: View {
     }
 
     public var body: some View {
-        PreferenceGroup("Reminders", subtitle: "Show today's plan in Apple Reminders") {
-            VStack(alignment: .leading, spacing: Space.sm) {
-                PreferenceInfoRow(
-                    systemImage: "checklist",
-                    title: "Sync planned blocks",
-                    detail: "Creates one reminder per planned block for today and the next seven days. Completing either side updates the other."
-                ) {
-                    Toggle("", isOn: enabledBinding)
-                        .labelsHidden()
-                        .accessibilityLabel("Sync planned blocks to Reminders")
-                }
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Toggle("Apple Reminders", isOn: enabledBinding)
+                .toggleStyle(.switch)
+                .accessibilityLabel("Sync planned blocks to Reminders")
+                .accessibilityHint("Sync today’s plan and the next seven days with Apple Reminders.")
 
-                if enabled {
-                    PreferenceDivider()
+            if enabled {
+                PreferenceDivider()
 
-                    if coordinator.availableLists.count > 1 {
-                        PreferenceInfoRow(
-                            systemImage: "list.bullet",
-                            title: "Reminders list",
-                            detail: "Where new reminders appear"
-                        ) {
-                            Picker("", selection: $listID) {
-                                Text("Default list").tag("")
-                                ForEach(coordinator.availableLists) { list in
-                                    Text(list.title).tag(list.id)
-                                }
-                            }
-                            .labelsHidden()
-                            .accessibilityLabel("Reminders list")
-                        }
-                        PreferenceDivider()
-                    }
-
+                if coordinator.availableLists.count > 1 {
                     PreferenceInfoRow(
-                        systemImage: "note.text",
-                        title: "Include block details",
-                        detail: "Off by default. Distraction and session notes are never exported."
+                        systemImage: "list.bullet",
+                        title: "Reminders list",
+                        detail: "Where new reminders appear"
                     ) {
-                        Toggle("", isOn: $exportDetails)
-                            .labelsHidden()
-                            .accessibilityLabel("Include block details in reminders")
+                        Picker("", selection: $listID) {
+                            Text("Default list").tag("")
+                            ForEach(coordinator.availableLists) { list in
+                                Text(list.title).tag(list.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .accessibilityLabel("Reminders list")
                     }
+                    PreferenceDivider()
                 }
 
-                if let status = coordinator.status {
-                    PreferenceDivider()
-                    Text(status)
-                        .font(.caption)
-                        .foregroundStyle(theme.textSecondary)
-                        .padding(.horizontal, Space.md)
-                        .padding(.bottom, Space.sm)
-                } else if enabled, let lastSync = coordinator.lastSyncedAt {
-                    PreferenceDivider()
-                    Text("Last synced \(lastSync.formatted(date: .omitted, time: .shortened))")
-                        .font(.caption)
-                        .foregroundStyle(theme.textTertiary)
-                        .padding(.horizontal, Space.md)
-                        .padding(.bottom, Space.sm)
+                PreferenceInfoRow(
+                    systemImage: "note.text",
+                    title: "Include block details",
+                    detail: "Off by default. Distraction and session notes are never exported."
+                ) {
+                    Toggle("", isOn: $exportDetails)
+                        .labelsHidden()
+                        .accessibilityLabel("Include block details in reminders")
                 }
+            }
+
+            if let status = coordinator.status {
+                PreferenceDivider()
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+                    .padding(.horizontal, Space.md)
+                    .padding(.bottom, Space.sm)
+            } else if enabled, let lastSync = coordinator.lastSyncedAt {
+                PreferenceDivider()
+                Text("Last synced \(lastSync.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption)
+                    .foregroundStyle(theme.textTertiary)
+                    .padding(.horizontal, Space.md)
+                    .padding(.bottom, Space.sm)
             }
         }
     }

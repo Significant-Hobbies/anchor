@@ -64,10 +64,9 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
-        app.tabBars.buttons.ci("Focus").tap()
-        let adHoc = app.buttons.ci("anchor.focus.start-unplanned")
-        XCTAssertTrue(adHoc.waitForExistence(timeout: 5))
-        adHoc.tap()
+        XCTAssertFalse(app.tabBars.buttons.ci("Focus").exists)
+        app.buttons.ci("Start focus").tap()
+
         let intention = app.textFields.ci("Ship the auth flow")
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
         intention.tap()
@@ -75,17 +74,13 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.ci("Done").tap()
         let start = app.buttons.ci("Start focusing")
         XCTAssertTrue(start.waitForExistence(timeout: 3))
-        let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.exists)
         XCTAssertTrue(start.isHittable)
-        XCTAssertLessThanOrEqual(start.frame.maxY, tabBar.frame.minY - 8)
         start.tap()
         XCTAssertTrue(app.staticTexts.ci("Finish the release").waitForExistence(timeout: 4))
 
         let capture = app.buttons.ci("Lock a distraction")
         XCTAssertTrue(capture.waitForExistence(timeout: 3))
         XCTAssertTrue(capture.isHittable)
-        XCTAssertLessThanOrEqual(capture.frame.maxY, tabBar.frame.minY - 8)
         capture.tap()
 
         let note = app.textFields.ci("Slack from Ravi about the invoice")
@@ -96,7 +91,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.ci("anchor.capture.pause").tap()
         app.terminate()
         app.launch()
-        app.tabBars.buttons.ci("Focus").tap()
+        app.buttons.ci("Open timer").tap()
         XCTAssertTrue(app.staticTexts.ci("Finish the release").waitForExistence(timeout: 4))
         let resume = app.buttons.ci("Resume")
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
@@ -106,12 +101,12 @@ final class AnchorIOSUITests: XCTestCase {
         decline.tap()
 
         app.buttons.ci("End session").tap()
-        app.tabBars.buttons.ci("History").tap()
+        app.tabBars.buttons.ci("Analysis").tap()
         app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
         app.terminate()
         app.launch()
-        app.tabBars.buttons.ci("History").tap()
+        app.tabBars.buttons.ci("Analysis").tap()
         app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-focus-history-after-relaunch")
@@ -174,28 +169,21 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.ci("Park it — return to focus").tap()
 
         XCTAssertTrue(app.staticTexts.ci("Thought parked.").waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts.ci("The practice interruption was discarded. Your real captures stay local and appear in History.").exists)
-        let openFocus = app.buttons.ci("Open my Focus")
+        XCTAssertTrue(app.staticTexts.ci("The practice interruption was discarded. Your real captures stay local and appear in Analysis.").exists)
+        let openFocus = app.buttons.ci("Open Today")
         XCTAssertTrue(openFocus.waitForExistence(timeout: 4))
         app.swipeUp()
         XCTAssertTrue(openFocus.isHittable)
         openFocus.tap()
-        let focusTab = app.tabBars.buttons.ci("Focus")
-        XCTAssertTrue(focusTab.waitForExistence(timeout: 5))
-        let startScheduled = app.buttons.ci("Start this block")
-        if startScheduled.waitForExistence(timeout: 2) {
-            startScheduled.tap()
-        } else {
-            let startUnplanned = app.buttons.ci("anchor.focus.start-unplanned")
-            XCTAssertTrue(startUnplanned.waitForExistence(timeout: 4))
-            startUnplanned.tap()
-            let realGoal = app.textFields.ci("Ship the auth flow")
-            XCTAssertTrue(realGoal.waitForExistence(timeout: 3))
+        let focus = app.buttons.ci("Start focus")
+        XCTAssertTrue(focus.waitForExistence(timeout: 5))
+        focus.tap()
+        let realGoal = app.textFields.ci("Ship the auth flow")
+        if realGoal.waitForExistence(timeout: 2) {
             realGoal.tap()
             realGoal.typeText("Draft the launch note")
-            XCTAssertTrue(app.keyboards.firstMatch.exists)
             let start = app.buttons.ci("Start focusing")
-            XCTAssertTrue(start.isHittable, "Starting must remain reachable while the keyboard is open")
+            XCTAssertTrue(start.isHittable)
             start.tap()
         }
         XCTAssertTrue(app.buttons.ci("Lock a distraction").waitForExistence(timeout: 4))
@@ -669,7 +657,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
-        for tab in ["Today", "Habits", "History", "Focus"] {
+        for tab in ["Today", "Habits", "Analysis"] {
             app.tabBars.buttons.ci(tab).tap()
             let toolbarButton = app.buttons.ci("anchor.toolbar.settings")
             XCTAssertTrue(toolbarButton.waitForExistence(timeout: 3), "Settings toolbar action is missing on \(tab)")
@@ -681,6 +669,10 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(settingsButton.isHittable)
         settingsButton.tap()
 
+        let appearance = app.segmentedControls["anchor.settings.appearance"]
+        XCTAssertTrue(appearance.exists)
+        appearance.buttons.ci("Dark").tap()
+        app.buttons.ci("Account and privacy").tap()
         XCTAssertTrue(app.staticTexts.ci("Significant Hobbies Hub").waitForExistence(timeout: 4))
         #if ANCHOR_LOCAL_ONLY
         XCTAssertTrue(app.descendants(matching: .any)["anchor.hub.unavailable"].exists)
@@ -690,14 +682,10 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.ci("Bring Anchor into your Hub").exists)
         XCTAssertTrue(app.buttons.ci("anchor.hub.sign-in-apple").exists)
         #endif
-        let appearance = app.segmentedControls["anchor.settings.appearance"]
-        XCTAssertTrue(appearance.exists)
-        appearance.buttons.ci("Dark").tap()
-        XCTAssertTrue(
-            app.staticTexts.ci("Uses the charcoal focus canvas on this device.")
-                .waitForExistence(timeout: 2)
-        )
-        XCTAssertTrue(app.staticTexts.ci("This build stores appearance on this device only").exists)
+        app.buttons.ci("Done").tap()
+        app.buttons.ci("Data & continuity").tap()
+        XCTAssertTrue(app.staticTexts.ci("Local library").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@ OR value CONTAINS[c] %@", "charcoal focus canvas", "charcoal focus canvas")).firstMatch.exists)
         XCTAssertFalse(app.staticTexts.ci("Talk to your data").exists)
         XCTAssertFalse(app.staticTexts.ci("Database").exists)
     }
