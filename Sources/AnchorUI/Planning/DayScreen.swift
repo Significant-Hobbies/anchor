@@ -23,7 +23,7 @@ struct PlanScreen: View {
     @State private var checkIns: [UUID: PlannerCheckIn] = [:]
     @State private var checkingEntry: PlannerCheckIn?
     @State private var checkInLoadFailed = false
-    private enum CalendarViewMode: String { case day, week }
+    private enum CalendarViewMode: String { case day, week, review }
     @SceneStorage("anchor.planner.view") private var viewMode = CalendarViewMode.day
     @State private var periodSyncError: String?
     @State private var isLoadingPeriod = false
@@ -126,7 +126,7 @@ struct PlanScreen: View {
                         Spacer()
                         calendarsButton.buttonStyle(.borderless)
                     }
-                } else {
+                } else if viewMode == .day {
                     dayHeader
                     dayControls
                 }
@@ -152,7 +152,9 @@ struct PlanScreen: View {
                         .foregroundStyle(theme.caution)
                 }
 
-                if viewMode == .week {
+                if viewMode == .review {
+                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions)
+                } else if viewMode == .week {
                     WeekAgenda(days: visibleDays,
                                entries: visibleBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
                                openDay: { today = $0; viewMode = .day },
@@ -377,7 +379,7 @@ struct PlanScreen: View {
                 .anchorTheme()
         }
         .sheet(item: $loggingBlock) { block in
-            LogTimeSheet(day: today, block: block, onSave: refresh)
+            LinkedActualEditor(block: block)
                 .anchorTheme()
         }
         .task {
@@ -537,7 +539,7 @@ struct PlanScreen: View {
 
     private var modePicker: some View {
         SMSegmentedControl("Calendar view", selection: $viewMode, segments: [
-            SMSegment(.day, title: "Day"), SMSegment(.week, title: "Week")
+            SMSegment(.day, title: "Day"), SMSegment(.week, title: "Week"), SMSegment(.review, title: "Review")
         ], size: .compact)
         .accessibilityIdentifier("anchor.planner.view-mode")
     }
@@ -1696,6 +1698,9 @@ struct DayReviewScreen: View {
                     DatePicker("Day", selection: $selectedDay, displayedComponents: .date).labelsHidden()
                 }
 
+                DayLedgerView(day: selectedDay, blocks: calendarVisibility.filter(blocks), sessions: sessions)
+
+                Text("Timer and activity analysis").font(.headline)
                 DayComparison(
                     planned: review.plannedSeconds,
                     observed: review.actualSeconds,

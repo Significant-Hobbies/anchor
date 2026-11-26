@@ -198,6 +198,7 @@ struct LogTimeSheet: View {
                     : max(60, Int(end.timeIntervalSince(start))),
                 kind: kind
             )
+            target.isUnplannedTimeLog = true
             context.insert(target)
         }
         target.projectID = selectedProjectID

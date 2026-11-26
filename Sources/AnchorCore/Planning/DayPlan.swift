@@ -346,6 +346,8 @@ public final class PlanBlock {
     public var details: String = ""
     public var plannedStart: Date = Date()
     public var plannedSeconds: Int = 1_500
+    /// A standalone time log is evidence of activity without a corresponding plan.
+    public var isUnplannedTimeLog: Bool = false
     public var actualStartedAt: Date?
     public var actualEndedAt: Date?
     public var stateRaw: String = PlanBlockState.planned.rawValue
