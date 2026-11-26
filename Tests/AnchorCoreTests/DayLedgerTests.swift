@@ -24,6 +24,9 @@ struct DayLedgerTests {
         #expect(throws: CocoaError.self) { try store.save(plan, replacing: nil) }
         #expect(try DayLedgerStore(storeURL: url).load() == [actual])
         #expect(plan.title == "Draft proposal")
+        #expect(throws: CocoaError.self) { try store.remove(plan) }
+        try store.remove(actual)
+        #expect(try store.load().isEmpty)
     }
 
     @Test func separatesUnrecordedUnplannedAndChangedAndClipsAtMidnight() {
@@ -35,6 +38,7 @@ struct DayLedgerTests {
         let result = DayLedgerComparison(period: period, plans: [plan, same, pending], actuals: [actual, same, extra])
         #expect(result.matched == 1 && result.changed == 1 && result.unrecorded == 1 && result.unplanned == 1)
         #expect(result.plannedSeconds == 80 * 60 && result.recordedSeconds == 80 * 60)
+        #expect(result.linkedVarianceSeconds == 600 && result.unplannedSeconds == 600)
         actual.start = midnight.addingTimeInterval(86400)
         actual.end = actual.start.addingTimeInterval(600)
         let moved = DayLedgerComparison(period: period, plans: [plan], actuals: [actual])

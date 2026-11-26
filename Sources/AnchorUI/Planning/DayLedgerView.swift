@@ -131,7 +131,13 @@ struct DayLedgerView: View {
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in reload() }
         .sheet(item: $editor) { item in
-            DayActualEditor(entry: item.entry) { updated in
+            DayActualEditor(entry: item.entry, onRemove: item.previous.map { previous in
+                {
+                    guard let store else { throw CocoaError(.fileWriteUnknown) }
+                    try store.remove(previous)
+                    NotificationCenter.default.post(name: .actualEntriesChanged, object: nil)
+                }
+            }) { updated in
                 try save(updated, replacing: item.previous)
             }.anchorTheme()
         }
@@ -187,6 +193,13 @@ struct DayLedgerView: View {
             Text("\(Int(data.plannedSeconds / 60)) min planned · \(Int(data.recordedSeconds / 60)) min recorded")
             Text("\(data.matched) as planned · \(data.changed) changed · \(data.unplanned) unplanned · \(data.unrecorded) unrecorded")
                 .foregroundStyle(theme.textSecondary)
+            let delta = Int((data.linkedVarianceSeconds / 60).rounded())
+            if delta != 0 {
+                Text("Recorded plan entries took \(abs(delta)) min " + (delta > 0 ? "more" : "less") + " than planned in this period.")
+            }
+            if data.unplanned > 0 {
+                Text("\(Int((data.unplannedSeconds / 60).rounded())) min went to unplanned entries.")
+            }
         }.font(.caption).frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -262,6 +275,8 @@ private struct DayActualEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State var entry: DayLedgerEntry
     @State private var error: String?
+    @State private var confirmsRemoval = false
+    var onRemove: (() throws -> Void)? = nil
     let onSave: (DayLedgerEntry) throws -> Void
 
     var body: some View {
@@ -273,6 +288,15 @@ private struct DayActualEditor: View {
                 TextField("Notes (optional)", text: $entry.notes, axis: .vertical).lineLimit(2...6)
                 if entry.end <= entry.start { Text("Choose an end after the start.").font(.caption) }
                 if let error { Text(error).font(.caption) }
+                if onRemove != nil {
+                    Button("Remove saved actual", role: .destructive) { confirmsRemoval = true }
+                        .confirmationDialog("Remove this saved actual?", isPresented: $confirmsRemoval) {
+                            Button("Remove saved actual", role: .destructive) {
+                                do { try onRemove?(); dismiss() }
+                                catch { self.error = "Couldn’t remove this entry. Reopen it and try again." }
+                            }
+                        } message: { Text("The plan and any original timer recording will remain available.") }
+                }
             }
             .formStyle(.grouped)
             .navigationTitle("What happened")

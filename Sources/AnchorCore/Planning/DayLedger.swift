@@ -27,6 +27,7 @@ public struct DayLedgerComparison {
     public let actuals: [DayLedgerEntry]
     public let matched, changed, unrecorded, unplanned: Int
     public let plannedSeconds, recordedSeconds: Double
+    public let linkedVarianceSeconds, unplannedSeconds: Double
 
     public init(period: DateInterval, plans: [DayLedgerEntry], actuals: [DayLedgerEntry]) {
         self.plans = plans.filter { $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
@@ -34,14 +35,23 @@ public struct DayLedgerComparison {
         let byID = Dictionary(actuals.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let planIDs = Set(plans.map(\.id))
         var same = 0, different = 0
+        var variance: Double = 0
         for plan in self.plans {
             guard let actual = byID[plan.id] else { continue }
+            variance += actual.seconds(in: period) - plan.seconds(in: period)
             if plan == actual { same += 1 } else { different += 1 }
         }
         matched = same
         changed = different
         unrecorded = self.plans.count - same - different
-        unplanned = self.actuals.filter { !planIDs.contains($0.id) }.count
+        let extras = self.actuals.filter { !planIDs.contains($0.id) }
+        unplanned = extras.count
+        unplannedSeconds = extras.reduce(0) { $0 + $1.seconds(in: period) }
+        // Actuals moved in from a plan outside the period also contribute here.
+        let localIDs = Set(self.plans.map(\.id))
+        linkedVarianceSeconds = variance + self.actuals.filter {
+            planIDs.contains($0.id) && !localIDs.contains($0.id)
+        }.reduce(0) { $0 + $1.seconds(in: period) }
         plannedSeconds = self.plans.reduce(0) { $0 + $1.seconds(in: period) }
         recordedSeconds = self.actuals.reduce(0) { $0 + $1.seconds(in: period) }
     }
@@ -75,17 +85,29 @@ public struct DayLedgerStore {
         var flags = URLResourceValues()
         flags.isExcludedFromBackup = true
         try location.setResourceValues(flags)
-        let url = folder.appendingPathComponent(entry.id.uuidString).appendingPathExtension("json")
+        try change(id: entry.id, from: previous, to: entry)
+    }
+
+    public func remove(_ previous: DayLedgerEntry) throws {
+        try change(id: previous.id, from: previous, to: nil)
+    }
+
+    private func change(id: UUID, from previous: DayLedgerEntry?, to entry: DayLedgerEntry?) throws {
+        let url = folder.appendingPathComponent(id.uuidString).appendingPathExtension("json")
         var coordinationError: NSError?
         var writeError: Error?
-        NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { destination in
+        NSFileCoordinator().coordinate(writingItemAt: url, options: entry == nil ? .forDeleting : .forReplacing, error: &coordinationError) { destination in
             do {
                 let existing: DayLedgerEntry?
                 do { existing = try JSONDecoder().decode(DayLedgerEntry.self, from: Data(contentsOf: destination)) }
                 catch let error as CocoaError where error.code == .fileReadNoSuchFile { existing = nil }
                 if existing == entry { return }
                 guard existing == previous else { throw CocoaError(.fileWriteFileExists) }
-                try JSONEncoder().encode(entry).write(to: destination, options: .atomic)
+                if let entry {
+                    try JSONEncoder().encode(entry).write(to: destination, options: .atomic)
+                } else {
+                    try FileManager.default.removeItem(at: destination)
+                }
             } catch { writeError = error }
         }
         if let coordinationError { throw coordinationError }
