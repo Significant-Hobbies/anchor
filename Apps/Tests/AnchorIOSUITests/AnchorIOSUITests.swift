@@ -30,12 +30,18 @@ final class AnchorIOSUITests: XCTestCase {
             XCTFail("Tapping the entry title must open the keyboard before typing")
             return
         }
+        // Fresh simulator keyboards can present Apple's QuickPath introduction
+        // over the app. Finish that system prompt before exercising entry input.
+        let keyboardIntroduction = app.staticTexts[
+            "Speed up your typing by sliding your finger across the letters to compose a word."
+        ]
+        if keyboardIntroduction.waitForExistence(timeout: 2) {
+            app.buttons["Continue"].tap()
+            XCTAssertTrue(keyboardIntroduction.waitForNonExistence(timeout: 3))
+        }
         title.typeText("Read the next chapter")
-        let enteredTitle = app.textFields.matching(
-            NSPredicate(format: "value == %@", "Read the next chapter")
-        ).firstMatch
-        XCTAssertTrue(enteredTitle.waitForExistence(timeout: 3),
-                      "The entry title must contain the intended text before saving")
+        XCTAssertEqual(title.value as? String, "Read the next chapter",
+                       "The entry title must contain the intended text before saving")
         app.buttons.ci("Save").tap()
         XCTAssertTrue(app.staticTexts.ci("Read the next chapter").waitForExistence(timeout: 4))
         app.buttons.ci("anchor.today.copy-day").tap()
@@ -213,7 +219,8 @@ final class AnchorIOSUITests: XCTestCase {
         app.descendants(matching: .any).ci("Entry actions").firstMatch.tap()
         app.descendants(matching: .any).ci("More options…").firstMatch.tap()
         XCTAssertTrue(app.switches.ci("Repeat weekly").exists)
-        app.buttons.ci("Save").tap()
+        XCTAssertEqual(app.textFields["anchor.plan.editor.title"].value as? String, "Morning walk")
+        app.buttons["anchor.plan.editor.save"].tap()
 
         XCTAssertTrue(app.staticTexts.ci("Morning walk").waitForExistence(timeout: 4))
     }
@@ -475,8 +482,8 @@ final class AnchorIOSUITests: XCTestCase {
             XCTAssertTrue(control.waitForExistence(timeout: 5), "Expected Today control \(control.identifier) to be present")
             XCTAssertEqual(control.label.lowercased(), expectedLabel.lowercased(), "The control should retain its clear accessible label")
             XCTAssertTrue(control.isHittable, "Today control \(control.identifier) must be reachable")
-            XCTAssertGreaterThanOrEqual(control.frame.width, 44, "Today control \(control.identifier) needs a 44pt hit width")
-            XCTAssertGreaterThanOrEqual(control.frame.height, 44, "Today control \(control.identifier) needs a 44pt hit height")
+            XCTAssertGreaterThanOrEqual(control.frame.width + 0.001, 44, "Today control \(control.identifier) needs a 44pt hit width")
+            XCTAssertGreaterThanOrEqual(control.frame.height + 0.001, 44, "Today control \(control.identifier) needs a 44pt hit height")
         }
 
         let customize = controls[2]

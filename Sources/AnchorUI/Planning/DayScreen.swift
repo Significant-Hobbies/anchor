@@ -34,7 +34,7 @@ struct PlanScreen: View {
     @AppStorage(TimetableStep.preferenceKey) private var gridStep = TimetableStep.five
     @State private var showsCopyDay = false
     @State private var editorSeed: EditorSeed?
-    @State private var advancedSeed: EditorSeed?
+    @State private var advancedDraft: AdvancedDraft?
     @State private var draftTitle = ""
     @State private var draftError: String?
     @State private var showsCustomize = false
@@ -218,7 +218,9 @@ struct PlanScreen: View {
                         draftError: draftError,
                         onSaveDraft: saveDraft,
                         onCancelDraft: clearDraft,
-                        onDraftOptions: { advancedSeed = editorSeed },
+                        onDraftOptions: { title in
+                            if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
+                        },
                         onAddAt: { interval, dragged in
                             guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
                             beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
@@ -257,11 +259,11 @@ struct PlanScreen: View {
         .onChange(of: blocks.isEmpty) { _, isEmpty in
             if !isEmpty, scrolledDay == nil { scrollToNow(proxy) }
         }
-        // A save can land while a sheet is mid-dismissal; re-anchor once it
-        // has fully closed so the new or edited card isn't left below the fold.
+        // A toolbar draft can start offscreen. Its bottom edge is the editor's
+        // bottom edge, including when the software keyboard resizes the timetable.
         .onChange(of: visibleDraft?.id) { _, id in
             if let id, visibleDraft?.revealInGrid == true {
-                DispatchQueue.main.async { proxy.scrollTo(id, anchor: .center) }
+                DispatchQueue.main.async { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
         .onChange(of: editingBlock != nil || loggingBlock != nil || explainingBlock != nil) { _, anyOpen in
@@ -337,9 +339,10 @@ struct PlanScreen: View {
             periodSyncError = error
             isLoadingPeriod = false
         }
-        .sheet(item: $advancedSeed) { seed in
+        .sheet(item: $advancedDraft) { draft in
+            let seed = draft.seed
             PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes,
-                            suggestedTitle: draftTitle, dayIsFull: seed.dayIsFull) { clearDraft(); refresh() }
+                            suggestedTitle: draft.title, dayIsFull: seed.dayIsFull) { clearDraft(); refresh() }
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
@@ -834,6 +837,12 @@ struct PlanScreen: View {
 }
 
 
+private struct AdvancedDraft: Identifiable {
+    let seed: EditorSeed
+    let title: String
+    var id: UUID { seed.id }
+}
+
 struct EditorSeed: Identifiable {
     let id = UUID()
     let start: Date
@@ -1150,6 +1159,7 @@ struct PlanBlockEditor: View {
                     VStack(alignment: .leading, spacing: Space.md) {
                         editorLabel("Intention", detail: "The thing that deserves a place")
                         TextField("What will you do?", text: $title, axis: .vertical)
+                            .accessibilityIdentifier("anchor.plan.editor.title")
                             .textFieldStyle(.plain)
                             .font(.system(size: 23, weight: .semibold, design: .rounded))
                             .foregroundStyle(theme.textPrimary)
@@ -1261,6 +1271,7 @@ struct PlanBlockEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("save", action: save)
+                        .accessibilityIdentifier("anchor.plan.editor.save")
                         .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (repeats && weekdays.isEmpty))
                 }
             }

@@ -139,7 +139,7 @@ struct DayTimetable: View {
     var draftError: String? = nil
     var onSaveDraft: () -> Void = {}
     var onCancelDraft: () -> Void = {}
-    var onDraftOptions: () -> Void = {}
+    var onDraftOptions: (String) -> Void = { _ in }
     var onAddAt: (DateInterval, Bool) -> Void = { _, _ in }
     #if os(macOS)
     @GestureState private var selection: DateInterval?
@@ -277,9 +277,9 @@ struct DayTimetable: View {
                     InlineEntryEditor(seed: draft, title: draftTitle, error: draftError,
                                       save: onSaveDraft, cancel: onCancelDraft, options: onDraftOptions)
                         .frame(width: gridWidth)
-                        .id(draft.id)
                         .padding(.top, max(0, offset(for: draft.start)))
                         .padding(.leading, gridX)
+                        .id(draft.id)
                 }
             }
         }

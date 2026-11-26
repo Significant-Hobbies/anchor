@@ -12,7 +12,7 @@ struct InlineEntryEditor: View {
     let error: String?
     let save: () -> Void
     let cancel: () -> Void
-    let options: () -> Void
+    let options: (String) -> Void
 
     #if os(macOS)
     private let actionSize: CGFloat = 24
@@ -38,7 +38,7 @@ struct InlineEntryEditor: View {
                     .accessibilityLabel("Save")
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 Menu {
-                    Button("More options…", action: options)
+                    Button("More options…") { options(title) }
                     Button("Cancel", action: cancel)
                 } label: { actionIcon("ellipsis.circle") }
                 #if os(macOS)
