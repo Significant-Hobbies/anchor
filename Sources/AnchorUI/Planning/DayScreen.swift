@@ -31,6 +31,9 @@ struct PlanScreen: View {
     @State private var lastCalendarDay = Date()
     @State private var showsCopyDay = false
     @State private var editorSeed: EditorSeed?
+    @State private var advancedSeed: EditorSeed?
+    @State private var draftTitle = ""
+    @State private var draftError: String?
     @State private var showsCustomize = false
     @State private var editingBlock: PlanBlock?
     @State private var editingCalendarEvent: PlanBlock?
@@ -150,7 +153,7 @@ struct PlanScreen: View {
                     WeekAgenda(days: visibleDays,
                                entries: visibleBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
                                openDay: { today = $0; viewMode = .day },
-                               add: { editorSeed = suggestedEntry(on: $0) },
+                               add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
                                edit: { editingBlock = $0 })
                 } else {
                     let calendarEvents = Calendar.current.isDateInToday(today) ? upcomingCalendarEvents(at: calendarReferenceTime)
@@ -169,7 +172,7 @@ struct PlanScreen: View {
                             HStack(spacing: Space.lg) {
                                 emptyDayCopy
                                 Spacer(minLength: Space.lg)
-                                Button("add the first entry") { editorSeed = suggestedEntry }
+                                Button("add the first entry") { beginDraft(suggestedEntry) }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                             }
                             #else
@@ -177,12 +180,12 @@ struct PlanScreen: View {
                                 HStack(spacing: Space.lg) {
                                     emptyDayCopy
                                     Spacer(minLength: Space.lg)
-                                    Button("add the first entry") { editorSeed = suggestedEntry }
+                                    Button("add the first entry") { beginDraft(suggestedEntry) }
                                         .buttonStyle(PrimaryButtonStyle(expands: false))
                                 }
                                 VStack(alignment: .leading, spacing: Space.md) {
                                     emptyDayCopy
-                                    Button("add the first entry") { editorSeed = suggestedEntry }
+                                    Button("add the first entry") { beginDraft(suggestedEntry) }
                                     .buttonStyle(PrimaryButtonStyle())
                                 }
                             }
@@ -204,7 +207,13 @@ struct PlanScreen: View {
                         onRemove: { removal = CalendarEventRemoval($0) },
                         onExplain: { explainingBlock = $0 },
                         onLogActual: { loggingBlock = $0 },
-                        onAddAt: { editorSeed = EditorSeed(start: $0.start, minutes: Int($0.duration / 60)) }
+                        draft: visibleDraft,
+                        draftTitle: $draftTitle,
+                        draftError: draftError,
+                        onSaveDraft: saveDraft,
+                        onCancelDraft: clearDraft,
+                        onDraftOptions: { advancedSeed = editorSeed },
+                        onAddAt: { beginDraft(EditorSeed(start: $0.start, minutes: Int($0.duration / 60), revealInGrid: false)) }
                     )
 
                 }
@@ -223,7 +232,7 @@ struct PlanScreen: View {
         }
         .safeAreaInset(edge: .bottom) {
             if viewMode == .day && !timetableEntries.isEmpty {
-                Button("add an entry") { editorSeed = suggestedEntry }
+                Button("add an entry") { beginDraft(suggestedEntry) }
                     .buttonStyle(PrimaryButtonStyle(expands: false))
                     .frame(maxWidth: workspaceMaxWidth, alignment: .trailing)
                     .frame(maxWidth: .infinity)
@@ -236,11 +245,16 @@ struct PlanScreen: View {
         // Blocks arrive through @Query after first layout — the onAppear pass
         // can fire while the store is still empty, so retry once entries land.
         .onChange(of: blocks.isEmpty) { _, isEmpty in
-            if !isEmpty { scrollToNow(proxy) }
+            if !isEmpty, scrolledDay == nil { scrollToNow(proxy) }
         }
         // A save can land while a sheet is mid-dismissal; re-anchor once it
         // has fully closed so the new or edited card isn't left below the fold.
-        .onChange(of: editorSeed != nil || editingBlock != nil || loggingBlock != nil || explainingBlock != nil) { _, anyOpen in
+        .onChange(of: visibleDraft?.id) { _, id in
+            if let id, visibleDraft?.revealInGrid == true {
+                DispatchQueue.main.async { proxy.scrollTo(id, anchor: .center) }
+            }
+        }
+        .onChange(of: editingBlock != nil || loggingBlock != nil || explainingBlock != nil) { _, anyOpen in
             if !anyOpen {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
@@ -313,8 +327,9 @@ struct PlanScreen: View {
             periodSyncError = error
             isLoadingPeriod = false
         }
-        .sheet(item: $editorSeed) { seed in
-            PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes, dayIsFull: seed.dayIsFull) { refresh() }
+        .sheet(item: $advancedSeed) { seed in
+            PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes,
+                            suggestedTitle: draftTitle, dayIsFull: seed.dayIsFull) { clearDraft(); refresh() }
                 .anchorTheme()
         }
         .sheet(item: $editingBlock) { block in
@@ -645,6 +660,37 @@ struct PlanScreen: View {
         .accessibilityIdentifier("anchor.today.completion")
     }
 
+    private var visibleDraft: EditorSeed? {
+        guard viewMode == .day, let editorSeed, Calendar.current.isDate(editorSeed.start, inSameDayAs: today) else { return nil }
+        return editorSeed
+    }
+
+    private func beginDraft(_ seed: EditorSeed) {
+        draftError = nil
+        editorSeed = seed
+    }
+
+    private func clearDraft() {
+        editorSeed = nil
+        draftTitle = ""
+        draftError = nil
+    }
+
+    private func saveDraft() {
+        let title = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let seed = visibleDraft, !title.isEmpty else { return }
+        let block = PlanBlock(title: title, plannedStart: seed.start, plannedSeconds: seed.minutes * 60)
+        context.insert(block)
+        do {
+            try context.save()
+            scrolledDay = today
+            clearDraft()
+        } catch {
+            context.delete(block)
+            draftError = "Couldn’t save. Try again."
+        }
+    }
+
     private var suggestedEntry: EditorSeed { suggestedEntry(on: today) }
 
     private func suggestedEntry(on day: Date) -> EditorSeed {
@@ -668,7 +714,7 @@ struct PlanScreen: View {
     }
 
     private func scrollToNow(_ proxy: ScrollViewProxy) {
-        guard viewMode == .day, Calendar.current.isDateInToday(today), !blocks.isEmpty,
+        guard viewMode == .day, Calendar.current.isDateInToday(today), !blocks.isEmpty, visibleDraft == nil,
               openBlockers.isEmpty,
               !upcomingCalendarEvents(at: Date()).contains(where: { $0.plannedStart < dayInterval.end }),
               scrolledDay != today else { return }
@@ -748,11 +794,12 @@ struct PlanScreen: View {
 }
 
 
-private struct EditorSeed: Identifiable {
+struct EditorSeed: Identifiable {
     let id = UUID()
     let start: Date
     var minutes = 30
     var dayIsFull = false
+    var revealInGrid = true
 }
 
 /// How Today draws its timetable. The choices live on `AnchorPreferences`, so
@@ -966,6 +1013,7 @@ struct PlanBlockEditor: View {
         initialDay: Date,
         suggestedStart: Date? = nil,
         suggestedMinutes: Int = 30,
+        suggestedTitle: String = "",
         dayIsFull: Bool = false,
         block: PlanBlock? = nil,
         template: ScheduleTemplate? = nil,
@@ -992,7 +1040,7 @@ struct PlanBlockEditor: View {
                 of: initialDay
             )
             ?? initialDay
-        _title = State(initialValue: block?.title ?? sourceTemplate?.title ?? "")
+        _title = State(initialValue: block?.title ?? sourceTemplate?.title ?? suggestedTitle)
         _details = State(initialValue: block?.details ?? sourceTemplate?.details ?? "")
         _selectedProjectID = State(initialValue: block?.projectID ?? sourceTemplate?.projectID)
         _plannedStart = State(initialValue: suggested)

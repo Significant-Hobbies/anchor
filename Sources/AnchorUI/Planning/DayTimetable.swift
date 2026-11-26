@@ -125,6 +125,12 @@ struct DayTimetable: View {
     var onRemove: (PlanBlock) -> Void = { _ in }
     var onExplain: (PlanBlock) -> Void = { _ in }
     var onLogActual: (PlanBlock) -> Void = { _ in }
+    var draft: EditorSeed? = nil
+    var draftTitle: Binding<String> = .constant("")
+    var draftError: String? = nil
+    var onSaveDraft: () -> Void = {}
+    var onCancelDraft: () -> Void = {}
+    var onDraftOptions: () -> Void = {}
     var onAddAt: (DateInterval) -> Void = { _ in }
     @GestureState private var selection: DateInterval?
 
@@ -143,12 +149,18 @@ struct DayTimetable: View {
     private var timedEntries: [Entry] { entries.filter { $0.block.plannedSeconds < 86_400 } }
 
     private var range: DateInterval {
-        TimetableLayout.displayRange(
+        let midnight = Calendar.current.startOfDay(for: day)
+        var intervals = timedEntries.map { entry in
+            let start = entry.block.plannedStart.timeIntervalSince(midnight)
+            return (start, start + Double(entry.block.plannedSeconds))
+        }
+        if let draft {
+            let start = draft.start.timeIntervalSince(midnight)
+            intervals.append((start, start + Double(draft.minutes * 60)))
+        }
+        return TimetableLayout.displayRange(
             for: day,
-            intervals: timedEntries.map { entry in
-                let start = entry.block.plannedStart.timeIntervalSince(Calendar.current.startOfDay(for: day))
-                return (start, start + Double(entry.block.plannedSeconds))
-            },
+            intervals: intervals,
             now: Date(),
             windowStartHour: windowStartHour,
             windowEndHour: windowEndHour
@@ -246,9 +258,17 @@ struct DayTimetable: View {
                         .allowsHitTesting(false)
                     nowLine(width: proxy.size.width)
                 }
+                if let draft {
+                    InlineEntryEditor(seed: draft, title: draftTitle, error: draftError,
+                                      save: onSaveDraft, cancel: onCancelDraft, options: onDraftOptions)
+                        .frame(width: gridWidth)
+                        .id(draft.id)
+                        .padding(.top, max(0, offset(for: draft.start)))
+                        .padding(.leading, gridX)
+                }
             }
         }
-        .frame(height: totalHeight)
+        .frame(height: max(totalHeight, draft.map { offset(for: $0.start) + 92 } ?? 0))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("anchor.today.timetable")
     }
