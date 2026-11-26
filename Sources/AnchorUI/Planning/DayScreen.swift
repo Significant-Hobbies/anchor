@@ -311,7 +311,7 @@ struct PlanScreen: View {
             .anchorTheme()
         }
         .sheet(isPresented: $showsCopyDay) {
-            CopyDaySheet(sourceDay: today, entryCount: blocks.count) { destination in
+            CopyDaySheet(sourceDay: today, entryCount: blocks.filter { !$0.isUnplannedTimeLog }.count) { destination in
                 do {
                     _ = try DayPlanService(context: context).copyDay(from: today, to: destination, including: Set(blocks.map(\.id)))
                     today = destination
@@ -379,7 +379,7 @@ struct PlanScreen: View {
                 .anchorTheme()
         }
         .sheet(item: $loggingBlock) { block in
-            LinkedActualEditor(block: block)
+            LogTimeSheet(day: today, block: block, onSave: refresh)
                 .anchorTheme()
         }
         .task {
@@ -596,7 +596,7 @@ struct PlanScreen: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel((direction < 0 ? "Previous " : "Next ") + viewMode.rawValue)
+        .accessibilityLabel((direction < 0 ? "Previous " : "Next ") + (viewMode == .week ? "week" : "day"))
     }
 
     private var dayControls: some View {

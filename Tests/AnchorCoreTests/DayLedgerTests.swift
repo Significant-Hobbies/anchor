@@ -22,11 +22,15 @@ struct DayLedgerTests {
         actual.notes = "Proposal moved to Friday"
         try store.save(actual, replacing: plan)
         #expect(throws: CocoaError.self) { try store.save(plan, replacing: nil) }
-        #expect(try DayLedgerStore(storeURL: url).load() == [actual])
+        #expect(try DayLedgerStore(storeURL: url).load().entries == [actual])
+        let corrupt = url.appendingPathExtension("actual-entries").appendingPathComponent("other.json")
+        try Data("{broken".utf8).write(to: corrupt)
+        let recoverable = try store.load()
+        #expect(recoverable.hasUnreadableFiles && recoverable.entries == [actual])
         #expect(plan.title == "Draft proposal")
         #expect(throws: CocoaError.self) { try store.remove(plan) }
         try store.remove(actual)
-        #expect(try store.load().isEmpty)
+        #expect(try store.load().entries.isEmpty)
     }
 
     @Test func separatesUnrecordedUnplannedAndChangedAndClipsAtMidnight() {
@@ -43,5 +47,7 @@ struct DayLedgerTests {
         actual.end = actual.start.addingTimeInterval(600)
         let moved = DayLedgerComparison(period: period, plans: [plan], actuals: [actual])
         #expect(moved.changed == 1 && moved.unrecorded == 0 && moved.recordedSeconds == 0)
+        let next = DayLedgerComparison(period: DateInterval(start: period.end, duration: 86400), plans: [plan], actuals: [actual])
+        #expect(next.changed == 1 && next.unplanned == 0 && next.linkedVarianceSeconds == 600)
     }
 }

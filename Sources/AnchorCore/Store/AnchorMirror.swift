@@ -359,6 +359,7 @@ struct PlanBlockPayload: Codable, Equatable {
     var id: String
     var templateID: String?
     var templateOccurrenceDay: Date?
+    var isUnplannedTimeLog: Bool?
     var isTemplateOverride: Bool
     var sessionID: String?
     var projectID: String?
@@ -383,6 +384,7 @@ struct PlanBlockPayload: Codable, Equatable {
         id = block.id.uuidString
         templateID = block.templateID?.uuidString
         templateOccurrenceDay = block.templateOccurrenceDay
+        isUnplannedTimeLog = block.isUnplannedTimeLog ? true : nil
         isTemplateOverride = block.isTemplateOverride
         sessionID = block.sessionID?.uuidString
         projectID = block.projectID?.uuidString
@@ -1348,6 +1350,7 @@ enum AnchorMirror {
     private static func assign(_ value: PlanBlockPayload, to block: PlanBlock) {
         block.templateID = value.templateID.flatMap(UUID.init(uuidString:))
         block.templateOccurrenceDay = value.templateOccurrenceDay
+        if let isLog = value.isUnplannedTimeLog { block.isUnplannedTimeLog = isLog }
         block.isTemplateOverride = value.isTemplateOverride
         block.sessionID = value.sessionID.flatMap(UUID.init(uuidString:))
         block.projectID = value.projectID.flatMap(UUID.init(uuidString:))

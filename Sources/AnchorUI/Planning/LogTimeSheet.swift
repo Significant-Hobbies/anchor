@@ -65,30 +65,35 @@ struct LogTimeSheet: View {
 
                     Card(padding: Space.lg) {
                         VStack(alignment: .leading, spacing: Space.md) {
-                            editorLabel("What happened", detail: "The thing you actually did")
-                            TextField("What did you do?", text: $title, axis: .vertical)
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 23, weight: .semibold, design: .rounded))
-                                .foregroundStyle(theme.textPrimary)
-                                .lineLimit(1...3)
-                                .accessibilityIdentifier("anchor.log.title")
-                            Divider().overlay(theme.hairline)
-                            TextField("Anything worth remembering", text: $details, axis: .vertical)
-                                .textFieldStyle(.plain)
-                                .font(.subheadline)
-                                .foregroundStyle(theme.textSecondary)
-                                .lineLimit(2...4)
+                            if let block, !block.isUnplannedTimeLog {
+                                Text(block.title).font(.headline)
+                                Text("Edit the account of this slot in Review.").font(.caption).foregroundStyle(theme.textSecondary)
+                            } else {
+                                editorLabel("What happened", detail: "The thing you actually did")
+                                TextField("What did you do?", text: $title, axis: .vertical)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(theme.textPrimary)
+                                    .lineLimit(1...3)
+                                    .accessibilityIdentifier("anchor.log.title")
+                                Divider().overlay(theme.hairline)
+                                TextField("Anything worth remembering", text: $details, axis: .vertical)
+                                    .textFieldStyle(.plain)
+                                    .font(.subheadline)
+                                    .foregroundStyle(theme.textSecondary)
+                                    .lineLimit(2...4)
 
-                            ProjectPicker(selectedID: $selectedProjectID)
+                                ProjectPicker(selectedID: $selectedProjectID)
 
-                            FlowRow(spacing: Space.xs) {
-                                ForEach(PlanBlockKind.allCases, id: \.self) { option in
-                                    Button {
-                                        withAnimation(Motion.snappy) { kind = option }
-                                    } label: {
-                                        Chip(option.label, symbol: option.symbolName, isSelected: kind == option)
+                                FlowRow(spacing: Space.xs) {
+                                    ForEach(PlanBlockKind.allCases, id: \.self) { option in
+                                        Button {
+                                            withAnimation(Motion.snappy) { kind = option }
+                                        } label: {
+                                            Chip(option.label, symbol: option.symbolName, isSelected: kind == option)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }
@@ -201,10 +206,12 @@ struct LogTimeSheet: View {
             target.isUnplannedTimeLog = true
             context.insert(target)
         }
-        target.projectID = selectedProjectID
-        target.title = trimmed
-        target.details = details
-        target.kind = kind
+        if target.isUnplannedTimeLog {
+            target.projectID = selectedProjectID
+            target.title = trimmed
+            target.details = details
+            target.kind = kind
+        }
         target.actualStartedAt = start
         if stillHappening {
             target.actualEndedAt = nil

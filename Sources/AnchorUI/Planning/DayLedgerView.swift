@@ -31,22 +31,22 @@ struct DayLedgerView: View {
     }
 
     private var plans: [DayLedgerEntry] {
-        blocks.filter { !$0.isUnplannedTimeLog }.map { DayLedgerEntry(id: $0.id, title: $0.title, start: $0.plannedStart, end: $0.plannedEnd, notes: $0.details) }
+        blocks.filter { !$0.isUnplannedTimeLog }.map { DayLedgerEntry(id: $0.id, title: $0.title, start: $0.plannedStart, end: $0.plannedEnd, notes: $0.details, sourcePlanID: $0.id) }
     }
 
     private var actuals: [DayLedgerEntry] {
         var entries = Dictionary(saved.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let linked = Dictionary(blocks.compactMap { block in block.sessionID.map { ($0, block.id) } }, uniquingKeysWith: { first, _ in first })
+        let linked = Dictionary(blocks.filter { !$0.isUnplannedTimeLog }.compactMap { block in block.sessionID.map { ($0, block.id) } }, uniquingKeysWith: { first, _ in first })
         for session in sessions {
             let id = linked[session.id] ?? session.id
             if entries[id] == nil, let end = session.endedAt, end > session.startedAt {
                 let title = session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent
-                entries[id] = DayLedgerEntry(id: id, title: title, start: session.startedAt, end: end)
+                entries[id] = DayLedgerEntry(id: id, title: title, start: session.startedAt, end: end, sourcePlanID: linked[session.id])
             }
         }
         for block in blocks where entries[block.id] == nil {
             if let start = block.actualStartedAt, let end = block.actualEndedAt, end > start {
-                entries[block.id] = DayLedgerEntry(id: block.id, title: block.title, start: start, end: end, notes: block.details)
+                entries[block.id] = DayLedgerEntry(id: block.id, title: block.title, start: start, end: end, notes: block.details, sourcePlanID: block.isUnplannedTimeLog ? nil : block.id)
             }
         }
         return Array(entries.values)
@@ -110,7 +110,7 @@ struct DayLedgerView: View {
                 ForEach(comparison.actuals.filter { !localPlanIDs.contains($0.id) }) { actual in
                     let source = planByID[actual.id]
                     pair {
-                        Text(source.map { "Planned " + $0.start.formatted(date: .abbreviated, time: .omitted) } ?? "Unplanned")
+                        Text(source.map { "Planned " + $0.start.formatted(date: .abbreviated, time: .omitted) } ?? (actual.sourcePlanID == nil ? "Unplanned" : "Original plan unavailable"))
                             .font(.caption).foregroundStyle(theme.textSecondary)
                     } right: {
                         actualButton(actual, plan: source, day: period)
@@ -155,10 +155,13 @@ struct DayLedgerView: View {
         Button { edit(actual) } label: {
             VStack(alignment: .leading, spacing: Space.xxs) {
                 row(actual)
+                if !actual.notes.isEmpty {
+                    Text(actual.notes).font(.caption).foregroundStyle(theme.textSecondary).lineLimit(2)
+                }
                 if actual.start < day.start || actual.start >= day.end {
                     Text(actual.start, format: .dateTime.month().day()).font(.caption)
                 }
-                if let plan, plan != actual {
+                if let plan, !plan.matches(actual) {
                     Text(difference(plan, actual)).font(.caption).foregroundStyle(theme.textSecondary)
                 }
             }
@@ -190,7 +193,7 @@ struct DayLedgerView: View {
     private func summary(_ data: DayLedgerComparison, title: String) -> some View {
         VStack(alignment: .leading, spacing: Space.xxs) {
             Text(title).font(.subheadline.bold())
-            Text("\(Int(data.plannedSeconds / 60)) min planned · \(Int(data.recordedSeconds / 60)) min recorded")
+            Text("\(Int(data.plannedSeconds / 60)) min planned · \(Int(data.recordedSeconds / 60)) min in recorded slots")
             Text("\(data.matched) as planned · \(data.changed) changed · \(data.unplanned) unplanned · \(data.unrecorded) unrecorded")
                 .foregroundStyle(theme.textSecondary)
             let delta = Int((data.linkedVarianceSeconds / 60).rounded())
@@ -213,8 +216,9 @@ struct DayLedgerView: View {
     private func reload() {
         do {
             guard let store else { throw CocoaError(.fileReadUnknown) }
-            saved = try store.load()
-            error = nil
+            let result = try store.load()
+            saved = result.entries
+            error = result.hasUnreadableFiles ? "Some actual entries couldn’t be read. The comparison includes the available entries." : nil
             unavailable = false
         } catch {
             unavailable = true
@@ -231,43 +235,6 @@ struct DayLedgerView: View {
     private func persist(_ entry: DayLedgerEntry, replacing previous: DayLedgerEntry?) {
         do { try save(entry, replacing: previous) }
         catch { reload(); self.error = "Couldn’t save this entry. Reload and try again." }
-    }
-}
-
-/// Timetable actions edit the same independent record as Review.
-struct LinkedActualEditor: View {
-    let block: PlanBlock
-    @Environment(\.modelContext) private var context
-    @Environment(\.dismiss) private var dismiss
-    @State private var draft: DayLedgerEntry?
-    @State private var prior: DayLedgerEntry?
-    @State private var failed = false
-
-    private var store: DayLedgerStore? {
-        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
-        return DayLedgerStore(storeURL: config.url)
-    }
-
-    var body: some View {
-        Group {
-            if let draft {
-                DayActualEditor(entry: draft) { updated in
-                    guard let store else { throw CocoaError(.fileWriteUnknown) }
-                    try store.save(updated, replacing: prior)
-                    NotificationCenter.default.post(name: .actualEntriesChanged, object: nil)
-                }
-            } else if failed {
-                VStack { Text("Couldn’t read this actual entry."); Button("Close") { dismiss() } }.padding()
-            } else { ProgressView() }
-        }
-        .onAppear {
-            do {
-                guard let store else { throw CocoaError(.fileReadUnknown) }
-                prior = try store.load().first { $0.id == block.id }
-                draft = prior ?? DayLedgerEntry(id: block.id, title: block.title, start: block.actualStartedAt ?? block.plannedStart,
-                                               end: block.actualEndedAt ?? block.plannedEnd, notes: block.details)
-            } catch { failed = true }
-        }
     }
 }
 

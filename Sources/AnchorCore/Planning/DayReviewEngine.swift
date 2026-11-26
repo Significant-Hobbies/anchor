@@ -22,6 +22,7 @@ public struct PlanBlockRecord: Sendable, Codable, Equatable, Identifiable {
     public var reminderLastSyncedAt: Date?
     public var externalEventKey: String?
     /// True once the owner has personalized a sync- or template-managed block.
+    public var isUnplannedTimeLog: Bool?
     public var isTemplateOverride: Bool
 
     public init(
@@ -124,7 +125,7 @@ public extension PlanBlock {
     }
 
     func snapshot() -> PlanBlockRecord {
-        PlanBlockRecord(
+        var record = PlanBlockRecord(
             id: id,
             projectID: projectID,
             templateID: templateID,
@@ -146,6 +147,8 @@ public extension PlanBlock {
             reminderLastSyncedAt: reminderLastSyncedAt,
             externalEventKey: externalEventKey
         )
+        record.isUnplannedTimeLog = isUnplannedTimeLog ? true : nil
+        return record
     }
 }
 
@@ -362,7 +365,7 @@ public struct DayReviewEngine: Sendable {
 
         for block in blocks {
             let blockEnd = block.plannedStart.addingTimeInterval(Double(block.plannedSeconds))
-            let plannedSeconds = min(end, blockEnd).timeIntervalSince(max(start, block.plannedStart))
+            let plannedSeconds = block.isUnplannedTimeLog == true ? 0 : min(end, blockEnd).timeIntervalSince(max(start, block.plannedStart))
             guard plannedSeconds > 0 else {
                 // The entry was planned on another day. Credit only the portion
                 // manually logged here; there is no local plan to compare against.
