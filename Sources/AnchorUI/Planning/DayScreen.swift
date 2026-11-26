@@ -43,7 +43,7 @@ struct PlanScreen: View {
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
-    @State private var showsDayCalendarEvents = false
+    @SceneStorage("anchor.planner.show-calendar-events") private var showsDayCalendarEvents = false
     @State private var loadError: String?
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
@@ -93,6 +93,10 @@ struct PlanScreen: View {
 
     private var blocks: [PlanBlock] {
         dayDisplayBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
+    }
+
+    private var copyableBlocks: [PlanBlock] {
+        visibleBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
     }
 
     private func upcomingCalendarEvents(at now: Date) -> [PlanBlock] {
@@ -324,9 +328,9 @@ struct PlanScreen: View {
             .anchorTheme()
         }
         .sheet(isPresented: $showsCopyDay) {
-            CopyDaySheet(sourceDay: today, entryCount: blocks.filter { !$0.isUnplannedTimeLog }.count) { destination in
+            CopyDaySheet(sourceDay: today, entryCount: copyableBlocks.count) { destination in
                 do {
-                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination, including: Set(blocks.map(\.id)))
+                    _ = try DayPlanService(context: context).copyDay(from: today, to: destination, including: Set(copyableBlocks.map(\.id)))
                     today = destination
                     refresh()
                     return nil
@@ -639,7 +643,7 @@ struct PlanScreen: View {
 
     private var copyDayButton: some View {
         Button("copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
-            .disabled(!blocks.contains { !$0.isUnplannedTimeLog })
+            .disabled(copyableBlocks.isEmpty)
             .accessibilityIdentifier("anchor.today.copy-day")
     }
 
