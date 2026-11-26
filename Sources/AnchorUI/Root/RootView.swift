@@ -513,9 +513,7 @@ public struct RootView: View {
         .onChange(of: scenePhase) {
             guard scenePhase == .active else { return }
             updateCalendarDay()
-            #if os(iOS)
             if controller.isCapturing { navigation.select(.focus) }
-            #endif
             controller.synchronizeActiveSessionFromStore()
             syncExternal()
         }
@@ -619,11 +617,9 @@ public struct RootView: View {
         .onChange(of: controller.hasSession) { wasActive, isActive in
             if wasActive && !isActive { navigation.showsFocus = false }
         }
-        #if os(iOS)
         .onChange(of: controller.isCapturing) { _, capturing in
             if capturing && scenePhase == .active && !navigation.showsFocus { navigation.select(.focus) }
         }
-        #endif
         .sheet(isPresented: $navigation.showsFocus, onDismiss: { alternativePlanID = nil }) {
             NavigationStack {
                 FocusScreen(controller: controller, composeWhenIdle: !controller.hasSession && alternativePlanID == nil, alternativePlanID: alternativePlanID)
