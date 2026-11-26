@@ -20,6 +20,7 @@ struct PlanScreen: View {
     @State private var showsCalendars = false
     private let controller: FocusController
     private let onOpenFocus: () -> Void
+    private let onChangeActivity: ((PlanBlock) -> Void)?
     @State private var checkIns: [UUID: PlannerCheckIn] = [:]
     @State private var checkingEntry: PlannerCheckIn?
     @State private var checkInLoadFailed = false
@@ -48,7 +49,8 @@ struct PlanScreen: View {
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
 
-    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, day: Binding<Date>, onOpenFocus: @escaping () -> Void) {
+    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, day: Binding<Date>, onChangeActivity: ((PlanBlock) -> Void)? = nil, onOpenFocus: @escaping () -> Void) {
+        self.onChangeActivity = onChangeActivity
         _today = day
         self.calendarCoordinator = calendarCoordinator
         self.controller = controller
@@ -127,6 +129,7 @@ struct PlanScreen: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
+                if controller.hasSession || (viewMode == .day && Calendar.current.isDateInToday(today)) { focusItem }
                 if viewMode == .week {
                     HStack {
                         Text(visibleInterval.start.formatted(date: .abbreviated, time: .omitted) + " – " +
@@ -136,7 +139,6 @@ struct PlanScreen: View {
                         calendarsButton.buttonStyle(.borderless)
                     }
                 } else if viewMode == .day {
-                    if controller.hasSession || Calendar.current.isDateInToday(today) { focusItem }
                     dayControls
                     DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
                                   hidesCalendarPlans: !showsDayCalendarEvents)
@@ -551,6 +553,9 @@ struct PlanScreen: View {
                 focusRow((block.plannedStart > calendarReferenceTime ? "Up next" : "Now") + " · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
                      title: block.title, action: "Start focus") { start(block) }
                 Menu {
+                    if let onChangeActivity {
+                        Button("Do something else in this slot") { onChangeActivity(block) }
+                    }
                     Button("Start an unplanned session", action: onOpenFocus)
                 } label: { Image(systemName: "ellipsis.circle") }
                 .menuIndicator(.hidden)

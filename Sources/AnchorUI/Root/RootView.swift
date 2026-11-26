@@ -25,7 +25,11 @@ public struct FocusScreen: View {
     @State private var previousCheckIn: PlannerCheckIn?
     @State private var checkInReadFailed = false
 
-    public init(controller: FocusController, composeWhenIdle: Bool = false) {
+    private let alternativePlanID: UUID?
+
+    public init(controller: FocusController, composeWhenIdle: Bool = false, alternativePlanID: UUID? = nil) {
+        self.alternativePlanID = alternativePlanID
+        _isChangingActivity = State(initialValue: alternativePlanID != nil)
         _showsAdHocComposer = State(initialValue: composeWhenIdle)
         self.controller = controller
     }
@@ -150,6 +154,7 @@ public struct FocusScreen: View {
     }
 
     private var scheduledBlock: PlanBlock? {
+        if let alternativePlanID { return calendarVisibility.filter(blocks).first { $0.id == alternativePlanID } }
         guard let record = ScheduledFocusResolver().nextBlock(from: calendarVisibility.filter(blocks).map { $0.snapshot() }, now: now) else {
             return nil
         }
@@ -453,6 +458,8 @@ public struct RootView: View {
     private let storeKind: AnchorStore.StoreKind
     @Bindable private var navigation: AnchorNavigationModel
     @State private var plannerDay = Date()
+    @State private var lastCalendarDay = Date()
+    @State private var alternativePlanID: UUID?
     @State private var forcedOnboardingFinished = false
     @State private var presentsOnboarding = false
 
@@ -502,11 +509,23 @@ public struct RootView: View {
         .onChange(of: planSignature) {
             syncExternal()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in updateCalendarDay() }
         .onChange(of: scenePhase) {
             guard scenePhase == .active else { return }
+            updateCalendarDay()
+            #if os(iOS)
+            if controller.isCapturing { navigation.select(.focus) }
+            #endif
             controller.synchronizeActiveSessionFromStore()
             syncExternal()
         }
+    }
+
+    private func updateCalendarDay() {
+        let now = Date()
+        guard !Calendar.current.isDate(now, inSameDayAs: lastCalendarDay) else { return }
+        if Calendar.current.isDate(plannerDay, inSameDayAs: lastCalendarDay) { plannerDay = now }
+        lastCalendarDay = now
     }
 
     private var reminderUpdate: PlannerReminderUpdate {
@@ -570,6 +589,11 @@ public struct RootView: View {
                     screen(for: item)
                         .navigationTitle(item.label)
                         .toolbar {
+                            if item != .today && controller.hasSession {
+                                ToolbarItem(placement: .secondaryAction) {
+                                    Button("Open timer") { navigation.select(.focus) }
+                                }
+                            }
                             ToolbarItem(placement: .primaryAction) {
                                 Button { navigation.showSettings() } label: {
                                     Label("settings", systemImage: "gearshape")
@@ -595,9 +619,14 @@ public struct RootView: View {
         .onChange(of: controller.hasSession) { wasActive, isActive in
             if wasActive && !isActive { navigation.showsFocus = false }
         }
-        .sheet(isPresented: $navigation.showsFocus) {
+        #if os(iOS)
+        .onChange(of: controller.isCapturing) { _, capturing in
+            if capturing && scenePhase == .active && !navigation.showsFocus { navigation.select(.focus) }
+        }
+        #endif
+        .sheet(isPresented: $navigation.showsFocus, onDismiss: { alternativePlanID = nil }) {
             NavigationStack {
-                FocusScreen(controller: controller, composeWhenIdle: !controller.hasSession)
+                FocusScreen(controller: controller, composeWhenIdle: !controller.hasSession && alternativePlanID == nil, alternativePlanID: alternativePlanID)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Back to Today") { navigation.select(.today) }
@@ -656,7 +685,10 @@ public struct RootView: View {
         Group {
             switch tab {
             case .focus: FocusScreen(controller: controller)
-            case .today: PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, day: $plannerDay) { navigation.select(.focus) }
+            case .today: PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, day: $plannerDay, onChangeActivity: { block in
+                alternativePlanID = block.id
+                navigation.select(.focus)
+            }) { navigation.select(.focus) }
             case .habits: HabitsScreen(plannerDay: plannerDay)
             case .history: HistoryScreen(day: $plannerDay)
             }
