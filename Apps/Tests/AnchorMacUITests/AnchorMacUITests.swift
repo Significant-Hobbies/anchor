@@ -527,10 +527,15 @@ final class AnchorMacUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts.ci("Turn that time into something concrete.").waitForExistence(timeout: 4))
         let shapeHabits = app.buttons.ci("Shape these habits")
-        if !shapeHabits.isHittable || !app.windows.firstMatch.frame.contains(shapeHabits.frame) {
-            app.scrollViews.firstMatch.swipeUp()
-        }
-        shapeHabits.click()
+        XCTAssertTrue(shapeHabits.waitForExistence(timeout: 3))
+        // The onboarding scroll view can report the visible SwiftUI button as
+        // unhittable to XCTest. Click its on-screen center as the user would.
+        let window = app.windows.firstMatch
+        let frame = shapeHabits.frame
+        XCTAssertTrue(window.frame.contains(frame))
+        window.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.midX - window.frame.minX, dy: frame.midY - window.frame.minY))
+            .click()
         XCTAssertTrue(app.staticTexts.ci("Choose when each habit is available.").waitForExistence(timeout: 4))
 
         let monday = app.buttons.ci("Monday")
@@ -678,7 +683,10 @@ final class AnchorMacUITests: XCTestCase {
         keepScreenshot(app, named: "anchor-timetable-grid")
 
         // Customize — the timetable's own options plus the door to usual week.
-        app.buttons.ci("anchor.today.customize").click()
+        let viewport = app.scrollViews.firstMatch
+        let customize = app.buttons.ci("anchor.today.customize")
+        scrollIntoVisibleTimetable(customize, in: viewport)
+        customize.click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.start-hour"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.lived-trace"].exists)
         app.buttons.ci("anchor.timetable.routines").click()
@@ -687,7 +695,9 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.timetable.options-done").click()
 
         // Quick log — "still happening" captures an open entry without a timer.
-        app.buttons.ci("anchor.today.log-time").click()
+        let logTime = app.buttons.ci("anchor.today.log-time")
+        scrollIntoVisibleTimetable(logTime, in: viewport)
+        logTime.click()
         let logTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(logTitle.waitForExistence(timeout: 3))
         logTitle.click()
@@ -704,13 +714,15 @@ final class AnchorMacUITests: XCTestCase {
             NSPredicate(format: "identifier == %@ AND label ENDSWITH[c] %@", "anchor.today.block-actions", "Actions for In-flight entry")
         ).firstMatch
         XCTAssertTrue(inFlightActions.waitForExistence(timeout: 3))
+        scrollIntoVisibleTimetable(inFlightActions, in: viewport)
         inFlightActions.click()
         let finish = app.buttons.ci("Finish now")
         XCTAssertTrue(finish.waitForExistence(timeout: 3))
         finish.click()
 
         // Retroactive log — toggling "Still happening" off records a past span.
-        app.buttons.ci("anchor.today.log-time").click()
+        scrollIntoVisibleTimetable(logTime, in: viewport)
+        logTime.click()
         let retroTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(retroTitle.waitForExistence(timeout: 3))
         retroTitle.click()
@@ -775,7 +787,7 @@ final class AnchorMacUITests: XCTestCase {
         let viewport = scrollView.frame.insetBy(dx: 1, dy: 1)
         XCTAssertTrue(
             viewport.contains(target.frame) && target.isHittable,
-            "The block action must be fully inside the Today scroll viewport and hittable before opening its popover."
+            "The control must be fully inside the Today scroll viewport and hittable before clicking it."
         )
     }
 
