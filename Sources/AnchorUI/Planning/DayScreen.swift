@@ -126,7 +126,7 @@ struct PlanScreen: View {
     }
 
     var body: some View {
-        CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks) { data in
+        CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks, editTimeLog: { loggingBlock = $0 }) { data in
             calendar(data)
         }
     }

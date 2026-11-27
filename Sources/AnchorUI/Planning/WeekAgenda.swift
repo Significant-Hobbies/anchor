@@ -49,10 +49,9 @@ struct WeekAgenda: View {
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         VStack(alignment: .leading, spacing: Space.xs) {
-                            ForEach(actuals.entries.filter { $0.start < end && $0.end > day }
-                                .sorted { ($0.start, $0.title) < ($1.start, $1.title) }) { entry in
+                            ForEach(actuals.calendarEntries(in: DateInterval(start: day, end: end))) { entry in
                                 Button { actuals.edit(entry) } label: {
-                                    row(entry.title, at: entry.start, day: day)
+                                    row(actuals.recordedIDs.contains(entry.id) ? entry.title : entry.title + " · In progress", at: entry.start, day: day)
                                 }.buttonStyle(.plain)
                                 .disabled(!actuals.available)
                                 .accessibilityLabel("Edit done entry " + entry.title)

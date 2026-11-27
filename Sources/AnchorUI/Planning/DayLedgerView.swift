@@ -214,15 +214,23 @@ struct CalendarActualData {
     let record: (DayLedgerEntry) -> Void
     let available: Bool
 
+    let ongoing: [DayLedgerEntry]
     let recordedIDs: Set<UUID>
 
     init(entries: [DayLedgerEntry], edit: @escaping (DayLedgerEntry) -> Void,
-         record: @escaping (DayLedgerEntry) -> Void, available: Bool) {
+         record: @escaping (DayLedgerEntry) -> Void, available: Bool, ongoing: [DayLedgerEntry] = []) {
+        self.ongoing = ongoing
         self.entries = entries
         self.edit = edit
         self.record = record
         self.available = available
         self.recordedIDs = Set(entries.map(\.id))
+    }
+
+    func calendarEntries(in period: DateInterval) -> [DayLedgerEntry] {
+        (entries + ongoing.filter { !recordedIDs.contains($0.id) })
+            .filter { $0.start < period.end && $0.end > period.start }
+            .sorted { ($0.start, $0.title) < ($1.start, $1.title) }
     }
 
     func check(_ block: PlanBlock) {
@@ -237,6 +245,7 @@ struct CalendarActuals<Content: View>: View {
     let blocks: [PlanBlock]
     let sessions: [FocusSession]
     let allBlocks: [PlanBlock]
+    var editTimeLog: ((PlanBlock) -> Void)? = nil
     @ViewBuilder let content: (CalendarActualData) -> Content
     @Environment(\.modelContext) private var context
     @Environment(\.anchorTheme) private var theme
@@ -274,13 +283,23 @@ struct CalendarActuals<Content: View>: View {
         return Array(entries.values)
     }
 
+    private var ongoing: [DayLedgerEntry] {
+        let now = Date()
+        return blocks.compactMap { block in
+            guard block.isUnplannedTimeLog, block.state == .inProgress,
+                  let start = block.actualStartedAt, block.actualEndedAt == nil else { return nil }
+            return DayLedgerEntry(id: block.id, title: block.title, start: start,
+                                  end: max(start.addingTimeInterval(1), now), notes: block.details)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle").font(.callout)
                 Button("Reload entries", action: reload)
             }
-            content(CalendarActualData(entries: actuals, edit: edit, record: { persist($0, replacing: nil) }, available: !unavailable))
+            content(CalendarActualData(entries: actuals, edit: edit, record: { persist($0, replacing: nil) }, available: !unavailable, ongoing: ongoing))
         }
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in reload() }
@@ -297,7 +316,14 @@ struct CalendarActuals<Content: View>: View {
         }
     }
 
-    private func edit(_ entry: DayLedgerEntry) { editor = Edit(entry: entry, previous: saved.first { $0.id == entry.id }) }
+    private func edit(_ entry: DayLedgerEntry) {
+        let previous = saved.first { $0.id == entry.id }
+        if previous == nil, let editTimeLog, let block = blocks.first(where: { $0.id == entry.id && $0.isUnplannedTimeLog }) {
+            editTimeLog(block)
+        } else {
+            editor = Edit(entry: entry, previous: previous)
+        }
+    }
 
     private func reload() {
         do {
