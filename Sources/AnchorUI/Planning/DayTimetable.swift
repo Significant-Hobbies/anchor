@@ -556,13 +556,13 @@ private struct TimetableBlockCard: View {
         HStack(alignment: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .center, spacing: Space.xxs) {
-                    CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil,
+                    CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : compact && height < 56 ? 18 : nil,
                                         showsLabel: !compact && height >= 38 && block.plannedEnd <= Date(), acceptsTap: { interaction.acceptsTap })
                     Button { if interaction.acceptsTap { showsActions = true } } label: {
                         Label(block.title, systemImage: category.calendarSymbol)
                             .font(height < 38 ? .caption2.weight(.semibold) : compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                             .foregroundStyle(Color.black.opacity(0.91))
-                            .lineLimit(height < 38 ? 1 : 2)
+                            .lineLimit(height < 56 ? 1 : 2)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
@@ -573,7 +573,7 @@ private struct TimetableBlockCard: View {
                     if !compact && height >= 38 { actionsButton }
 
                 }
-                if height >= 38 {
+                if height >= (compact ? 38 : 56) {
                     let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated
                     Text("\(category.rawValue.capitalized) · \(block.plannedStart.formatted(date: dateStyle, time: .shortened)) – \(block.plannedEnd.formatted(date: dateStyle, time: .shortened))")
                         .font(.caption2.monospacedDigit())
@@ -586,7 +586,7 @@ private struct TimetableBlockCard: View {
             }
             .padding(.leading, Space.xs)
             .padding(.trailing, 2)
-            .padding(.vertical, height < 38 ? 0 : Space.xxs)
+            .padding(.vertical, height < 56 ? 0 : Space.xxs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {

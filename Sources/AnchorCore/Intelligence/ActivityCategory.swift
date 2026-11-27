@@ -6,7 +6,7 @@ public enum ActivityCategory: String, CaseIterable, Sendable {
     private static let cues: [(ActivityCategory, Set<String>)] = [
         (.meeting, ["standup", "sync", "meeting", "interview", "huddle", "zoom", "retro", "retrospective", "kickoff", "standups", "catchup", "townhall", "demo"]),
         (.work, ["write", "draft", "design", "debug", "build", "study", "research", "coding", "writing", "studying", "implementation", "debugging", "documentation", "planning", "tests", "release", "deploy"]),
-        (.fitness, ["gym", "workout", "yoga", "pilates", "swim", "cycling", "jog", "run", "running", "swimming", "training", "walk", "walking", "exercise"]),
+        (.fitness, ["gym", "workout", "yoga", "pilates", "swim", "cycling", "jog", "run", "running", "swimming", "walk", "walking", "exercise"]),
         (.meal, ["breakfast", "lunch", "dinner", "brunch", "snack", "meal"]),
         (.leisure, ["game", "gaming", "movie", "concert", "playstation", "xbox", "movies", "cinema", "games"]),
         (.rest, ["sleep", "nap", "sleeping", "bedtime", "break", "meditate", "meditation"]),
