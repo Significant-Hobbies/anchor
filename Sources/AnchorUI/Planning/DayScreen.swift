@@ -140,8 +140,10 @@ struct PlanScreen: View {
                     }
                 } else if viewMode == .day {
                     dayControls
-                    DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
-                                  hidesCalendarPlans: !showsDayCalendarEvents)
+                    DisclosureGroup("Day comparison") {
+                        DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
+                                      hidesCalendarPlans: !showsDayCalendarEvents)
+                    }
                 }
                 CalendarListButton(isExpanded: $showsDayCalendarEvents)
                     .accessibilityIdentifier("anchor.today.show-calendar-events")
@@ -172,11 +174,13 @@ struct PlanScreen: View {
                     DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
                                   hidesCalendarPlans: !showsDayCalendarEvents)
                 } else if viewMode == .week {
-                    WeekAgenda(days: visibleDays,
-                               entries: dayDisplayBlocks.filter { $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
-                               openDay: { today = $0; viewMode = .day },
-                               add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
-                               edit: { editingBlock = $0 })
+                    CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks) { data in
+                        WeekAgenda(days: visibleDays, actuals: data,
+                                   entries: dayDisplayBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
+                                   openDay: { today = $0; viewMode = .day },
+                                   add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
+                                   edit: { editingBlock = $0 })
+                    }
                 } else {
                     let calendarEvents = Calendar.current.isDateInToday(today) ? upcomingCalendarEvents(at: calendarReferenceTime)
                         : visibleBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
@@ -219,35 +223,38 @@ struct PlanScreen: View {
                         }
                     }
                     Text(timetableHint).font(.caption).foregroundStyle(theme.textSecondary)
-                    DayTimetable(
-                        day: today,
-                        entries: timetableEntries,
-                        step: gridStep,
-                        windowStartHour: timetablePrefs.startHour,
-                        windowEndHour: timetablePrefs.endHour,
-                        showsLivedTrace: timetablePrefs.showsLivedTrace,
-                        dimsFinished: timetablePrefs.dimsFinished,
-                        onCheckIn: openCheckIn,
-                        onStart: start,
-                        onOpenFocus: onOpenFocus,
-                        onComplete: complete,
-                        onEdit: { editingBlock = $0 },
-                        onRemove: { removal = CalendarEventRemoval($0) },
-                        onExplain: { explainingBlock = $0 },
-                        onLogActual: { loggingBlock = $0 },
-                        draft: visibleDraft,
-                        draftTitle: $draftTitle,
-                        draftError: draftError,
-                        onSaveDraft: saveDraft,
-                        onCancelDraft: clearDraft,
-                        onDraftOptions: { title in
-                            if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
-                        },
-                        onAddAt: { interval, dragged in
-                            guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
-                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
-                        }
-                    )
+                    CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks) { data in
+                        DayTimetable(
+                            day: today,
+                            entries: timetableEntries.filter { !$0.block.isUnplannedTimeLog },
+                            actuals: data,
+                            step: gridStep,
+                            windowStartHour: timetablePrefs.startHour,
+                            windowEndHour: timetablePrefs.endHour,
+                            showsLivedTrace: timetablePrefs.showsLivedTrace,
+                            dimsFinished: timetablePrefs.dimsFinished,
+                            onCheckIn: openCheckIn,
+                            onStart: start,
+                            onOpenFocus: onOpenFocus,
+                            onComplete: complete,
+                            onEdit: { editingBlock = $0 },
+                            onRemove: { removal = CalendarEventRemoval($0) },
+                            onExplain: { explainingBlock = $0 },
+                            onLogActual: { loggingBlock = $0 },
+                            draft: visibleDraft,
+                            draftTitle: $draftTitle,
+                            draftError: draftError,
+                            onSaveDraft: saveDraft,
+                            onCancelDraft: clearDraft,
+                            onDraftOptions: { title in
+                                if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
+                            },
+                            onAddAt: { interval, dragged in
+                                guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
+                                beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
+                            }
+                        )
+                    }
 
                 }
             }
@@ -256,7 +263,18 @@ struct PlanScreen: View {
             .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            periodNavigation
+            VStack(alignment: .leading, spacing: Space.xs) {
+                periodNavigation
+                if viewMode != .review {
+                    HStack(spacing: Space.xxs) {
+                        Text("Scheduled").frame(maxWidth: .infinity, alignment: .leading)
+                        Text("Done").frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .font(.headline)
+                    .padding(.leading, viewMode == .day ? (timetablePrefs.showsLivedTrace ? 62 : 50) : Space.md)
+                    .accessibilityIdentifier("anchor.calendar.columns")
+                }
+            }
                 .padding(.horizontal, Space.lg)
                 .padding(.vertical, Space.xs)
                 .frame(maxWidth: workspaceMaxWidth, alignment: .leading)

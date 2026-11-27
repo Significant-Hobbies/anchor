@@ -13,52 +13,29 @@ struct DayLedgerView: View {
     let sessions: [FocusSession]
     let allBlocks: [PlanBlock]
     var hidesCalendarPlans = false
-    @Environment(\.modelContext) private var context
+    var body: some View {
+        CalendarActuals(blocks: blocks, sessions: sessions, allBlocks: allBlocks) { data in
+            LedgerRows(day: day, blocks: blocks, data: data, hidesCalendarPlans: hidesCalendarPlans)
+        }
+    }
+}
+
+private struct LedgerRows: View {
+    let day: Date
+    let blocks: [PlanBlock]
+    let data: CalendarActualData
+    let hidesCalendarPlans: Bool
     @Environment(\.anchorTheme) private var theme
-    @State private var saved: [DayLedgerEntry] = []
-    @State private var error: String?
-    @State private var unavailable = false
-    @State private var editor: Edit?
     @State private var showsWeek = false
-
-    private struct Edit: Identifiable {
-        let entry: DayLedgerEntry
-        let previous: DayLedgerEntry?
-        var id: UUID { entry.id }
-    }
-
-    private var store: DayLedgerStore? {
-        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
-        return DayLedgerStore(storeURL: config.url)
-    }
-
     private var plans: [DayLedgerEntry] {
         blocks.filter { !$0.isUnplannedTimeLog }.map { DayLedgerEntry(id: $0.id, title: $0.title, start: $0.plannedStart, end: $0.plannedEnd, notes: $0.details, sourcePlanID: $0.id) }
-    }
-
-    private var actuals: [DayLedgerEntry] {
-        var entries = Dictionary(saved.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let linked = Dictionary(allBlocks.filter { !$0.isUnplannedTimeLog }.compactMap { block in block.sessionID.map { ($0, block.id) } }, uniquingKeysWith: { first, _ in first })
-        for session in sessions {
-            let id = linked[session.id] ?? session.id
-            if entries[id] == nil, let end = session.endedAt, end > session.startedAt {
-                let title = session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent
-                entries[id] = DayLedgerEntry(id: id, title: title, start: session.startedAt, end: end, sourcePlanID: linked[session.id])
-            }
-        }
-        for block in blocks where entries[block.id] == nil {
-            if let start = block.actualStartedAt, let end = block.actualEndedAt, end > start {
-                entries[block.id] = DayLedgerEntry(id: block.id, title: block.title, start: start, end: end, notes: block.details, sourcePlanID: block.isUnplannedTimeLog ? nil : block.id)
-            }
-        }
-        return Array(entries.values)
     }
 
     var body: some View {
         let period = Calendar.current.dateInterval(of: .day, for: day)!
         // Date pickers and slot labels expose minutes. Compare those same
         // visible boundaries even when a timer or imported plan stores seconds.
-        let allPlans = plans.map(minutePrecision), allActuals = actuals.map(minutePrecision)
+        let allPlans = plans.map(minutePrecision), allActuals = data.entries.map(minutePrecision)
         let comparison = DayLedgerComparison(period: period, plans: allPlans, actuals: allActuals)
         VStack(alignment: .leading, spacing: Space.md) {
             HStack {
@@ -66,14 +43,10 @@ struct DayLedgerView: View {
                 Spacer()
                 Button { newEntry(period) } label: { Label("Log actual", systemImage: "plus") }
                     .buttonStyle(QuietButtonStyle(expands: false))
-                    .disabled(unavailable)
+                    .disabled(!data.available)
                     .accessibilityIdentifier("anchor.actual.add")
             }
-            if let error {
-                Label(error, systemImage: "exclamationmark.triangle").font(.callout)
-                Button("Reload entries", action: reload)
-            }
-            if !unavailable {
+            if data.available {
                 let hiddenPlanIDs = hidesCalendarPlans ? Set(blocks.filter { $0.externalEventKey != nil }.map(\.id)) : []
                 let visiblePlans = comparison.plans.filter { !hiddenPlanIDs.contains($0.id) }
                 let localPlanIDs = Set(visiblePlans.map(\.id))
@@ -93,8 +66,8 @@ struct DayLedgerView: View {
                     let actual = actualByID[plan.id]
                     pair {
                         Button {
-                            if let actual { edit(actual) }
-                            else { persist(plan, replacing: nil) }
+                            if let actual { data.edit(actual) }
+                            else { data.record(plan) }
                         } label: {
                             HStack(alignment: .top, spacing: Space.xs) {
                                 Image(systemName: actual == nil ? "square" : "checkmark.square.fill")
@@ -107,7 +80,7 @@ struct DayLedgerView: View {
                     } right: {
                         if let actual { actualButton(actual, plan: plan, day: period) }
                         else {
-                            Button("Record differently") { edit(plan) }
+                            Button("Record differently") { data.edit(plan) }
                                 .font(.caption).foregroundStyle(theme.textSecondary)
                         }
                     }
@@ -135,19 +108,6 @@ struct DayLedgerView: View {
         }
         .padding(Space.md)
         .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
-        .onAppear(perform: reload)
-        .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in reload() }
-        .sheet(item: $editor) { item in
-            DayActualEditor(entry: item.entry, onRemove: item.previous.map { previous in
-                {
-                    guard let store else { throw CocoaError(.fileWriteUnknown) }
-                    try store.remove(previous)
-                    NotificationCenter.default.post(name: .actualEntriesChanged, object: nil)
-                }
-            }) { updated in
-                try save(updated, replacing: item.previous)
-            }.anchorTheme()
-        }
     }
 
     private func minutePrecision(_ entry: DayLedgerEntry) -> DayLedgerEntry {
@@ -168,7 +128,7 @@ struct DayLedgerView: View {
     }
 
     private func actualButton(_ actual: DayLedgerEntry, plan: DayLedgerEntry?, day: DateInterval) -> some View {
-        Button { edit(actual) } label: {
+        Button { data.edit(actual) } label: {
             VStack(alignment: .leading, spacing: Space.xxs) {
                 row(actual)
                 if !actual.notes.isEmpty {
@@ -225,7 +185,105 @@ struct DayLedgerView: View {
 
     private func newEntry(_ period: DateInterval) {
         let end = period.contains(Date()) ? Date() : Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: period.start) ?? period.end
-        editor = Edit(entry: DayLedgerEntry(title: "", start: max(period.start, end.addingTimeInterval(-1800)), end: end), previous: nil)
+        data.edit(DayLedgerEntry(title: "", start: max(period.start, end.addingTimeInterval(-1800)), end: end))
+    }
+
+}
+
+struct CalendarCheckButton: View {
+    let block: PlanBlock
+    let data: CalendarActualData
+
+    var body: some View {
+        let checked = data.entries.contains { $0.id == block.id }
+        Button { data.check(block) } label: {
+            Image(systemName: checked ? "checkmark.square.fill" : "square")
+                .frame(minWidth: 24, minHeight: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!data.available)
+        .accessibilityLabel((checked ? "Edit done entry for " : "Mark done: ") + block.title)
+        .accessibilityIdentifier("anchor.calendar.check." + block.id.uuidString)
+    }
+}
+
+struct CalendarActualData {
+    let entries: [DayLedgerEntry]
+    let edit: (DayLedgerEntry) -> Void
+    let record: (DayLedgerEntry) -> Void
+    let available: Bool
+
+    func check(_ block: PlanBlock) {
+        guard available else { return }
+        if let existing = entries.first(where: { $0.id == block.id }) { edit(existing); return }
+        record(DayLedgerEntry(id: block.id, title: block.title, start: block.plannedStart,
+                              end: block.plannedEnd, notes: block.details, sourcePlanID: block.id))
+    }
+}
+
+struct CalendarActuals<Content: View>: View {
+    let blocks: [PlanBlock]
+    let sessions: [FocusSession]
+    let allBlocks: [PlanBlock]
+    @ViewBuilder let content: (CalendarActualData) -> Content
+    @Environment(\.modelContext) private var context
+    @Environment(\.anchorTheme) private var theme
+    @State private var saved: [DayLedgerEntry] = []
+    @State private var error: String?
+    @State private var unavailable = false
+    @State private var editor: Edit?
+
+    private struct Edit: Identifiable {
+        let entry: DayLedgerEntry
+        let previous: DayLedgerEntry?
+        var id: UUID { entry.id }
+    }
+
+    private var store: DayLedgerStore? {
+        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
+        return DayLedgerStore(storeURL: config.url)
+    }
+
+    private var actuals: [DayLedgerEntry] {
+        var entries = Dictionary(saved.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let linked = Dictionary(allBlocks.filter { !$0.isUnplannedTimeLog }.compactMap { block in block.sessionID.map { ($0, block.id) } }, uniquingKeysWith: { first, _ in first })
+        for session in sessions {
+            let id = linked[session.id] ?? session.id
+            if entries[id] == nil, let end = session.endedAt, end > session.startedAt {
+                let title = session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent
+                entries[id] = DayLedgerEntry(id: id, title: title, start: session.startedAt, end: end, sourcePlanID: linked[session.id])
+            }
+        }
+        for block in blocks where entries[block.id] == nil {
+            if let start = block.actualStartedAt, let end = block.actualEndedAt, end > start {
+                entries[block.id] = DayLedgerEntry(id: block.id, title: block.title, start: start, end: end, notes: block.details, sourcePlanID: block.isUnplannedTimeLog ? nil : block.id)
+            }
+        }
+        return Array(entries.values)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            if let error {
+                Label(error, systemImage: "exclamationmark.triangle").font(.callout)
+                Button("Reload entries", action: reload)
+            }
+            content(CalendarActualData(entries: actuals, edit: edit, record: { persist($0, replacing: nil) }, available: !unavailable))
+        }
+        .onAppear(perform: reload)
+        .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in reload() }
+        .sheet(item: $editor) { item in
+            DayActualEditor(entry: item.entry, onRemove: item.previous.map { previous in
+                {
+                    guard let store else { throw CocoaError(.fileWriteUnknown) }
+                    try store.remove(previous)
+                    NotificationCenter.default.post(name: .actualEntriesChanged, object: nil)
+                }
+            }) { updated in
+                try save(updated, replacing: item.previous)
+            }.anchorTheme()
+        }
     }
 
     private func edit(_ entry: DayLedgerEntry) { editor = Edit(entry: entry, previous: saved.first { $0.id == entry.id }) }
