@@ -251,7 +251,7 @@ struct DayTimetable: View {
             .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
         }
         .buttonStyle(.plain)
-        .disabled(!actuals.available)
+        .disabled(!actuals.available && !actuals.storedLogIDs.contains(item.id))
         .accessibilityLabel("Edit done entry " + item.title)
     }
 

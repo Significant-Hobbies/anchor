@@ -53,7 +53,7 @@ struct WeekAgenda: View {
                                 Button { actuals.edit(entry) } label: {
                                     row(actuals.recordedIDs.contains(entry.id) ? entry.title : entry.title + " · In progress", at: entry.start, day: day)
                                 }.buttonStyle(.plain)
-                                .disabled(!actuals.available)
+                                .disabled(!actuals.available && !actuals.storedLogIDs.contains(entry.id))
                                 .accessibilityLabel("Edit done entry " + entry.title)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading)

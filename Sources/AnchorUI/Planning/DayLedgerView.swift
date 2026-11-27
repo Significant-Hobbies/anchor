@@ -214,11 +214,13 @@ struct CalendarActualData {
     let record: (DayLedgerEntry) -> Void
     let available: Bool
 
+    let storedLogIDs: Set<UUID>
     let ongoing: [DayLedgerEntry]
     let recordedIDs: Set<UUID>
 
     init(entries: [DayLedgerEntry], edit: @escaping (DayLedgerEntry) -> Void,
-         record: @escaping (DayLedgerEntry) -> Void, available: Bool, ongoing: [DayLedgerEntry] = []) {
+         record: @escaping (DayLedgerEntry) -> Void, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = []) {
+        self.storedLogIDs = storedLogIDs
         self.ongoing = ongoing
         self.entries = entries
         self.edit = edit
@@ -252,6 +254,7 @@ struct CalendarActuals<Content: View>: View {
     @State private var saved: [DayLedgerEntry] = []
     @State private var error: String?
     @State private var unavailable = false
+    @State private var editingTimeLog: PlanBlock?
     @State private var editor: Edit?
 
     private struct Edit: Identifiable {
@@ -299,10 +302,14 @@ struct CalendarActuals<Content: View>: View {
                 Label(error, systemImage: "exclamationmark.triangle").font(.callout)
                 Button("Reload entries", action: reload)
             }
-            content(CalendarActualData(entries: actuals, edit: edit, record: { persist($0, replacing: nil) }, available: !unavailable, ongoing: ongoing))
+            content(CalendarActualData(entries: actuals, edit: edit, record: { persist($0, replacing: nil) }, available: !unavailable, ongoing: ongoing,
+                                       storedLogIDs: Set(blocks.filter(\.isUnplannedTimeLog).map(\.id))))
         }
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in reload() }
+        .sheet(item: $editingTimeLog) { block in
+            LogTimeSheet(day: block.actualStartedAt ?? block.plannedStart, block: block, onSave: reload).anchorTheme()
+        }
         .sheet(item: $editor) { item in
             DayActualEditor(entry: item.entry, onRemove: item.previous.map { previous in
                 {
@@ -318,8 +325,8 @@ struct CalendarActuals<Content: View>: View {
 
     private func edit(_ entry: DayLedgerEntry) {
         let previous = saved.first { $0.id == entry.id }
-        if previous == nil, let editTimeLog, let block = blocks.first(where: { $0.id == entry.id && $0.isUnplannedTimeLog }) {
-            editTimeLog(block)
+        if let block = blocks.first(where: { $0.id == entry.id && $0.isUnplannedTimeLog }) {
+            if let editTimeLog { editTimeLog(block) } else { editingTimeLog = block }
         } else {
             editor = Edit(entry: entry, previous: previous)
         }
