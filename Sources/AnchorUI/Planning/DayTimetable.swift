@@ -125,6 +125,7 @@ struct DayTimetable: View {
     var onAddAt: (DateInterval, Bool, TimetableColumn) -> Void = { _, _, _ in }
     @State private var draftHeight: CGFloat = 92
     @State private var gridFrame = CGRect.zero
+    @State private var interaction = CalendarEntryInteraction()
     #if os(macOS)
     @GestureState private var selection: (interval: DateInterval, column: TimetableColumn)?
     #else
@@ -181,7 +182,7 @@ struct DayTimetable: View {
                     VStack {
                         ForEach(longPlans) { item in
                             blockCard(item, height: 70).frame(height: 70)
-                                .modifier(CalendarEntryGesture { point, resize in
+                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
                                     drop(CalendarDrag(id: item.id, source: .plan, resizing: resize), at: point)
                                 })
                         }
@@ -190,7 +191,7 @@ struct DayTimetable: View {
                     VStack {
                         ForEach(longActuals) { item in
                             doneCard(item).frame(height: 70)
-                                .modifier(CalendarEntryGesture { point, resize in
+                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
                                     drop(CalendarDrag(id: item.id, source: .actual, resizing: resize), at: point)
                                 })
                         }
@@ -203,7 +204,7 @@ struct DayTimetable: View {
     }
 
     private func blockCard(_ entry: Entry, height: CGFloat, compact: Bool = false) -> some View {
-        TimetableBlockCard(entry: entry, height: height, compact: compact, category: activityTags[entry.block.title] ?? .suggestion(for: entry.block.title), actuals: actuals, dimsFinished: dimsFinished,
+        TimetableBlockCard(interaction: interaction, entry: entry, height: height, compact: compact, category: activityTags[entry.block.title] ?? .suggestion(for: entry.block.title), actuals: actuals, dimsFinished: dimsFinished,
                            onCheckIn: { onCheckIn(entry.block) }, onStart: { onStart(entry.block) },
                            onOpenFocus: onOpenFocus, onComplete: { onComplete(entry.block) },
                            onEdit: { onEdit(entry.block) }, onRemove: { onRemove(entry.block) },
@@ -212,7 +213,7 @@ struct DayTimetable: View {
 
     private func doneCard(_ item: DayLedgerEntry, height: CGFloat = 70) -> some View {
         let category = activityTags[item.title] ?? .suggestion(for: item.title)
-        return Button { actuals.edit(item) } label: {
+        return Button { if interaction.acceptsTap { actuals.edit(item) } } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).font(height < 38 ? .caption2.weight(.semibold) : .subheadline.weight(.semibold)).lineLimit(height < 38 ? 1 : 2)
                 if height >= 38 {
@@ -276,7 +277,7 @@ struct DayTimetable: View {
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
                     blockCard(entry, height: height, compact: laneWidth < 180)
                     .frame(width: laneWidth, height: height, alignment: .topLeading)
-                    .modifier(CalendarEntryGesture { point, resize in
+                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
                         drop(CalendarDrag(id: entry.id, source: .plan, resizing: resize), at: point)
                     })
                     .offset(
@@ -297,7 +298,7 @@ struct DayTimetable: View {
                     let height = bounds.end - bounds.start
                     doneCard(item, height: height)
                     .frame(width: width, height: height)
-                    .modifier(CalendarEntryGesture { point, resize in
+                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
                         drop(CalendarDrag(id: item.id, source: .actual, resizing: resize), at: point)
                     })
                     .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: bounds.start)
@@ -524,6 +525,7 @@ private struct TimetableBlockCard: View {
     @State private var showsActions = false
     @State private var showsMore = false
 
+    let interaction: CalendarEntryInteraction
     let entry: DayTimetable.Entry
     let height: CGFloat
     let compact: Bool
@@ -560,8 +562,8 @@ private struct TimetableBlockCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .center, spacing: Space.xxs) {
                     CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil,
-                                        showsLabel: !compact && height >= 38 && block.plannedEnd <= Date())
-                    Button { showsActions = true } label: {
+                                        showsLabel: !compact && height >= 38 && block.plannedEnd <= Date(), acceptsTap: { interaction.acceptsTap })
+                    Button { if interaction.acceptsTap { showsActions = true } } label: {
                         Text(block.title)
                             .font(height < 38 ? .caption2.weight(.semibold) : compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                             .foregroundStyle(Color.black.opacity(0.91))
@@ -593,7 +595,7 @@ private struct TimetableBlockCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
-            Button { showsActions = true } label: {
+            Button { if interaction.acceptsTap { showsActions = true } } label: {
                 RoundedRectangle(cornerRadius: Radius.sm).fill(category.calendarColor)
                     .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityHidden(true)
@@ -643,7 +645,7 @@ private struct TimetableBlockCard: View {
 
     @ViewBuilder
     private var actionsButton: some View {
-        Button { showsActions = true } label: {
+        Button { if interaction.acceptsTap { showsActions = true } } label: {
             Image(systemName: "ellipsis")
                 .foregroundStyle(Color.black.opacity(0.72))
                 .frame(width: 32, height: 32)

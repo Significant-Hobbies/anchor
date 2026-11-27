@@ -8,7 +8,15 @@ struct CalendarDrag {
     var resizing = false
 }
 
+@MainActor
+final class CalendarEntryInteraction {
+    private var lastDrag: ContinuousClock.Instant?
+    func noteDrag() { lastDrag = .now }
+    var acceptsTap: Bool { lastDrag.map { $0.duration(to: .now) > .milliseconds(180) } ?? true }
+}
+
 struct CalendarEntryGesture: ViewModifier {
+    let interaction: CalendarEntryInteraction
     let commit: (CGPoint, Bool) -> Void
     @GestureState private var drag: DragGesture.Value?
 
@@ -31,7 +39,8 @@ struct CalendarEntryGesture: ViewModifier {
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("anchor.day.grid")) } action: { frame = $0 }
             .simultaneousGesture(DragGesture(minimumDistance: 4, coordinateSpace: .named("anchor.day.grid"))
                 .updating($drag) { value, state, _ in state = value }
-                .onEnded { commit($0.location, resizes($0)) })
+                .onChanged { _ in interaction.noteDrag() }
+                .onEnded { interaction.noteDrag(); commit($0.location, resizes($0)) })
             .zIndex(drag == nil ? 0 : 1)
     }
 }

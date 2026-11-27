@@ -195,10 +195,11 @@ struct CalendarCheckButton: View {
     let data: CalendarActualData
     var rowHeight: CGFloat? = nil
     var showsLabel = false
+    var acceptsTap: () -> Bool = { true }
 
     var body: some View {
         let checked = data.recordedIDs.contains(block.id)
-        Button { data.check(block) } label: {
+        Button { if acceptsTap() { data.check(block) } } label: {
             HStack(spacing: Space.xxs) {
                 Image(systemName: checked ? "checkmark.square.fill" : "square")
                     .font(rowHeight == nil ? .body : .caption2)
