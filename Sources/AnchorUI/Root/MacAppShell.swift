@@ -120,7 +120,7 @@ private struct AnchorNavigationRail: View {
                         item: item,
                         presentation: metrics.presentation,
                         isSelected: !isSettingsSelected && selection == item,
-                        carriesLiveSession: item == .today && controller.hasSession
+                        carriesLiveSession: item == .focus && controller.hasSession
                     ) {
                         selection = item
                     }

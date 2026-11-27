@@ -385,7 +385,7 @@ private struct FocusPreludeStage<Actions: View>: View {
 public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
     case focus, today, history
 
-    static let destinations: [AnchorTab] = [.today, .history]
+    static let destinations: [AnchorTab] = [.today, .focus, .history]
 
     public var id: String { rawValue }
 
@@ -454,7 +454,6 @@ public struct RootView: View {
     @Bindable private var navigation: AnchorNavigationModel
     @State private var plannerDay = Date()
     @State private var lastCalendarDay = Date()
-    @State private var alternativePlanID: UUID?
     @State private var forcedOnboardingFinished = false
     @State private var presentsOnboarding = false
 
@@ -580,13 +579,8 @@ public struct RootView: View {
             ForEach(AnchorTab.destinations) { item in
                 NavigationStack {
                     screen(for: item)
-                        .navigationTitle(item.label)
+                        .navigationTitle(item == .history ? "Insights" : item.label)
                         .toolbar {
-                            if item != .today && controller.hasSession {
-                                ToolbarItem(placement: .secondaryAction) {
-                                    Button("Open timer") { navigation.select(.focus) }
-                                }
-                            }
                             ToolbarItem(placement: .primaryAction) {
                                 Button { navigation.showSettings() } label: {
                                     Label("settings", systemImage: "gearshape")
@@ -609,25 +603,8 @@ public struct RootView: View {
         .tint(theme.accent)
         #endif
         }
-        .onChange(of: controller.hasSession) { wasActive, isActive in
-            if wasActive && !isActive { navigation.showsFocus = false }
-        }
         .onChange(of: controller.isCapturing) { _, capturing in
-            if capturing && scenePhase == .active && !navigation.showsFocus { navigation.select(.focus) }
-        }
-        .sheet(isPresented: $navigation.showsFocus, onDismiss: { alternativePlanID = nil }) {
-            NavigationStack {
-                FocusScreen(controller: controller, alternativePlanID: alternativePlanID)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Back to Today") { navigation.select(.today) }
-                        }
-                    }
-            }
-            #if os(macOS)
-            .frame(minWidth: 540, idealWidth: 760, minHeight: 480, idealHeight: 660)
-            #endif
-            .anchorTheme()
+            if capturing && scenePhase == .active { navigation.select(.focus) }
         }
     }
 
@@ -676,11 +653,8 @@ public struct RootView: View {
         Group {
             switch tab {
             case .focus: FocusScreen(controller: controller)
-            case .today: PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, day: $plannerDay, onChangeActivity: { block in
-                alternativePlanID = block.id
-                navigation.select(.focus)
-            }) { navigation.select(.focus) }
-            case .history: HistoryScreen(day: $plannerDay)
+            case .today: PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, day: $plannerDay) { navigation.select(.focus) }
+            case .history: AnalyticsScreen()
             }
         }
     }

@@ -229,9 +229,9 @@ struct LogTimeSheet: View {
             try context.save()
             // A recorded span edited on the timetable also updates an existing
             // journal copy. Keep its independent title and reflection notes.
-            if !stillHappening, block != nil, let config = context.container.configurations.first, !config.isStoredInMemoryOnly {
+            if !stillHappening, block != nil, let url = context.plannerSidecarURL {
                 do {
-                    let store = DayLedgerStore(storeURL: config.url)
+                    let store = DayLedgerStore(storeURL: url)
                     if let previous = try store.load().entries.first(where: { $0.id == target.id }) {
                         var updated = previous
                         if target.isUnplannedTimeLog {

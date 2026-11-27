@@ -69,7 +69,7 @@ xcodebuild -project Apps/Anchor.xcodeproj -scheme "Anchor (macOS)" \
   -configuration DebugLocal build
 ```
 
-To explore with three weeks of plausible history instead of an empty database:
+Launch a Debug or DebugLocal build with three weeks of sample history:
 
 ```bash
 ANCHOR_DEMO_DATA=1 ./path/to/Anchor.app/Contents/MacOS/Anchor
@@ -79,7 +79,7 @@ Set `ANCHOR_INITIAL_TAB` to `focus`, `today`, or `history` in demo
 mode. The old `day`, `log`, and `insights` values remain accepted as aliases for
 repeatable screenshot workflows.
 
-Demo data is only ever written into an empty store.
+Each demo launch starts with an isolated in-memory database. Release builds always open the regular planner.
 
 ## Releasing
 

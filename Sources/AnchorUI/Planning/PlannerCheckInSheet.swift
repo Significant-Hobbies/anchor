@@ -3,10 +3,24 @@ import AnchorCore
 import SwiftData
 import SwiftUI
 
+#if DEBUG
+// Manual demo sessions get disposable sidecars alongside their in-memory models.
+private let demoPlannerURL = FileManager.default.temporaryDirectory
+    .appendingPathComponent("anchor-demo-" + UUID().uuidString)
+#endif
+
 extension ModelContext {
+    var plannerSidecarURL: URL? {
+        guard let config = container.configurations.first else { return nil }
+        if !config.isStoredInMemoryOnly { return config.url }
+        #if DEBUG
+        if DemoData.isRequested { return demoPlannerURL }
+        #endif
+        return nil
+    }
+
     var plannerCheckInStore: PlannerCheckInStore? {
-        guard let config = container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
-        return PlannerCheckInStore(storeURL: config.url)
+        plannerSidecarURL.map { PlannerCheckInStore(storeURL: $0) }
     }
 
     func savePlannerCheckIn(_ record: PlannerCheckIn) throws {

@@ -162,21 +162,16 @@ public final class AnchorNavigationModel {
     public var selectedTab: AnchorTab
     public var showsSettings = false
 
-    public var showsFocus = false
-
     public init(selectedTab: AnchorTab = .today) {
-        self.selectedTab = selectedTab == .focus ? .today : selectedTab
-        showsFocus = selectedTab == .focus
+        self.selectedTab = selectedTab
     }
 
     public func select(_ tab: AnchorTab) {
-        selectedTab = tab == .focus ? .today : tab
-        showsFocus = tab == .focus
+        selectedTab = tab
         showsSettings = false
     }
 
     public func showSettings() {
-        showsFocus = false
         showsSettings = true
     }
 }

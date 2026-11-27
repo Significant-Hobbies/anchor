@@ -65,10 +65,10 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
-        XCTAssertFalse(app.tabBars.buttons.ci("Focus").exists)
-        app.buttons.ci("Start focus").tap()
+        XCTAssertTrue(app.tabBars.buttons.ci("Focus").exists)
+        app.buttons.ci("Focus").tap()
 
-        let intention = app.textFields.ci("Ship the auth flow")
+        let intention = app.textFields.ci("What are you focusing on?")
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
         intention.tap()
         intention.typeText("Finish the release")
@@ -84,7 +84,7 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(capture.isHittable)
         capture.tap()
 
-        let note = app.textFields.ci("Slack from Ravi about the invoice")
+        let note = app.textFields.ci("What interrupted you?")
         XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.tap()
         note.typeText("Check the build status")
@@ -92,7 +92,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.ci("anchor.capture.pause").tap()
         app.terminate()
         app.launch()
-        app.buttons.ci("Open timer").tap()
+        app.tabBars.buttons.ci("Focus").tap()
         XCTAssertTrue(app.staticTexts.ci("Finish the release").waitForExistence(timeout: 4))
         let resume = app.buttons.ci("Resume")
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
@@ -103,12 +103,10 @@ final class AnchorIOSUITests: XCTestCase {
 
         app.buttons.ci("End session").tap()
         app.tabBars.buttons.ci("Analysis").tap()
-        app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
         app.terminate()
         app.launch()
         app.tabBars.buttons.ci("Analysis").tap()
-        app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-focus-history-after-relaunch")
     }
@@ -140,7 +138,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.ci("anchor.onboarding.hub-continue-locally").tap()
 
         XCTAssertTrue(app.staticTexts.ci("Protect one thing.").waitForExistence(timeout: 5))
-        let goal = app.textFields.ci("Finish the release")
+        let goal = app.textFields.ci("Your focus goal")
         goal.tap()
         goal.typeText("Draft the launch note")
         app.buttons.ci("Done").tap()
@@ -148,7 +146,7 @@ final class AnchorIOSUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts.ci("Draft the launch note").waitForExistence(timeout: 4))
         app.buttons.ci("Something pulled me").tap()
-        let thought = app.textFields.ci("Check the build status")
+        let thought = app.textFields.ci("What came to mind?")
         thought.tap()
         thought.typeText("Read the incoming message")
         app.buttons.ci("Done").tap()
@@ -161,10 +159,10 @@ final class AnchorIOSUITests: XCTestCase {
         app.swipeUp()
         XCTAssertTrue(openFocus.isHittable)
         openFocus.tap()
-        let focus = app.buttons.ci("Start focus")
+        let focus = app.buttons.ci("Focus")
         XCTAssertTrue(focus.waitForExistence(timeout: 5))
         focus.tap()
-        let realGoal = app.textFields.ci("Ship the auth flow")
+        let realGoal = app.textFields.ci("What are you focusing on?")
         if realGoal.waitForExistence(timeout: 2) {
             realGoal.tap()
             realGoal.typeText("Draft the launch note")
@@ -511,7 +509,6 @@ final class AnchorIOSUITests: XCTestCase {
         app.launch()
         XCTAssertFalse(app.tabBars.buttons.ci("Habits").exists)
         app.tabBars.buttons.ci("Analysis").tap()
-        app.buttons.ci("Insights").tap()
         XCTAssertTrue(app.staticTexts.ci("Habit insights").waitForExistence(timeout: 4))
     }
 

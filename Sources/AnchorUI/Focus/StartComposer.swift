@@ -60,7 +60,7 @@ public struct StartComposer: View {
                 Card(padding: Space.lg) {
                     VStack(alignment: .leading, spacing: Space.md) {
                         fieldLabel("What are you working on?")
-                        TextField("Ship the auth flow", text: $draft.intent, axis: .vertical)
+                        TextField("What are you focusing on?", text: $draft.intent, axis: .vertical)
                             .textFieldStyle(.plain)
                             .font(.system(size: 20, weight: .medium, design: .rounded))
                             .foregroundStyle(theme.textPrimary)

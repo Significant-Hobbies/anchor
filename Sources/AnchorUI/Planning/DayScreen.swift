@@ -19,7 +19,6 @@ struct PlanScreen: View {
     @State private var showsCalendars = false
     private let controller: FocusController
     private let onOpenFocus: () -> Void
-    private let onChangeActivity: ((PlanBlock) -> Void)?
     @State private var checkIns: [UUID: PlannerCheckIn] = [:]
     @State private var checkingEntry: PlannerCheckIn?
     @State private var checkInLoadFailed = false
@@ -51,8 +50,7 @@ struct PlanScreen: View {
     @State private var showsAllCalendarEvents = false
     @State private var calendarReferenceTime = Date()
 
-    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, day: Binding<Date>, onChangeActivity: ((PlanBlock) -> Void)? = nil, onOpenFocus: @escaping () -> Void) {
-        self.onChangeActivity = onChangeActivity
+    init(controller: FocusController, calendarCoordinator: CalendarSyncCoordinator?, day: Binding<Date>, onOpenFocus: @escaping () -> Void) {
         _today = day
         self.calendarCoordinator = calendarCoordinator
         self.controller = controller
@@ -210,15 +208,24 @@ struct PlanScreen: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: Space.xs) {
-                dateNavigation
-                HStack(spacing: Space.sm) {
-                    if controller.hasSession || Calendar.current.isDateInToday(today) {
-                        focusItem(recorded: data.recordedIDs) { time in
-                            proxy.scrollTo(DayTimetable.hourAnchor(for: time, on: today), anchor: .top)
-                        }
+                let status = agendaStatus(recorded: data.recordedIDs) { time in
+                    proxy.scrollTo(DayTimetable.hourAnchor(for: time, on: today), anchor: .top)
+                }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.md) {
+                        dateNavigation
+                        if Calendar.current.isDateInToday(today) { status.fixedSize(horizontal: true, vertical: false) }
+                        Spacer(minLength: 0)
+                        calendarOptions
                     }
-                    Spacer(minLength: 0)
-                    calendarOptions
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        HStack {
+                            dateNavigation
+                            Spacer(minLength: 0)
+                            calendarOptions
+                        }
+                        if Calendar.current.isDateInToday(today) { status }
+                    }
                 }
                 HStack(spacing: Space.xxs) {
                     columnHeading("Scheduled", actionLabel: "Add scheduled entry") { beginDraft(suggestedEntry) }
@@ -519,54 +526,20 @@ struct PlanScreen: View {
     }
 
     @ViewBuilder
-    private func focusItem(recorded: Set<UUID>, jump: @escaping (Date) -> Void) -> some View {
-        if let session = controller.session, controller.hasSession {
-            focusRow(controller.isRunning ? "In focus" : "Paused", title: session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent,
-                     action: "Open timer", perform: onOpenFocus)
-        } else if let record = ScheduledFocusResolver().nextBlock(from: visibleBlocks.filter { $0.plannedEnd > calendarReferenceTime }.map { $0.snapshot() }, recorded: recorded, now: calendarReferenceTime),
-                  let block = visibleBlocks.first(where: { $0.id == record.id }) {
-            if block.plannedStart > calendarReferenceTime {
-                Button { jump(block.plannedStart) } label: {
-                    HStack(spacing: Space.xs) {
-                        Text("Up next · " + block.plannedStart.formatted(date: .omitted, time: .shortened))
+    private func agendaStatus(recorded: Set<UUID>, jump: @escaping (Date) -> Void) -> some View {
+        if let record = ScheduledFocusResolver().nextBlock(from: visibleBlocks.filter { $0.plannedEnd > calendarReferenceTime }.map { $0.snapshot() }, recorded: recorded, now: calendarReferenceTime) {
+            Button { jump(record.plannedStart) } label: {
+                HStack(spacing: Space.xs) {
+                    Text(record.plannedStart > calendarReferenceTime ? "Up next" : "Now")
                         .foregroundStyle(theme.textSecondary)
-                        Text(block.title).fontWeight(.semibold).lineLimit(1)
-                        Image(systemName: "chevron.right").font(.caption2)
-                    }.font(.subheadline)
-                }.buttonStyle(.plain).accessibilityHint("Show this event on the timetable")
-
-                Spacer(minLength: 0)
-                Button("Focus", systemImage: "scope", action: onOpenFocus).buttonStyle(.borderless)
-            } else {
-                HStack {
-                    focusRow("Now · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
-                         title: block.title, action: "Start focus") { start(block) }
-                    Menu {
-                        if let onChangeActivity {
-                            Button("Do something else in this slot") { onChangeActivity(block) }
-                        }
-                        Button("Open Focus", action: onOpenFocus)
-                    } label: { Image(systemName: "arrow.triangle.2.circlepath") }
-                    .menuIndicator(.hidden)
-                    .accessibilityLabel("More focus actions")
-                }
+                    Text(record.plannedStart, style: .time).monospacedDigit()
+                    Text(record.title).fontWeight(.semibold).lineLimit(1)
+                    Image(systemName: "chevron.right").font(.caption2)
+                }.font(.subheadline)
             }
-        } else {
-            Button("Start focus", systemImage: "scope", action: onOpenFocus)
-                .buttonStyle(QuietButtonStyle(expands: false))
+            .buttonStyle(.plain)
+            .accessibilityHint("Show this event on the timetable")
         }
-    }
-
-    private func focusRow(_ status: String, title: String, action: String, perform: @escaping () -> Void) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(status).font(.caption).foregroundStyle(theme.textSecondary)
-                Text(title).font(.headline)
-            }
-            Spacer()
-            Button(action, action: perform).buttonStyle(QuietButtonStyle(expands: false))
-        }
-        .accessibilityElement(children: .contain)
     }
 
     private var dateNavigation: some View {
@@ -601,6 +574,7 @@ struct PlanScreen: View {
                 today = Date()
             }
                 .buttonStyle(QuietButtonStyle(expands: false))
+                .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel("Go to today")
         }
     }

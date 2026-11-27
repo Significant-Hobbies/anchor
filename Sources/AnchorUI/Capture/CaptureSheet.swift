@@ -98,7 +98,7 @@ public struct CaptureSheet: View {
             Card(padding: Space.md) {
                 VStack(alignment: .trailing, spacing: Space.xs) {
                     TextField(
-                        isReturningFromPause ? "Ravi came over about the invoice" : "Slack from Ravi about the invoice",
+                        isReturningFromPause ? "What interrupted your focus?" : "What interrupted you?",
                         text: $note,
                         axis: .vertical
                     )

@@ -228,11 +228,9 @@ struct DayTimetable: View {
             .padding(.vertical, height < 38 ? 0 : Space.xxs)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.leading, Space.xxs)
-            .background(category.calendarColor.opacity(0.24), in: .rect(cornerRadius: Radius.sm))
-            .overlay { RoundedRectangle(cornerRadius: Radius.sm).strokeBorder(category.calendarColor.opacity(0.75)) }
-            .overlay(alignment: .leading) {
-                Capsule().fill(category.calendarColor).frame(width: 3).padding(.vertical, 2)
-            }
+            .foregroundStyle(Color.black.opacity(0.91))
+            .background(category.calendarColor, in: .rect(cornerRadius: Radius.sm))
+
         }
         .help(category.rawValue.capitalized)
         .accessibilityValue(category.rawValue.capitalized)
