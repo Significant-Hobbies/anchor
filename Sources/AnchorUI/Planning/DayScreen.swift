@@ -254,7 +254,9 @@ struct PlanScreen: View {
                         },
                         onAddAt: { interval, dragged, column in
                             guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
-                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false, column: column))
+                            let finalHour = Calendar.current.component(.hour, from: interval.start) == 23
+                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60),
+                                                  revealInGrid: finalHour, column: column))
                         }
                     )
 
