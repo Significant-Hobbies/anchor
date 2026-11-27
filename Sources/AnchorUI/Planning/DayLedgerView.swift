@@ -195,10 +195,11 @@ struct CalendarCheckButton: View {
     let data: CalendarActualData
     var rowHeight: CGFloat? = nil
     var showsLabel = false
+    var acceptsTap: () -> Bool = { true }
 
     var body: some View {
         let checked = data.recordedIDs.contains(block.id)
-        Button { data.check(block) } label: {
+        Button { if acceptsTap() { data.check(block) } } label: {
             HStack(spacing: Space.xxs) {
                 Image(systemName: checked ? "checkmark.square.fill" : "square")
                     .font(rowHeight == nil ? .body : .caption2)
@@ -224,12 +225,14 @@ struct CalendarActualData {
     let record: (DayLedgerEntry) -> Bool
     let available: Bool
 
+    var move: (DayLedgerEntry, Bool) -> Bool = { _, _ in false }
     let storedLogIDs: Set<UUID>
     let ongoing: [DayLedgerEntry]
     let recordedIDs: Set<UUID>
 
     init(entries: [DayLedgerEntry], edit: @escaping (DayLedgerEntry) -> Void,
-         record: @escaping (DayLedgerEntry) -> Bool, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = []) {
+         record: @escaping (DayLedgerEntry) -> Bool, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = [], move: @escaping (DayLedgerEntry, Bool) -> Bool = { _, _ in false }) {
+        self.move = move
         self.storedLogIDs = storedLogIDs
         self.ongoing = ongoing
         self.entries = entries
@@ -316,7 +319,7 @@ struct CalendarActuals<Content: View>: View {
                 Button("Reload entries", action: reload)
             }
             content(CalendarActualData(entries: actuals, edit: edit, record: { persist($0, replacing: nil) }, available: !unavailable, ongoing: ongoing,
-                                       storedLogIDs: Set(blocks.filter(\.isUnplannedTimeLog).map(\.id))))
+                                       storedLogIDs: Set(blocks.filter(\.isUnplannedTimeLog).map(\.id)), move: move))
         }
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in reload() }
@@ -334,6 +337,40 @@ struct CalendarActuals<Content: View>: View {
                 try save(updated, replacing: item.previous)
             }.anchorTheme()
         }
+    }
+
+    private func move(_ entry: DayLedgerEntry, finishing: Bool) -> Bool {
+        guard !unavailable else { return false }
+        let previous = saved.first { $0.id == entry.id }
+        if let log = blocks.first(where: { $0.id == entry.id && $0.isUnplannedTimeLog }) {
+            let hasEnd = finishing || log.actualEndedAt != nil
+            guard entry.start <= Date(), !hasEnd || entry.end <= Date() else {
+                error = "Logged time must be in the past."
+                return false
+            }
+            let prior = (log.actualStartedAt, log.actualEndedAt, log.state, log.updatedAt)
+            log.actualStartedAt = entry.start
+            if hasEnd {
+                log.actualEndedAt = entry.end
+                log.state = .completed
+            }
+            log.updatedAt = Date()
+            do { try context.save() } catch {
+                (log.actualStartedAt, log.actualEndedAt, log.state, log.updatedAt) = prior
+                self.error = "Couldn’t move the logged time."
+                return false
+            }
+            guard previous != nil else { return true }
+            if !persist(entry, replacing: previous) {
+                (log.actualStartedAt, log.actualEndedAt, log.state, log.updatedAt) = prior
+                do { try context.save() } catch {
+                    self.error = "The time log moved, but its journal copy could not be updated. Reopen the log to reconcile its times."
+                }
+                return false
+            }
+            return true
+        }
+        return persist(entry, replacing: previous)
     }
 
     private func edit(_ entry: DayLedgerEntry) {

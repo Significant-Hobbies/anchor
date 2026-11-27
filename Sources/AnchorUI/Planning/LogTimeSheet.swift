@@ -27,6 +27,8 @@ struct LogTimeSheet: View {
     init(
         day: Date,
         suggestedStart: Date? = nil,
+        suggestedEnd: Date? = nil,
+        suggestedTitle: String = "",
         block: PlanBlock? = nil,
         onSave: @escaping () -> Void
     ) {
@@ -37,13 +39,13 @@ struct LogTimeSheet: View {
             : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
         let resolvedStart = block?.actualStartedAt ?? block?.plannedStart ?? suggestedStart ?? fallbackStart
         let isOngoing = block?.state == .inProgress && block?.actualStartedAt != nil
-        _title = State(initialValue: block?.title ?? "")
+        _title = State(initialValue: block?.title ?? suggestedTitle)
         _details = State(initialValue: block?.details ?? "")
         _selectedProjectID = State(initialValue: block?.projectID)
         _kind = State(initialValue: block?.kind ?? .focus)
         _start = State(initialValue: resolvedStart)
-        _end = State(initialValue: block?.actualEndedAt ?? (isOngoing ? now : min(now, resolvedStart.addingTimeInterval(30 * 60))))
-        _stillHappening = State(initialValue: block == nil ? calendar.isDateInToday(day) : isOngoing)
+        _end = State(initialValue: block?.actualEndedAt ?? suggestedEnd ?? (isOngoing ? now : min(now, resolvedStart.addingTimeInterval(30 * 60))))
+        _stillHappening = State(initialValue: block == nil ? (suggestedEnd == nil && calendar.isDateInToday(day)) : isOngoing)
         self.block = block
         self.onSave = onSave
     }

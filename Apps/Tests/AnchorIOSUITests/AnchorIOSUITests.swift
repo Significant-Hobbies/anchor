@@ -79,7 +79,7 @@ final class AnchorIOSUITests: XCTestCase {
         start.tap()
         XCTAssertTrue(app.staticTexts.ci("Finish the release").waitForExistence(timeout: 4))
 
-        let capture = app.buttons.ci("Lock a distraction")
+        let capture = app.buttons.ci("Log interruption")
         XCTAssertTrue(capture.waitForExistence(timeout: 3))
         XCTAssertTrue(capture.isHittable)
         capture.tap()
@@ -172,7 +172,7 @@ final class AnchorIOSUITests: XCTestCase {
             XCTAssertTrue(start.isHittable)
             start.tap()
         }
-        XCTAssertTrue(app.buttons.ci("Lock a distraction").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons.ci("Log interruption").waitForExistence(timeout: 4))
         app.buttons.ci("End session").tap()
     }
 
@@ -367,7 +367,7 @@ final class AnchorIOSUITests: XCTestCase {
     private func verifyTodayLongLabelControls(_ app: XCUIApplication, copyEnabled: Bool) -> [XCUIElement] {
         openDayTools(app)
         let controls = [app.buttons.ci("anchor.today.copy-day"),
-                        app.buttons.ci("anchor.today.log-time"),
+                        app.buttons.ci("anchor.today.calendars"),
                         app.buttons.ci("anchor.today.customize")]
         for control in controls {
             XCTAssertTrue(control.waitForExistence(timeout: 5))
@@ -387,7 +387,7 @@ final class AnchorIOSUITests: XCTestCase {
             if controlsAreVisible && enabledControls.allSatisfy({ $0.isHittable }) { break }
             app.swipeDown()
         }
-        for (control, baseline) in zip(controls, ["Copy day", "Log time", "Customize"]) {
+        for (control, baseline) in zip(controls, ["Copy day…", "Calendars…", "Timetable settings…"]) {
             XCTAssertEqual(control.label.lowercased().components(separatedBy: baseline.lowercased()).count - 1, 2,
                            "Pseudolocalization must actually double \(baseline); baseline English is not variant evidence")
             XCTAssertGreaterThanOrEqual(control.frame.width, 44)
@@ -402,11 +402,6 @@ final class AnchorIOSUITests: XCTestCase {
             XCTAssertTrue(control.isEnabled)
             XCTAssertTrue(control.isHittable)
         }
-        XCTAssertLessThanOrEqual(controls[0].frame.maxX, controls[1].frame.minX + 0.5,
-                                 "The first-row actions must not overlap")
-        XCTAssertGreaterThanOrEqual(controls[2].frame.minY,
-                                    max(controls[0].frame.maxY, controls[1].frame.maxY) - 0.5,
-                                    "Customize must remain below both first-row actions")
         return controls
     }
 
@@ -457,10 +452,10 @@ final class AnchorIOSUITests: XCTestCase {
         openDayTools(app)
         let controls = [
             app.buttons.ci("anchor.today.copy-day"),
-            app.buttons.ci("anchor.today.log-time"),
+            app.buttons.ci("anchor.today.calendars"),
             app.buttons.ci("anchor.today.customize"),
         ]
-        let expectedLabels = ["Copy day", "Log time", "Customize"]
+        let expectedLabels = ["Copy day…", "Calendars…", "Timetable settings…"]
         for (control, expectedLabel) in zip(controls, expectedLabels) {
             XCTAssertTrue(control.waitForExistence(timeout: 5), "Expected Today control \(control.identifier) to be present")
             XCTAssertEqual(control.label.lowercased(), expectedLabel.lowercased(), "The control should retain its clear accessible label")
@@ -468,10 +463,6 @@ final class AnchorIOSUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(control.frame.width + 0.001, 44, "Today control \(control.identifier) needs a 44pt hit width")
             XCTAssertGreaterThanOrEqual(control.frame.height + 0.001, 44, "Today control \(control.identifier) needs a 44pt hit height")
         }
-
-        let customize = controls[2]
-        XCTAssertGreaterThanOrEqual(customize.frame.minY, controls[0].frame.maxY - 1,
-                                    "Customize should occupy the second compact row")
 
         let evidence = XCTAttachment(screenshot: app.screenshot())
         evidence.name = expectedWidth == nil

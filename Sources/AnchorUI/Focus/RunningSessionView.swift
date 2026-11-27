@@ -13,7 +13,12 @@ public struct RunningSessionView: View {
     @Query(sort: \SavedTag.createdAt) private var savedTags: [SavedTag]
     private let controller: FocusController
 
-    public init(controller: FocusController) {
+    private let nextBlock: PlanBlock?
+    @State private var replacing = false
+    @State private var replacementTitle = ""
+
+    public init(controller: FocusController, nextBlock: PlanBlock? = nil) {
+        self.nextBlock = nextBlock
         self.controller = controller
     }
 
@@ -23,6 +28,12 @@ public struct RunningSessionView: View {
         ScrollView {
             VStack(spacing: Space.lg) {
                 title
+                if let nextBlock {
+                    Text("Up next · " + nextBlock.title + " · " + nextBlock.plannedStart.formatted(date: Calendar.current.isDateInToday(nextBlock.plannedStart) ? .omitted : .abbreviated, time: .shortened))
+                        .font(.subheadline).foregroundStyle(theme.textSecondary)
+                } else {
+                    Text("Nothing else scheduled").font(.caption).foregroundStyle(theme.textSecondary)
+                }
 
                 FocusRing(
                     fraction: controller.fraction,
@@ -123,7 +134,7 @@ public struct RunningSessionView: View {
 
     private var transport: some View {
         VStack(spacing: Space.md) {
-            if controller.isPaused, let error = controller.lastError {
+            if let error = controller.lastError {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(theme.negative)
@@ -136,11 +147,28 @@ public struct RunningSessionView: View {
             } label: {
                 HStack(spacing: Space.xs) {
                     InterruptionKnotMark(tint: theme.onAccent)
-                    Text("Lock a distraction")
+                    Text("Log interruption")
                 }
             }
             .buttonStyle(PrimaryButtonStyle())
             .keyboardShortcut("l", modifiers: [.command, .shift])
+
+            Button("Switch activity", systemImage: "arrow.triangle.2.circlepath") {
+                replacementTitle = ""
+                replacing = true
+            }
+            .buttonStyle(QuietButtonStyle(expands: false))
+            .alert("Switch activity", isPresented: $replacing) {
+                TextField("New activity", text: $replacementTitle)
+                Button("Cancel", role: .cancel) {}
+                Button("Switch") {
+                    let title = replacementTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !title.isEmpty else { return }
+                    _ = controller.start(goal: nil, intent: title, minutes: 0)
+                }.disabled(replacementTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            } message: {
+                Text("Time already recorded stays with the current activity. An open-ended timer starts for the new activity.")
+            }
 
             HStack(spacing: Space.lg) {
                 Button {

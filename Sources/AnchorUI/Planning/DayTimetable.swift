@@ -107,6 +107,7 @@ struct DayTimetable: View {
     var windowEndHour: Int = 22
     var showsLivedTrace: Bool = true
     var dimsFinished: Bool = true
+    var onDropEntry: (CalendarDrag, TimetableColumn, Date) -> Bool = { _, _, _ in false }
     var onCheckIn: (PlanBlock) -> Void = { _ in }
     var onStart: (PlanBlock) -> Void = { _ in }
     var onOpenFocus: () -> Void = {}
@@ -123,6 +124,8 @@ struct DayTimetable: View {
     var onDraftOptions: (String) -> Void = { _ in }
     var onAddAt: (DateInterval, Bool, TimetableColumn) -> Void = { _, _, _ in }
     @State private var draftHeight: CGFloat = 92
+    @State private var gridFrame = CGRect.zero
+    @State private var interaction = CalendarEntryInteraction()
     #if os(macOS)
     @GestureState private var selection: (interval: DateInterval, column: TimetableColumn)?
     #else
@@ -176,18 +179,32 @@ struct DayTimetable: View {
             let longActuals = dayActuals.filter { $0.end.timeIntervalSince($0.start) >= 86_400 }
             if !longPlans.isEmpty || !longActuals.isEmpty {
                 HStack(alignment: .top, spacing: Space.xxs) {
-                    VStack { ForEach(longPlans) { blockCard($0, height: 70).frame(height: 70) } }
+                    VStack {
+                        ForEach(longPlans) { item in
+                            blockCard(item, height: 70).frame(height: 70)
+                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                                    drop(CalendarDrag(id: item.id, source: .plan, resizing: resize, keepsTime: keepsTime), at: point)
+                                })
+                        }
+                    }
                         .frame(maxWidth: .infinity)
-                    VStack { ForEach(longActuals) { doneCard($0).frame(height: 70) } }
+                    VStack {
+                        ForEach(longActuals) { item in
+                            doneCard(item).frame(height: 70)
+                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                                    drop(CalendarDrag(id: item.id, source: .actual, resizing: resize, keepsTime: keepsTime), at: point)
+                                })
+                        }
+                    }
                         .frame(maxWidth: .infinity)
                 }.padding(.leading, railWidth + traceWidth)
             }
             grid
-        }
+        }.coordinateSpace(name: "anchor.day.grid")
     }
 
     private func blockCard(_ entry: Entry, height: CGFloat, compact: Bool = false) -> some View {
-        TimetableBlockCard(entry: entry, height: height, compact: compact, category: activityTags[entry.block.title] ?? .suggestion(for: entry.block.title), actuals: actuals, dimsFinished: dimsFinished,
+        TimetableBlockCard(interaction: interaction, entry: entry, height: height, compact: compact, category: activityTags[entry.block.title] ?? .suggestion(for: entry.block.title), actuals: actuals, dimsFinished: dimsFinished,
                            onCheckIn: { onCheckIn(entry.block) }, onStart: { onStart(entry.block) },
                            onOpenFocus: onOpenFocus, onComplete: { onComplete(entry.block) },
                            onEdit: { onEdit(entry.block) }, onRemove: { onRemove(entry.block) },
@@ -196,7 +213,7 @@ struct DayTimetable: View {
 
     private func doneCard(_ item: DayLedgerEntry, height: CGFloat = 70) -> some View {
         let category = activityTags[item.title] ?? .suggestion(for: item.title)
-        return Button { actuals.edit(item) } label: {
+        return Button { if interaction.acceptsTap { actuals.edit(item) } } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).font(height < 38 ? .caption2.weight(.semibold) : .subheadline.weight(.semibold)).lineLimit(height < 38 ? 1 : 2)
                 if height >= 38 {
@@ -211,7 +228,8 @@ struct DayTimetable: View {
             .padding(.vertical, height < 38 ? 0 : Space.xxs)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.leading, Space.xxs)
-            .background(category.calendarColor.opacity(0.16), in: .rect(cornerRadius: Radius.sm))
+            .background(category.calendarColor.opacity(0.24), in: .rect(cornerRadius: Radius.sm))
+            .overlay { RoundedRectangle(cornerRadius: Radius.sm).strokeBorder(category.calendarColor.opacity(0.75)) }
             .overlay(alignment: .leading) {
                 Capsule().fill(category.calendarColor).frame(width: 3).padding(.vertical, 2)
             }
@@ -259,6 +277,9 @@ struct DayTimetable: View {
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
                     blockCard(entry, height: height, compact: laneWidth < 180)
                     .frame(width: laneWidth, height: height, alignment: .topLeading)
+                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                        drop(CalendarDrag(id: entry.id, source: .plan, resizing: resize, keepsTime: keepsTime), at: point)
+                    })
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
                         y: bounds.start
@@ -277,17 +298,20 @@ struct DayTimetable: View {
                     let height = bounds.end - bounds.start
                     doneCard(item, height: height)
                     .frame(width: width, height: height)
+                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                        drop(CalendarDrag(id: item.id, source: .actual, resizing: resize, keepsTime: keepsTime), at: point)
+                    })
                     .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: bounds.start)
                 }
 
                 if let selection {
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: Radius.sm)
                         .fill(theme.accent.opacity(0.22))
-                        .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(theme.accent) }
+                        .overlay { RoundedRectangle(cornerRadius: Radius.sm).strokeBorder(theme.accent) }
                         .overlay(alignment: .topLeading) {
                             Text("\(selection.interval.start.formatted(date: .omitted, time: .shortened)) – \(selection.interval.end.formatted(date: .omitted, time: .shortened))")
                                 .font(.caption2.monospacedDigit()).padding(.horizontal, 4)
-                                .background(theme.surfaceRaised, in: .rect(cornerRadius: 3))
+                                .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
                                 .fixedSize()
                         }
                         .frame(width: gridWidth, height: selection.interval.duration / 3600 * hourHeight)
@@ -309,10 +333,22 @@ struct DayTimetable: View {
                         .id(draft.id)
                 }
             }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("anchor.day.grid")) } action: { gridFrame = $0 }
         }
         .frame(height: max(totalHeight, draft.map { offset(for: $0.start) + draftHeight } ?? 0))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("anchor.today.timetable")
+    }
+
+    private func drop(_ item: CalendarDrag, at location: CGPoint) {
+        let point = CGPoint(x: location.x - gridFrame.minX, y: location.y - gridFrame.minY)
+        let gridX = railWidth + traceWidth
+        let doneX = gridX + (gridFrame.width - gridX + Space.xxs) / 2
+        guard point.x >= gridX, point.x <= doneX + (doneX - gridX), point.y >= 0, point.y <= totalHeight else { return }
+        let increment = Double(step.rawValue * 60)
+        let offset = (point.y / hourHeight * 3600 / increment).rounded() * increment
+        let limit = range.duration - (item.resizing ? 0 : increment)
+        _ = onDropEntry(item, point.x < doneX ? .scheduled : .done, range.start.addingTimeInterval(min(limit, max(0, offset))))
     }
 
     private func offset(for date: Date) -> CGFloat {
@@ -489,6 +525,7 @@ private struct TimetableBlockCard: View {
     @State private var showsActions = false
     @State private var showsMore = false
 
+    let interaction: CalendarEntryInteraction
     let entry: DayTimetable.Entry
     let height: CGFloat
     let compact: Bool
@@ -525,11 +562,11 @@ private struct TimetableBlockCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .center, spacing: Space.xxs) {
                     CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil,
-                                        showsLabel: !compact && height >= 38 && block.plannedEnd <= Date())
-                    Button { showsActions = true } label: {
+                                        showsLabel: !compact && height >= 38 && block.plannedEnd <= Date(), acceptsTap: { interaction.acceptsTap })
+                    Button { if interaction.acceptsTap { showsActions = true } } label: {
                         Text(block.title)
                             .font(height < 38 ? .caption2.weight(.semibold) : compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
-                            .foregroundStyle(theme.textPrimary)
+                            .foregroundStyle(Color.black.opacity(0.91))
                             .lineLimit(height < 38 ? 1 : 2)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -545,7 +582,7 @@ private struct TimetableBlockCard: View {
                     let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated
                     Text("\(block.plannedStart.formatted(date: dateStyle, time: .shortened)) – \(block.plannedEnd.formatted(date: dateStyle, time: .shortened))")
                         .font(.caption2.monospacedDigit())
-                        .foregroundStyle(theme.textTertiary)
+                        .foregroundStyle(Color.black.opacity(0.76))
                         .lineLimit(1)
                 }
                 if height >= 92 {
@@ -558,9 +595,8 @@ private struct TimetableBlockCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
-            Button { showsActions = true } label: {
-                RoundedRectangle(cornerRadius: Radius.sm).fill(cardFill)
-                    .overlay { RoundedRectangle(cornerRadius: Radius.sm).fill(category.calendarColor.opacity(0.14)) }
+            Button { if interaction.acceptsTap { showsActions = true } } label: {
+                RoundedRectangle(cornerRadius: Radius.sm).fill(category.calendarColor)
                     .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityHidden(true)
         }
@@ -575,6 +611,7 @@ private struct TimetableBlockCard: View {
                 ).allowsHitTesting(false)
         }
         .help(category.rawValue.capitalized)
+        .foregroundStyle(Color.black.opacity(0.91))
         .opacity(cardOpacity)
         .popover(isPresented: $showsActions, arrowEdge: actionsArrow) {
             VStack(alignment: .leading, spacing: Space.xxs) {
@@ -608,9 +645,9 @@ private struct TimetableBlockCard: View {
 
     @ViewBuilder
     private var actionsButton: some View {
-        Button { showsActions = true } label: {
+        Button { if interaction.acceptsTap { showsActions = true } } label: {
             Image(systemName: "ellipsis")
-                .foregroundStyle(theme.textSecondary)
+                .foregroundStyle(Color.black.opacity(0.72))
                 .frame(width: 32, height: 32)
                 .contentShape(.rect)
         }
@@ -635,7 +672,7 @@ private struct TimetableBlockCard: View {
                 Text(projectName)
                 Text("·")
             }
-            Text(block.kind.label)
+            Text(category.rawValue.capitalized)
             Text("·")
             Text(block.flexibility.label)
             if block.templateID != nil {
@@ -648,7 +685,7 @@ private struct TimetableBlockCard: View {
             }
         }
         .font(.caption2)
-        .foregroundStyle(theme.textTertiary)
+        .foregroundStyle(Color.black.opacity(0.76))
         .lineLimit(1)
     }
 
@@ -695,10 +732,6 @@ private struct TimetableBlockCard: View {
         case .skipped, .moved: theme.textTertiary
         default: theme.accent
         }
-    }
-
-    private var cardFill: Color {
-        entry.isCurrent || block.state == .inProgress ? theme.surfaceRaised : theme.surface
     }
 
     private var cardOpacity: Double {

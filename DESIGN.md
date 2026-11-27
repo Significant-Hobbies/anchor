@@ -163,8 +163,8 @@ placing a card inside another card.
 
 ## Shapes
 
-Cards use continuous 20-point corners, compact controls use 8- or 14-point
-corners, and major actions are capsules. The focus ring remains the signature
+Cards and settings panels use 12-point continuous corners. Calendar entries, editors,
+and rectangular buttons use 8-point corners. The focus ring remains the signature
 circular form. Indulge artwork keeps its authored silhouettes and is clipped
 only by its transparent or rectangular asset boundary, not arbitrary UI masks.
 
@@ -193,7 +193,7 @@ selected state and textual label.
 
 ### Cards / Containers
 
-The shared Card is the only generic raised container: 20-point corners, one
+The shared Card is the only generic raised container: 12-point corners, one
 hairline, 16-point default padding, and a restrained ambient shadow.
 
 Settings use `PreferenceGroup`, `PreferenceActionRow`, and `PreferenceInfoRow`

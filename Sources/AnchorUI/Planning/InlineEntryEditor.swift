@@ -75,7 +75,8 @@ struct InlineEntryEditor: View {
             .accessibilityLabel("Save")
             .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         Menu {
-            if seed.column == .scheduled { Button("More options…") { options(title) } }
+            Button(seed.column == .scheduled ? "More options…" : "Log with details…") { options(title) }
+                .accessibilityIdentifier(seed.column == .done ? "anchor.today.log-time" : "anchor.plan.more-options")
             Button("Cancel", action: cancel)
         } label: { actionIcon("ellipsis.circle") }
         #if os(macOS)
