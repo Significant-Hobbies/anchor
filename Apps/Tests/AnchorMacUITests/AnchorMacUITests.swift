@@ -44,7 +44,6 @@ final class AnchorMacUITests: XCTestCase {
 
         app.buttons.ci("End session").click()
         app.buttons.ci("Analysis").click()
-        app.radioButtons.ci("Interruptions").click()
         let parkedRow = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH[c] %@", "Synthetic interruption")
         ).firstMatch
@@ -53,7 +52,6 @@ final class AnchorMacUITests: XCTestCase {
         app.terminate()
         app.launch()
         app.buttons.ci("Analysis").click()
-        app.radioButtons.ci("Interruptions").click()
         XCTAssertTrue(parkedRow.waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-build25-mac-interruption-reopened")
     }
@@ -96,11 +94,7 @@ final class AnchorMacUITests: XCTestCase {
         finish.click()
 
         app.buttons.ci("Analysis").click()
-        XCTAssertTrue(app.radioButtons.ci("Day review").waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts.ci("Reviewing today").exists)
-        let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
-        XCTAssertTrue(comparison.waitForExistence(timeout: 3))
-        XCTAssertTrue(String(describing: comparison.value).contains("1 untimed"))
+        XCTAssertTrue(app.staticTexts.ci("Insights").waitForExistence(timeout: 4))
 
         app.terminate()
         app.launch()
@@ -168,7 +162,6 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
         XCTAssertFalse(app.buttons.ci("Habits").exists)
         app.buttons.ci("Analysis").click()
-        app.radioButtons.ci("Insights").click()
         XCTAssertTrue(app.staticTexts.ci("Habit insights").waitForExistence(timeout: 4))
     }
 
@@ -287,10 +280,9 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "history")
         app.launch()
 
-        XCTAssertTrue(app.radioButtons.ci("Day review").waitForExistence(timeout: 6))
-        XCTAssertTrue(app.staticTexts.ci("Reviewing today").exists)
+        XCTAssertTrue(app.staticTexts.ci("Insights").waitForExistence(timeout: 6))
+        XCTAssertFalse(app.radioButtons.ci("Day review").exists)
 
-        app.radioButtons.ci("Interruptions").click()
         XCTAssertTrue(
             app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "To deal with"))
                 .firstMatch.waitForExistence(timeout: 4)
@@ -298,7 +290,6 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.buttons.ci("Everything parked").exists)
         XCTAssertTrue(app.buttons.ci("Sessions").exists)
 
-        app.radioButtons.ci("Insights").click()
         XCTAssertTrue(app.staticTexts.ci("When you focus").waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts.ci("Weekday rhythm").exists)
 
@@ -608,12 +599,6 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.log.save").click()
         XCTAssertTrue(app.buttons.ci("Edit done entry Logged earlier").waitForExistence(timeout: 4))
         keepScreenshot(app, named: "anchor-timetable-logged")
-
-        // Logged entries count as observed time — no "untimed" in the review.
-        app.buttons.ci("Analysis").click()
-        let comparison = app.descendants(matching: .any)["anchor.history.day-comparison"]
-        XCTAssertTrue(comparison.waitForExistence(timeout: 3))
-        XCTAssertFalse(String(describing: comparison.value).contains("untimed"))
 
         app.terminate()
         app.launch()

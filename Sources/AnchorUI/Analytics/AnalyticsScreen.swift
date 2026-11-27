@@ -55,25 +55,28 @@ public struct AnalyticsScreen: View {
     private var tileMinimumWidth: CGFloat { 190 }
     #endif
 
+    private var periodStart: Date {
+        guard let days = range.days else { return .distantPast }
+        return Calendar.current.date(byAdding: .day, value: 1 - days, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
+    }
+
     private var records: [SessionRecord] {
         let all = sessions.map { $0.snapshot() }
-        guard let days = range.days,
-              let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date())
-        else { return all }
+        let cutoff = periodStart
         return all.filter { $0.startedAt >= cutoff }
     }
 
     private func exportData(_ format: ExportFormat) -> Data {
         guard format == .workbook else { return format.makeData(from: records) }
-        let cutoff = range.days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) } ?? .distantPast
+        let cutoff = periodStart
         let dayPlan = calendarVisibility.filter(plans).filter { $0.plannedEnd > cutoff }.map { $0.snapshot() }
         let changes = divergences.filter { $0.occurredAt >= cutoff }.map { $0.snapshot() }
         return format.makeData(from: records, plans: dayPlan, divergences: changes)
     }
 
     private var previousRecords: [SessionRecord] {
+        let currentStart = periodStart
         guard let days = range.days,
-              let currentStart = Calendar.current.date(byAdding: .day, value: -days, to: Date()),
               let previousStart = Calendar.current.date(byAdding: .day, value: -days, to: currentStart)
         else { return [] }
         return sessions.map { $0.snapshot() }.filter {
@@ -83,9 +86,7 @@ public struct AnalyticsScreen: View {
 
     private var machineRecords: [MachineActivityRecord] {
         let all = machineDays.map { $0.snapshot() }
-        guard let days = range.days,
-              let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date())
-        else { return all }
+        let cutoff = periodStart
         return all.filter { $0.day >= cutoff }
     }
 
@@ -95,10 +96,14 @@ public struct AnalyticsScreen: View {
             let overview = engine.overview(records)
 
             VStack(alignment: .leading, spacing: Space.lg) {
+                Text("Insights").font(.title.bold())
                 rangePicker
                 CalendarActuals(blocks: calendarVisibility.filter(plans), sessions: sessions, allBlocks: plans) { data in
                     ObservedHabitsCard(entries: data.entries, blocks: calendarVisibility.filter(plans), days: range.days)
                 }
+
+                SectionHeader("Interruptions")
+                InterruptionLog(since: periodStart)
 
                 if records.isEmpty {
                     EmptyStateView(

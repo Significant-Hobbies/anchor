@@ -79,7 +79,7 @@ public enum AnchorStore {
     ) -> ModelConfiguration {
         switch kind {
         case .inMemory:
-            ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         case .localOnly:
             ModelConfiguration(
                 schema: schema,

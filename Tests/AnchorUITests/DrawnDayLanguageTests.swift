@@ -142,14 +142,14 @@ struct DrawnDayLanguageTests {
         #expect(asset.contains("menu-bar-anchor.svg"))
     }
 
-    @Test("Visual review stays offscreen and History keeps one visible section control")
+    @Test("Visual review stays offscreen and Insights includes the interruption log")
     func visualReviewDoesNotDriveTheWorkingMac() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
         let history = try source(
-            "Sources/AnchorUI/Planning/FourSurfaceScreens.swift",
+            "Sources/AnchorUI/Analytics/AnalyticsScreen.swift",
             in: repository
         )
         let project = try source("Apps/project.yml", in: repository)
@@ -163,8 +163,8 @@ struct DrawnDayLanguageTests {
         )
         let workflow = try source(".github/workflows/native-review.yml", in: repository)
 
-        #expect(history.contains("Picker(\"History section\""))
-        #expect(history.contains(".labelsHidden()"))
+        #expect(history.contains("InterruptionLog(since:"))
+        #expect(!history.contains("DayReviewScreen("))
         #expect(project.contains("AnchorVisualCatalog:"))
         #expect(project.contains("LSUIElement: true"))
         #expect(catalog.contains("AnchorStore.makeContainer(kind: .inMemory)"))

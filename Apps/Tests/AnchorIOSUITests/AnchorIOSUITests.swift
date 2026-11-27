@@ -92,7 +92,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.ci("anchor.capture.pause").tap()
         app.terminate()
         app.launch()
-        app.buttons.ci("Open timer").tap()
+        app.tabBars.buttons.ci("Focus").tap()
         XCTAssertTrue(app.staticTexts.ci("Finish the release").waitForExistence(timeout: 4))
         let resume = app.buttons.ci("Resume")
         XCTAssertTrue(resume.waitForExistence(timeout: 3))
@@ -103,12 +103,10 @@ final class AnchorIOSUITests: XCTestCase {
 
         app.buttons.ci("End session").tap()
         app.tabBars.buttons.ci("Analysis").tap()
-        app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
         app.terminate()
         app.launch()
         app.tabBars.buttons.ci("Analysis").tap()
-        app.buttons.ci("Interruptions").tap()
         XCTAssertTrue(app.staticTexts.ci("Check the build status").waitForExistence(timeout: 3))
         keepScreenshot(app, named: "anchor-focus-history-after-relaunch")
     }
@@ -511,7 +509,6 @@ final class AnchorIOSUITests: XCTestCase {
         app.launch()
         XCTAssertFalse(app.tabBars.buttons.ci("Habits").exists)
         app.tabBars.buttons.ci("Analysis").tap()
-        app.buttons.ci("Insights").tap()
         XCTAssertTrue(app.staticTexts.ci("Habit insights").waitForExistence(timeout: 4))
     }
 

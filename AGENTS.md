@@ -67,7 +67,7 @@ Verify on-device tagging actually works before trusting it:
 ```
 
 Screenshots and manual QA: `ANCHOR_DEMO_DATA=1` seeds three weeks of history into
-an empty store, and `ANCHOR_INITIAL_TAB=history` opens on a given tab. Both are
+an isolated in-memory store in debug builds, and `ANCHOR_INITIAL_TAB=history` opens on a given tab. Both are
 ignored outside demo mode. `ANCHOR_STORE_PATH` redirects the database, which is how
 to avoid touching real data while testing.
 

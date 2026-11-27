@@ -654,7 +654,7 @@ public struct RootView: View {
             switch tab {
             case .focus: FocusScreen(controller: controller)
             case .today: PlanScreen(controller: controller, calendarCoordinator: calendarCoordinator, day: $plannerDay) { navigation.select(.focus) }
-            case .history: HistoryScreen(day: $plannerDay)
+            case .history: AnalyticsScreen()
             }
         }
     }

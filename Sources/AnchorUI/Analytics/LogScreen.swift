@@ -11,23 +11,23 @@ import SwiftUI
 /// The capture sheet promises "it'll be here when you're done". This is where
 /// that promise is kept — so it leads with what's still open, not with a
 /// chronological dump.
-public struct LogScreen: View {
+struct InterruptionLog: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
 
-    @Query(sort: \Distraction.capturedAt, order: .reverse) private var distractions: [Distraction]
-    @Query(
-        filter: #Predicate<FocusSession> { $0.stateRaw == "finished" },
-        sort: \FocusSession.startedAt,
-        order: .reverse
-    ) private var sessions: [FocusSession]
+    @Query private var distractions: [Distraction]
+    @Query private var sessions: [FocusSession]
     @Query(sort: \SavedTag.createdAt) private var savedTags: [SavedTag]
 
     @State private var tab: Tab = .open
+    @State private var expanded = false
     @State private var editingDistraction: Distraction?
     @State private var editingSession: FocusSession?
 
-    public init() {}
+    init(since cutoff: Date) {
+        _distractions = Query(filter: #Predicate { $0.capturedAt >= cutoff }, sort: \Distraction.capturedAt, order: .reverse)
+        _sessions = Query(filter: #Predicate { $0.stateRaw == "finished" && $0.startedAt >= cutoff }, sort: \FocusSession.startedAt, order: .reverse)
+    }
 
     private enum Tab: String, CaseIterable, Identifiable {
         case open, all, history
@@ -44,36 +44,35 @@ public struct LogScreen: View {
     private var openItems: [Distraction] { distractions.filter { !$0.isHandled } }
 
     public var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Space.md) {
-                HStack(spacing: Space.xs) {
-                    ForEach(Tab.allCases) { option in
-                        Button {
-                            withAnimation(Motion.snappy) { tab = option }
-                        } label: {
-                            Chip(
-                                option == .open && !openItems.isEmpty
-                                    ? "\(option.label) (\(openItems.count))"
-                                    : option.label,
-                                isSelected: tab == option
-                            )
-                        }
-                        .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: Space.md) {
+            HStack(spacing: Space.xs) {
+                ForEach(Tab.allCases) { option in
+                    Button {
+                        withAnimation(Motion.snappy) { tab = option; expanded = false }
+                    } label: {
+                        Chip(
+                            option == .open && !openItems.isEmpty
+                                ? "\(option.label) (\(openItems.count))"
+                                : option.label,
+                            isSelected: tab == option
+                        )
                     }
-                    Spacer()
+                    .buttonStyle(.plain)
                 }
-
-                switch tab {
-                case .open: parkedList(openItems, emptyIsGood: true)
-                case .all: parkedList(distractions, emptyIsGood: false)
-                case .history: sessionList
-                }
+                Spacer()
             }
-            .padding(Space.lg)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity)
+
+            switch tab {
+            case .open: parkedList(openItems, emptyIsGood: true)
+            case .all: parkedList(distractions, emptyIsGood: false)
+            case .history: sessionList
+            }
+            let count = tab == .history ? sessions.count : (tab == .open ? openItems.count : distractions.count)
+            if count > 3 {
+                Button(expanded ? "Show fewer" : "Show all (\(count))") { expanded.toggle() }
+                    .buttonStyle(.borderless)
+            }
         }
-        .background(theme.canvas)
         .sheet(item: $editingDistraction) { distraction in
             DistractionEditSheet(distraction: distraction) { try AnchorStore.save(context) }
         }
@@ -97,9 +96,9 @@ public struct LogScreen: View {
         } else {
             Card {
                 VStack(alignment: .leading, spacing: Space.sm) {
-                    ForEach(items) { distraction in
+                    ForEach(items.prefix(expanded ? items.count : 3)) { distraction in
                         row(distraction)
-                        if distraction.id != items.last?.id {
+                        if distraction.id != items.prefix(expanded ? items.count : 3).last?.id {
                             Divider().overlay(theme.hairline)
                         }
                     }
@@ -184,9 +183,9 @@ public struct LogScreen: View {
             } else {
                 Card {
                     VStack(alignment: .leading, spacing: Space.sm) {
-                        ForEach(sessions.prefix(50)) { session in
+                        ForEach(sessions.prefix(expanded ? sessions.count : 3)) { session in
                             sessionRow(session)
-                            if session.id != sessions.prefix(50).last?.id {
+                            if session.id != sessions.prefix(expanded ? sessions.count : 3).last?.id {
                                 Divider().overlay(theme.hairline)
                             }
                         }

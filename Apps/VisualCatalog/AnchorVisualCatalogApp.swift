@@ -149,37 +149,25 @@ private struct VisualCatalogRenderer {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
             page("habits-phone", width: 402, height: 874) {
-                HistoryScreen(section: .trends)
+                AnalyticsScreen()
             },
             page("habits-390", width: 390, height: 874, horizontalSizeClass: .compact) {
-                HistoryScreen(section: .trends)
+                AnalyticsScreen()
             },
             page("habits-768", width: 768, height: 900, horizontalSizeClass: .regular) {
-                HistoryScreen(section: .trends)
+                AnalyticsScreen()
             },
             page("habits-1440", width: 1_440, height: 900, horizontalSizeClass: .regular) {
-                HistoryScreen(section: .trends)
+                AnalyticsScreen()
             },
             page("habits-mac", width: 1_200, height: 800) {
-                HistoryScreen(section: .trends)
-            },
-            page("history-day-phone", width: 402, height: 874) {
-                HistoryScreen(section: .day)
-            },
-            page("history-day-mac", width: 1_200, height: 800) {
-                HistoryScreen(section: .day)
-            },
-            page("history-interruptions-mac", width: 1_200, height: 800) {
-                HistoryScreen(section: .interruptions)
-            },
-            page("history-interruptions-phone", width: 402, height: 874) {
-                HistoryScreen(section: .interruptions)
+                AnalyticsScreen()
             },
             page("history-trends-mac", width: 1_200, height: 800) {
-                HistoryScreen(section: .trends)
+                AnalyticsScreen()
             },
             page("history-trends-phone", width: 402, height: 874) {
-                HistoryScreen(section: .trends)
+                AnalyticsScreen()
             },
             page("settings-phone", width: 402, height: 874) {
                 SettingsScreen(storeKind: .inMemory, onShowOnboarding: {})
