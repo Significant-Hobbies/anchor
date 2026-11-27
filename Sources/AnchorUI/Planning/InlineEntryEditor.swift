@@ -9,7 +9,10 @@ struct InlineEntryEditor: View {
     @FocusState private var focused: Bool
     let seed: EditorSeed
     let compact: Bool
-    private var prompt: String { seed.column == .done ? "What happened?" : "What will you do?" }
+    private var prompt: String {
+        if compact { return seed.column == .done ? "Activity" : "Plan title" }
+        return seed.column == .done ? "What happened?" : "What will you do?"
+    }
     @Binding var title: String
     let error: String?
     let save: () -> Void
