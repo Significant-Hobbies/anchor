@@ -195,7 +195,7 @@ public struct CalendarSyncReport: Sendable, Equatable {
     public var deletions: [UUID] = []
     public var detachments: [UUID] = []
     /// Accounts whose fetch failed — their blocks were left completely alone.
-    public var failedAccounts: Set<String> { Set(failureReasons.keys) }
+    public var failedAccounts: Set<String> = []
     public var failureReasons: [String: String] = [:]
     public var syncedAt: Date
 
@@ -274,6 +274,7 @@ public struct CalendarEventBatch: Sendable {
         )
         var report = CalendarSyncReport(syncedAt: now)
         report.failureReasons = failureReasons.filter { eligibleAccountIDs?.contains($0.key) ?? true }
+        report.failedAccounts = Set(report.failureReasons.keys)
         report.creations = plan.creations
         report.updates = plan.updates
         report.deletions = plan.deletions

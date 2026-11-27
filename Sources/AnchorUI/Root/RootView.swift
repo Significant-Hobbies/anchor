@@ -23,6 +23,7 @@ public struct FocusScreen: View {
     @State private var detailsExpanded = false
     @State private var showsEditor = false
     @State private var checkInBlock: PlanBlock?
+    @State private var checkInReadFailed = false
     @State private var previousCheckIn: PlannerCheckIn?
     private let controller: FocusController
     @State private var now = Date()
@@ -112,7 +113,7 @@ public struct FocusScreen: View {
                                     guard let store = context.plannerCheckInStore else { throw CocoaError(.fileReadUnknown) }
                                     previousCheckIn = try store.load().records[last.id]
                                     checkInBlock = last
-                                } catch { loadError = "Couldn’t open this check-in." }
+                                } catch { checkInReadFailed = true }
                             }
                             .buttonStyle(.plain)
                         }
@@ -144,6 +145,11 @@ public struct FocusScreen: View {
             CaptureSheet(controller: controller)
                 .anchorTheme()
         }
+        .alert("Couldn’t open this check-in", isPresented: $checkInReadFailed) {
+            Button("OK") {}
+        } message: {
+            Text("Check that Anchor can access its local planner store and try again.")
+        }
         .sheet(isPresented: $showsEditor) {
             PlanBlockEditor(initialDay: Date()) { refreshSchedule() }.anchorTheme()
         }
@@ -159,7 +165,7 @@ public struct FocusScreen: View {
     }
 
     private var lastFinishedBlock: PlanBlock? {
-        guard let session = sessions.first, session.state == .finished,
+        guard let session = sessions.first(where: { $0.startedAt <= now }), session.state == .finished,
               let end = session.endedAt, Calendar.current.isDateInToday(end) else { return nil }
         return calendarVisibility.filter(blocks).first { $0.sessionID == session.id }
     }
@@ -209,13 +215,7 @@ public struct FocusScreen: View {
                                    intent: trimmedActivity, minutes: minutes,
                                    project: projects.first { $0.id == projectID && !$0.isArchived },
                                    notes: notes, tagIDStrings: tagIDs) != nil {
-            goalID = nil
-            projectID = nil
-            tagIDs = []
-            notes = ""
-            detailsExpanded = false
-            activity = ""
-            replacingID = nil
+            clearDraft()
         }
     }
 
@@ -278,8 +278,17 @@ public struct FocusScreen: View {
             loadError = controller.lastError ?? "Anchor could not start this planned session. Please try again."
             return
         }
+        clearDraft()
+    }
+
+    private func clearDraft() {
         replacingID = nil
         activity = ""
+        notes = ""
+        goalID = nil
+        projectID = nil
+        tagIDs = []
+        detailsExpanded = false
     }
 }
 
