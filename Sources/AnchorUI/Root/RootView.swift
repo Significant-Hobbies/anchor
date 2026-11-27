@@ -15,6 +15,7 @@ public struct FocusScreen: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
     @State private var now = Date()
+    @FocusState private var editingActivity: Bool
     @State private var activity = ""
     @State private var replacingID: UUID?
     @State private var recorded = Set<UUID>()
@@ -43,12 +44,23 @@ public struct FocusScreen: View {
                                 .foregroundStyle(theme.textSecondary)
                             Button("Start focusing") { start(block) }
                                 .buttonStyle(PrimaryButtonStyle(expands: false))
-                            Button("Do something else") { replacingID = block.id }
+                            Button("Do something else") {
+                                replacingID = block.id
+                                editingActivity = true
+                            }
                                 .buttonStyle(.plain)
                         } else {
-                            TextField("Add an activity", text: $activity)
-                                .textFieldStyle(.roundedBorder)
-                                .controlSize(.large)
+                            TextField("Add an activity", text: $activity, prompt: Text("Add an activity").foregroundColor(theme.textSecondary))
+                                .textFieldStyle(.plain)
+                                .focused($editingActivity)
+                                .padding(.horizontal, Space.md)
+                                .frame(minHeight: 44)
+                                .background(theme.surfaceRaised, in: RoundedRectangle(cornerRadius: Radius.md))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: Radius.md)
+                                        .strokeBorder(editingActivity ? theme.textSecondary : theme.hairline)
+                                        .allowsHitTesting(false)
+                                }
                                 .submitLabel(.go)
                                 .onSubmit(startActivity)
                             HStack(spacing: Space.md) {
