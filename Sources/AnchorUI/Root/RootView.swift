@@ -125,7 +125,7 @@ public struct FocusScreen: View {
         .animation(Motion.gentle, value: controller.hasSession)
         .task {
             refreshSchedule()
-            if !controller.hasSession && scheduledBlock == nil { showsAdHocComposer = true }
+            if !controller.hasSession && scheduledBlock == nil && lastFinishedBlock == nil { showsAdHocComposer = true }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
                 now = Date()

@@ -343,7 +343,7 @@ struct PlanScreen: View {
         .sheet(item: $advancedDraft) { draft in
             let seed = draft.seed
             if seed.column == .done {
-                LogTimeSheet(day: today, suggestedStart: seed.start, suggestedTitle: draft.title) { clearDraft(); refresh() }
+                LogTimeSheet(day: today, suggestedStart: seed.start, suggestedEnd: seed.start.addingTimeInterval(Double(seed.minutes * 60)), suggestedTitle: draft.title) { clearDraft(); refresh() }
                     .anchorTheme()
             } else {
                 PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes,
@@ -773,6 +773,7 @@ struct PlanScreen: View {
             do { try context.save(); return true }
             catch { context.delete(copy) }
         } else if let plan {
+            guard updated.start != plan.plannedStart || seconds != plan.plannedSeconds else { return true }
             let prior = (plan.plannedStart, plan.plannedSeconds, plan.isTemplateOverride, plan.updatedAt)
             plan.plannedStart = updated.start
             plan.plannedSeconds = seconds

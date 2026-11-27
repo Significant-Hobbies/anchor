@@ -134,7 +134,7 @@ public struct RunningSessionView: View {
 
     private var transport: some View {
         VStack(spacing: Space.md) {
-            if controller.isPaused, let error = controller.lastError {
+            if let error = controller.lastError {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(theme.negative)
@@ -167,7 +167,7 @@ public struct RunningSessionView: View {
                     _ = controller.start(goal: nil, intent: title, minutes: 0)
                 }.disabled(replacementTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } message: {
-                Text("Time already recorded stays with the current activity. A new timer starts for the replacement.")
+                Text("Time already recorded stays with the current activity. An open-ended timer starts for the new activity.")
             }
 
             HStack(spacing: Space.lg) {

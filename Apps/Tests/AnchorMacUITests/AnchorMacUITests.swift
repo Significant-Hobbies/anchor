@@ -568,6 +568,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(logTitle.waitForExistence(timeout: 3))
         logTitle.click()
         logTitle.typeText("In-flight entry")
+        app.checkBoxes.ci("anchor.log.still-happening").click()
         app.buttons.ci("anchor.log.save").click()
         XCTAssertTrue(app.buttons.ci("Edit done entry In-flight entry").waitForExistence(timeout: 4))
 
@@ -600,7 +601,7 @@ final class AnchorMacUITests: XCTestCase {
             .containing(.checkBox, identifier: "anchor.log.still-happening")
             .firstMatch
         for _ in 0..<4 { sheetScroll.swipeUp() }
-        ongoingToggle.click()
+        if (ongoingToggle.value as? String) == "1" { ongoingToggle.click() }
         // The "Ended" picker only exists once "Still happening" is off — a
         // missed click would silently save the entry as still in progress.
         XCTAssertTrue(app.datePickers["anchor.log.end"].waitForExistence(timeout: 3))
