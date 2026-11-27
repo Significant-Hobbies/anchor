@@ -127,7 +127,7 @@ struct LogTimeSheet: View {
                                 }
                             }
                             if stillHappening {
-                                Text("Anchor keeps this entry open on the timetable. Finish it from the block's actions when you're done.")
+                                Text("To finish later, open the entry in Done and turn off Still happening.")
                                     .font(.caption)
                                     .foregroundStyle(theme.textTertiary)
                             }
