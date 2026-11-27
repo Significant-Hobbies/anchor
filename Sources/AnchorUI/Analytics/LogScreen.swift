@@ -15,6 +15,8 @@ struct InterruptionLog: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
 
+    @Query(filter: #Predicate<Distraction> { $0.handledAt == nil }, sort: \Distraction.capturedAt, order: .reverse)
+    private var openItems: [Distraction]
     @Query private var distractions: [Distraction]
     @Query private var sessions: [FocusSession]
     @Query(sort: \SavedTag.createdAt) private var savedTags: [SavedTag]
@@ -41,14 +43,15 @@ struct InterruptionLog: View {
         }
     }
 
-    private var openItems: [Distraction] { distractions.filter { !$0.isHandled } }
-
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
             HStack(spacing: Space.xs) {
                 ForEach(Tab.allCases) { option in
                     Button {
-                        withAnimation(Motion.snappy) { tab = option; expanded = false }
+                        withAnimation(Motion.snappy) {
+                            tab = option
+                            expanded = false
+                        }
                     } label: {
                         Chip(
                             option == .open && !openItems.isEmpty
@@ -95,7 +98,7 @@ struct InterruptionLog: View {
             )
         } else {
             Card {
-                VStack(alignment: .leading, spacing: Space.sm) {
+                LazyVStack(alignment: .leading, spacing: Space.sm) {
                     ForEach(items.prefix(expanded ? items.count : 3)) { distraction in
                         row(distraction)
                         if distraction.id != items.prefix(expanded ? items.count : 3).last?.id {
@@ -182,7 +185,7 @@ struct InterruptionLog: View {
                 )
             } else {
                 Card {
-                    VStack(alignment: .leading, spacing: Space.sm) {
+                    LazyVStack(alignment: .leading, spacing: Space.sm) {
                         ForEach(sessions.prefix(expanded ? sessions.count : 3)) { session in
                             sessionRow(session)
                             if session.id != sessions.prefix(expanded ? sessions.count : 3).last?.id {
