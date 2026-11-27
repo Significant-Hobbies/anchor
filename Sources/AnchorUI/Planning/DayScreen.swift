@@ -284,17 +284,6 @@ struct PlanScreen: View {
                 .background(theme.canvas)
                 .overlay(alignment: .bottom) { Rectangle().fill(theme.hairline).frame(height: 0.5) }
         }
-        .safeAreaInset(edge: .bottom) {
-            if viewMode == .day && !timetableEntries.isEmpty {
-                Button("add an entry") { beginDraft(suggestedEntry) }
-                    .buttonStyle(PrimaryButtonStyle(expands: false))
-                    .frame(maxWidth: workspaceMaxWidth, alignment: .trailing)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, Space.lg)
-                    .padding(.vertical, Space.xs)
-                    .background(.bar)
-            }
-        }
         // A toolbar draft can start offscreen. Its bottom edge is the editor's
         // bottom edge, including when the software keyboard resizes the timetable.
         .onChange(of: visibleDraft?.id) { _, id in
@@ -666,11 +655,17 @@ struct PlanScreen: View {
         .accessibilityLabel((direction < 0 ? "Previous " : "Next ") + (viewMode == .week ? "week" : "day"))
     }
 
+    private var addEntryButton: some View {
+        Button { beginDraft(suggestedEntry) } label: { Label("Add", systemImage: "plus") }
+            .accessibilityLabel("Add an entry")
+    }
+
     private var dayControls: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             if horizontalSizeClass == .compact {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     HStack(spacing: Space.xs) {
+                        addEntryButton
                         copyDayButton
                         logTimeButton
                     }
@@ -683,6 +678,7 @@ struct PlanScreen: View {
                 .buttonStyle(QuietButtonStyle(expands: false))
             } else {
                 HStack(spacing: Space.xs) {
+                    addEntryButton
                     copyDayButton
                     logTimeButton
                     calendarsButton
@@ -968,7 +964,7 @@ struct TimetableOptionsSheet: View {
                                 }
                             }
                             .accessibilityIdentifier("anchor.timetable.end-hour")
-                            Text("Entries outside these hours still appear — the grid grows to include them.")
+                            Text("Hours outside this window are shaded. You can add entries anywhere on the 24-hour timetable.")
                                 .font(.caption)
                                 .foregroundStyle(theme.textTertiary)
                         }
