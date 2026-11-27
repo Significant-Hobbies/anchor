@@ -64,7 +64,7 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        XCTAssertTrue(app.buttons.ci("Choose date").exists, "The schedule must allow choosing a day.")
+        XCTAssertTrue(app.buttons.ci("Choose date").waitForExistence(timeout: 5), "The schedule must allow choosing a day.")
 
         app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
         app.menuItems.ci("Add scheduled entry").click()

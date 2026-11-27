@@ -10,6 +10,8 @@ struct HeuristicTaggerTests {
     func calendarPhrases() {
         #expect(ActivityCategory.suggestion(for: "Design catch-up") == .meeting)
         #expect(ActivityCategory.suggestion(for: "1:1 with Sam") == .meeting)
+        #expect(ActivityCategory.suggestion(for: "Release 1.1") == .work)
+        #expect(ActivityCategory.suggestion(for: "Gym 1-1:30") == .fitness)
         #expect(ActivityCategory.suggestion(for: "Morning swimming") == .fitness)
         #expect(ActivityCategory.suggestion(for: "Writing the quarterly update") == .work)
         #expect(ActivityCategory.suggestion(for: "Lunch") == .meal)

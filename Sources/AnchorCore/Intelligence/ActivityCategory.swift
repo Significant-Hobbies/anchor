@@ -16,7 +16,8 @@ public enum ActivityCategory: String, CaseIterable, Sendable {
     public static func suggestion(for title: String) -> Self {
         let tokens = title.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
         let phrase = " " + tokens.joined(separator: " ") + " "
-        if [" stand up ", " 1 1 ", " 1 on 1 ", " one on one ", " catch up ", " kick off ", " team call ", " board meeting "].contains(where: phrase.contains) {
+        if title.range(of: #"\b1:1\b"#, options: .regularExpression) != nil { return .meeting }
+        if [" stand up ", " 1 on 1 ", " one on one ", " catch up ", " kick off ", " team call ", " board meeting "].contains(where: phrase.contains) {
             return .meeting
         }
         let words = Set(tokens)

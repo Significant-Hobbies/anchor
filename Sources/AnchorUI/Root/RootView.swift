@@ -47,7 +47,7 @@ public struct FocusScreen: View {
                     VStack(alignment: .leading, spacing: Space.md) {
                         let slot = scheduledBlock
                         DoodleScene("FocusDoodle",
-                                    eyebrow: slot == nil ? "Focus" : "Scheduled now",
+                                    eyebrow: slot == nil ? nil : "Scheduled now",
                                     title: slot?.title ?? "Open time",
                                     message: slot.map { timeRange($0) } ?? "Nothing scheduled right now.",
                                     compact: true)
@@ -531,7 +531,7 @@ public struct RootView: View {
                         }
                         .navigationDestination(isPresented: $navigation.showsSettings) {
                             SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding, remindersCoordinator: remindersCoordinator, calendarCoordinator: calendarCoordinator)
-                                .navigationTitle("settings")
+                                .navigationTitle("Settings")
                                 .toolbar(.hidden, for: .tabBar)
                         }
                 }

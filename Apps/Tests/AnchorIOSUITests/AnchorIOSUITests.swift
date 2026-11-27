@@ -181,7 +181,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.launch()
 
         app.tabBars.buttons.ci("Today").tap()
-        XCTAssertTrue(app.buttons.ci("Choose date").exists, "The schedule must allow choosing a day.")
+        XCTAssertTrue(app.buttons.ci("Choose date").waitForExistence(timeout: 5), "The schedule must allow choosing a day.")
         app.descendants(matching: .any)["anchor.today.tools"].firstMatch.tap()
         app.buttons.ci("Add scheduled entry").tap()
         let title = app.textFields.ci("What will you do?")
