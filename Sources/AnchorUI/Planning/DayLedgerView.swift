@@ -224,13 +224,13 @@ struct CalendarActualData {
     let record: (DayLedgerEntry) -> Bool
     let available: Bool
 
-    var move: (DayLedgerEntry) -> Bool = { _ in false }
+    var move: (DayLedgerEntry, Bool) -> Bool = { _, _ in false }
     let storedLogIDs: Set<UUID>
     let ongoing: [DayLedgerEntry]
     let recordedIDs: Set<UUID>
 
     init(entries: [DayLedgerEntry], edit: @escaping (DayLedgerEntry) -> Void,
-         record: @escaping (DayLedgerEntry) -> Bool, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = [], move: @escaping (DayLedgerEntry) -> Bool = { _ in false }) {
+         record: @escaping (DayLedgerEntry) -> Bool, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = [], move: @escaping (DayLedgerEntry, Bool) -> Bool = { _, _ in false }) {
         self.move = move
         self.storedLogIDs = storedLogIDs
         self.ongoing = ongoing
@@ -338,23 +338,36 @@ struct CalendarActuals<Content: View>: View {
         }
     }
 
-    private func move(_ entry: DayLedgerEntry) -> Bool {
+    private func move(_ entry: DayLedgerEntry, finishing: Bool) -> Bool {
         guard !unavailable else { return false }
         let previous = saved.first { $0.id == entry.id }
         if let log = blocks.first(where: { $0.id == entry.id && $0.isUnplannedTimeLog }) {
-            guard entry.start <= Date(), log.actualEndedAt == nil || entry.end <= Date() else {
+            let hasEnd = finishing || log.actualEndedAt != nil
+            guard entry.start <= Date(), !hasEnd || entry.end <= Date() else {
                 error = "Logged time must be in the past."
                 return false
             }
+            let prior = (log.actualStartedAt, log.actualEndedAt, log.state, log.updatedAt)
             log.actualStartedAt = entry.start
-            if log.actualEndedAt != nil { log.actualEndedAt = entry.end }
+            if hasEnd {
+                log.actualEndedAt = entry.end
+                log.state = .completed
+            }
             log.updatedAt = Date()
             do { try context.save() } catch {
-                context.rollback()
+                (log.actualStartedAt, log.actualEndedAt, log.state, log.updatedAt) = prior
                 self.error = "Couldn’t move the logged time."
                 return false
             }
             guard previous != nil else { return true }
+            if !persist(entry, replacing: previous) {
+                (log.actualStartedAt, log.actualEndedAt, log.state, log.updatedAt) = prior
+                do { try context.save() } catch {
+                    self.error = "The time log moved, but its journal copy could not be updated. Reopen the log to reconcile its times."
+                }
+                return false
+            }
+            return true
         }
         return persist(entry, replacing: previous)
     }

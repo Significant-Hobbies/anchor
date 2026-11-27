@@ -764,27 +764,31 @@ struct PlanScreen: View {
                 updated.start = time
                 updated.end = time.addingTimeInterval(actual.end.timeIntervalSince(actual.start))
             }
-            return data.move(updated)
+            return data.move(updated, drag.resizing)
         }
-        do {
-            if drag.source == .actual {
-                context.insert(PlanBlock(title: original.title, details: original.notes, plannedStart: updated.start,
-                                         plannedSeconds: Int(updated.end.timeIntervalSince(updated.start))))
-            } else if let plan {
-                plan.plannedStart = updated.start
-                plan.plannedSeconds = Int(updated.end.timeIntervalSince(updated.start))
-                if plan.externalEventKey != nil || plan.templateID != nil { plan.isTemplateOverride = true }
-                plan.updatedAt = Date()
-                context.insert(DivergenceEvent(blockID: plan.id, sessionID: plan.sessionID, kind: .deliberateReplan,
-                                               evidence: .scheduleChange, note: "Moved on the timetable"))
+        let seconds = Int(updated.end.timeIntervalSince(updated.start))
+        if drag.source == .actual {
+            let copy = PlanBlock(title: original.title, details: original.notes, plannedStart: updated.start, plannedSeconds: seconds)
+            context.insert(copy)
+            do { try context.save(); return true }
+            catch { context.delete(copy) }
+        } else if let plan {
+            let prior = (plan.plannedStart, plan.plannedSeconds, plan.isTemplateOverride, plan.updatedAt)
+            plan.plannedStart = updated.start
+            plan.plannedSeconds = seconds
+            if plan.externalEventKey != nil || plan.templateID != nil { plan.isTemplateOverride = true }
+            plan.updatedAt = Date()
+            let event = DivergenceEvent(blockID: plan.id, sessionID: plan.sessionID, kind: .deliberateReplan,
+                                        evidence: .scheduleChange, note: "Moved on the timetable")
+            context.insert(event)
+            do { try context.save(); return true }
+            catch {
+                (plan.plannedStart, plan.plannedSeconds, plan.isTemplateOverride, plan.updatedAt) = prior
+                context.delete(event)
             }
-            try context.save()
-            return true
-        } catch {
-            context.rollback()
-            loadError = "Couldn’t move this entry. Try again."
-            return false
         }
+        loadError = "Couldn’t move this entry. Try again."
+        return false
     }
 
     private func saveDraft(_ actuals: CalendarActualData) {
