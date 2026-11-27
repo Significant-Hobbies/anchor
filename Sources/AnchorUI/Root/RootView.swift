@@ -33,7 +33,8 @@ public struct FocusScreen: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Space.md) {
-                        if let block = scheduledBlock, replacingID != block.id, activity.isEmpty {
+                        let slot = scheduledBlock
+                        if let block = slot, replacingID != block.id {
                             Text("Scheduled now")
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(theme.textSecondary)
@@ -50,6 +51,11 @@ public struct FocusScreen: View {
                             }
                                 .buttonStyle(.plain)
                         } else {
+                            if replacingID != nil && slot == nil {
+                                Text("That time slot has ended.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(theme.textSecondary)
+                            }
                             TextField("Add an activity", text: $activity, prompt: Text("Add an activity").foregroundColor(theme.textSecondary))
                                 .textFieldStyle(.plain)
                                 .focused($editingActivity)
@@ -62,9 +68,11 @@ public struct FocusScreen: View {
                                         .allowsHitTesting(false)
                                 }
                                 .submitLabel(.go)
-                                .onSubmit(startActivity)
+                                .onSubmit { startActivity(expectedSlot: slot?.id) }
                             HStack(spacing: Space.md) {
-                                Button("Start focusing", action: startActivity)
+                                Button(replacingID != nil && slot == nil ? "Start unplanned session" : "Start focusing") {
+                                    startActivity(expectedSlot: slot?.id)
+                                }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
                                     .disabled(trimmedActivity.isEmpty)
                                 if replacingID != nil {
@@ -111,9 +119,12 @@ public struct FocusScreen: View {
         activity.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func startActivity() {
+    private func startActivity(expectedSlot: UUID?) {
         guard !controller.hasSession, !trimmedActivity.isEmpty else { return }
-        if let block = scheduledBlock, replacingID == block.id {
+        now = Date()
+        let current = scheduledBlock
+        guard current?.id == expectedSlot else { return }
+        if let block = current, replacingID == block.id {
             start(block, intent: trimmedActivity)
         } else if controller.start(goal: nil, intent: trimmedActivity, minutes: 25) != nil {
             activity = ""
@@ -214,10 +225,7 @@ enum PlanBlockFocusStarter {
     }
 }
 
-/// The first view of Focus is a stage, not an empty-state card. It gives the
-/// authored scene enough room to carry emotion while the action remains the
-/// first operational read. The same component reflows rather than forking the
-/// Mac and iPhone product.
+/// Primary destinations shared by the Mac and iPhone shells.
 public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
     case focus, today, history
 
