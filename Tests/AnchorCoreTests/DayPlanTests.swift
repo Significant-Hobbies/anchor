@@ -575,6 +575,17 @@ struct DayPlanTests {
         }
     }
 
+    @Test("A future calendar appointment stays next after an early journal checkoff")
+    func upcomingRecordedAppointment() {
+        let now = Fixture.calendar.startOfDay(for: Fixture.day0).addingTimeInterval(15 * 3600)
+        let meeting = PlanBlockRecord(id: UUID(), title: "Product Data Sync", plannedStart: now.addingTimeInterval(5400),
+                                      plannedSeconds: 3600, externalEventKey: "imported")
+        let gym = PlanBlockRecord(id: UUID(), title: "Gym", plannedStart: now.addingTimeInterval(9000), plannedSeconds: 3600)
+        let resolver = ScheduledFocusResolver()
+        #expect(resolver.nextBlock(from: [gym, meeting], recorded: [meeting.id], now: now, calendar: Fixture.calendar)?.id == meeting.id)
+        #expect(resolver.nextBlock(from: [gym, meeting], recorded: [meeting.id], now: meeting.plannedStart, calendar: Fixture.calendar)?.id == gym.id)
+    }
+
     @Test("Focus resolves the active, current and upcoming blocks and lets expired plans pass")
     func scheduledFocusResolution() {
         let resolver = ScheduledFocusResolver()
