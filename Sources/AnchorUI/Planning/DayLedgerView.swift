@@ -270,6 +270,9 @@ struct CalendarActuals<Content: View>: View {
 
     private var actuals: [DayLedgerEntry] {
         var entries = Dictionary(saved.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for block in blocks where block.isUnplannedTimeLog && block.state == .inProgress && block.actualEndedAt == nil {
+            entries.removeValue(forKey: block.id)
+        }
         let linked = Dictionary(allBlocks.filter { !$0.isUnplannedTimeLog }.compactMap { block in block.sessionID.map { ($0, block.id) } }, uniquingKeysWith: { first, _ in first })
         for session in sessions {
             let id = linked[session.id] ?? session.id
