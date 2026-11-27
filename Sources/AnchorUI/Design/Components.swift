@@ -75,10 +75,6 @@ public struct DoodleScene: View {
                     .tracking(1.25)
                     .foregroundStyle(theme.accent)
             }
-            #if !os(watchOS) && canImport(SaaSMakerUI)
-            SMDisplay(title.lowercased(), size: compact ? 22 : 28)
-                .accessibilityLabel(title)
-            #else
             Text(title)
                 .font(
                     .system(compact ? .title2 : .title, design: .rounded)
@@ -86,7 +82,7 @@ public struct DoodleScene: View {
                 )
                 .foregroundStyle(theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
-            #endif
+
             DrawnUnderline(width: compact ? 48 : 64)
             .accessibilityHidden(true)
             Text(message)
@@ -313,17 +309,13 @@ public struct SectionHeader<Trailing: View>: View {
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
         layout {
             VStack(alignment: .leading, spacing: 2) {
-                #if !os(watchOS) && canImport(SaaSMakerUI)
-                SMSectionHeader(title.lowercased(), size: 17)
-                    .accessibilityLabel(title)
-                #else
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.system(.headline, design: .rounded).weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
-                #endif
+
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(theme.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -389,7 +381,7 @@ private struct PlannerActionStyle: ButtonStyle {
         let tint = destructive || configuration.role == .destructive ? theme.negative : theme.accent
         let shape = RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
         configuration.label
-            .font(.custom("Figtree", size: 13, relativeTo: .subheadline).weight(.semibold))
+            .font(.system(.subheadline, design: .rounded).weight(.semibold))
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             #if os(macOS)

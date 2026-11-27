@@ -56,6 +56,36 @@ public enum GoogleCalendarError: LocalizedError, Equatable, Sendable {
     case api(status: Int, message: String)
     case keychain(status: Int32)
 
+    /// Only display known failure classes. Google response bodies may contain private identifiers.
+    public static func importMessage(for error: Error, refreshingAccess: Bool = false) -> String {
+        if let network = error as? URLError {
+            switch network.code {
+            case .notConnectedToInternet: return "This device is offline. Retry when connected."
+            case .timedOut: return "The connection to Google timed out. Retry in a moment."
+            default: return "The network request to Google failed (\(network.errorCode)). Check your connection and retry."
+            }
+        }
+        let stage = refreshingAccess ? "refreshing account access" : "reading calendar events"
+        guard let google = error as? GoogleCalendarError else {
+            return "Anchor couldn’t finish \(stage). Retry the import."
+        }
+        switch google {
+        case .missingRefreshToken: return "The saved sign-in is missing. Open Manage calendars and connect this account again."
+        case .keychain: return "Anchor couldn’t read the saved sign-in from the device keychain. Unlock the device and retry."
+        case let .api(status, _):
+            let action: String
+            switch status {
+            case 401: action = "Connect this account again in Manage calendars."
+            case 400 where refreshingAccess: action = "Connect this account again in Manage calendars."
+            case 403, 404: action = "Check access to the selected calendars in Manage calendars."
+            case 429: action = "Wait a few minutes and retry."
+            default: action = "Retry the import."
+            }
+            return "Google returned HTTP \(status) while \(stage). \(action)"
+        default: return google.connectionMessage
+        }
+    }
+
     public var connectionMessage: String {
         if case let .api(status, _) = self {
             return "Google returned HTTP \(status) while connecting the calendar. Try connecting again."

@@ -242,6 +242,8 @@ struct CalendarSyncTests {
             now: Date(timeIntervalSince1970: 1_704_067_200)
         )
         #expect(report.failedAccounts == ["acct-2"])
+        #expect(report.failureReasons["acct-2"]?.contains("HTTP 401") == true)
+        #expect(report.failureReasons["acct-2"]?.contains("unauthorized") == false)
         #expect(report.creations.count == 1)
         #expect(report.deletions.isEmpty && report.detachments.isEmpty)
     }

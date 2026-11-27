@@ -85,7 +85,7 @@ public struct FocusScreen: View {
                                     startActivity(expectedSlot: slot?.id)
                                 }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
-                                    .disabled(trimmedActivity.isEmpty)
+                                    .disabled(trimmedActivity.isEmpty && (slot != nil || selectedGoal == nil))
                                 if replacingID != nil {
                                     Button("Cancel") {
                                         activity = ""
@@ -192,18 +192,20 @@ public struct FocusScreen: View {
         }
     }
 
+    private var selectedGoal: Goal? { goals.first { $0.id == goalID && !$0.isArchived } }
+
     private var trimmedActivity: String {
         activity.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func startActivity(expectedSlot: UUID?) {
-        guard !controller.hasSession, !trimmedActivity.isEmpty else { return }
+        guard !controller.hasSession, !trimmedActivity.isEmpty || (expectedSlot == nil && selectedGoal != nil) else { return }
         now = Date()
         let current = scheduledBlock
         guard current?.id == expectedSlot else { return }
         if let block = current, replacingID == block.id {
             start(block, intent: trimmedActivity)
-        } else if controller.start(goal: goals.first { $0.id == goalID && !$0.isArchived },
+        } else if controller.start(goal: selectedGoal,
                                    intent: trimmedActivity, minutes: minutes,
                                    project: projects.first { $0.id == projectID && !$0.isArchived },
                                    notes: notes, tagIDStrings: tagIDs) != nil {
@@ -524,7 +526,7 @@ public struct RootView: View {
                                 .toolbar(.hidden, for: .tabBar)
                         }
                 }
-                .tabItem { Label(item.label.lowercased(), systemImage: item.symbolName)
+                .tabItem { Label(item.label, systemImage: item.symbolName)
                     .accessibilityLabel(item.label) }
                 .tag(item)
             }

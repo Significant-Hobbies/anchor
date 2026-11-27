@@ -259,7 +259,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
 
         let requested = accounts.filter { !$0.selectedCalendarIDs.isEmpty }
         var syncAccounts: [CalendarSyncAccount] = []
-        var unauthenticated: Set<String> = []
+        var accessFailures: [String: String] = [:]
         for account in requested {
             do {
                 let token = try await accessToken(for: account.id)
@@ -269,7 +269,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
                     selectedCalendarIDs: Set(account.selectedCalendarIDs)
                 ))
             } catch {
-                unauthenticated.insert(account.id)
+                accessFailures[account.id] = GoogleCalendarError.importMessage(for: error, refreshingAccess: true)
             }
         }
 
@@ -301,10 +301,15 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             return syncFailure("Anchor could not save the calendar import. Try again.")
         }
 
-        let skipped = report.failedAccounts.union(unauthenticated.intersection(eligible)).count
-        if skipped < eligible.count { defaults.set(report.syncedAt, forKey: Self.lastSyncKey) }
-        if skipped > 0 {
-            return syncFailure("Couldn’t reach \(skipped) calendar account\(skipped == 1 ? "" : "s"). Previously imported entries were kept for those accounts.")
+        let failures = accessFailures.merging(report.failureReasons) { _, reason in reason }
+        let details = requested.compactMap { account -> String? in
+            guard eligible.contains(account.id), let reason = failures[account.id] else { return nil }
+            let label = account.email.isEmpty ? account.displayName : account.email
+            return "\(label) — \(reason)"
+        }
+        if details.count < eligible.count { defaults.set(report.syncedAt, forKey: Self.lastSyncKey) }
+        if !details.isEmpty {
+            return syncFailure((details + ["Previously imported entries were kept."]).joined(separator: "\n"))
         }
         if report.creations.isEmpty && report.updates.isEmpty && report.deletions.isEmpty && report.detachments.isEmpty {
             status = "Calendars are up to date."

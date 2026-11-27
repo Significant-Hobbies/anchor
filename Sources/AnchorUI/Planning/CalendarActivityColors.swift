@@ -7,6 +7,19 @@ extension EnvironmentValues {
 }
 
 extension ActivityCategory {
+    var calendarSymbol: String {
+        switch self {
+        case .meeting: "person.2"
+        case .fitness: "figure.run"
+        case .meal: "fork.knife"
+        case .leisure: "gamecontroller"
+        case .rest: "moon"
+        case .work: "briefcase"
+        case .personal: "person"
+        case .other: "calendar"
+        }
+    }
+
     var calendarColor: Color {
         switch self {
         case .meeting: Color(red: 0.718, green: 0.627, blue: 1.0)

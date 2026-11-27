@@ -64,10 +64,10 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        XCTAssertTrue(app.buttons.ci("Add done entry").waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons.ci("Choose date").exists, "The schedule must allow choosing a day.")
 
-        app.buttons.ci("Add scheduled entry").click()
+        app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
+        app.menuItems.ci("Add scheduled entry").click()
         let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
@@ -110,7 +110,8 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add scheduled entry").click()
+        app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
+        app.menuItems.ci("Add scheduled entry").click()
         let recurringTitle = app.textFields.ci("What will you do?")
         XCTAssertTrue(recurringTitle.waitForExistence(timeout: 3))
         recurringTitle.click()
@@ -173,7 +174,8 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add scheduled entry").click()
+        app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
+        app.menuItems.ci("Add scheduled entry").click()
         let initialTitle = app.textFields.ci("What will you do?")
         XCTAssertTrue(initialTitle.waitForExistence(timeout: 3))
         initialTitle.click()
@@ -350,7 +352,8 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add scheduled entry").click()
+        app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
+        app.menuItems.ci("Add scheduled entry").click()
         let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
@@ -525,7 +528,8 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add scheduled entry").click()
+        app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
+        app.menuItems.ci("Add scheduled entry").click()
         let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
@@ -552,7 +556,8 @@ final class AnchorMacUITests: XCTestCase {
 
         // Quick log — "still happening" captures an open entry without a timer.
         let logTime = app.descendants(matching: .any).ci("anchor.today.log-time").firstMatch
-        app.buttons.ci("Add done entry").click()
+        app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
+        app.menuItems.ci("Add done entry").click()
         app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         logTime.click()
         let logTitle = app.textFields.ci("anchor.log.title")
@@ -576,7 +581,8 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.log.save").click()
 
         // Retroactive log — toggling "Still happening" off records a past span.
-        app.buttons.ci("Add done entry").click()
+        app.descendants(matching: .any)["anchor.today.tools"].firstMatch.click()
+        app.menuItems.ci("Add done entry").click()
         app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         logTime.click()
         let retroTitle = app.textFields.ci("anchor.log.title")
