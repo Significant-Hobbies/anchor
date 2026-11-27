@@ -68,11 +68,10 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(app.tabBars.buttons.ci("Focus").exists)
         app.buttons.ci("Focus").tap()
 
-        let intention = app.textFields.ci("What are you focusing on?")
+        let intention = app.textFields.ci("Add an activity")
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
         intention.tap()
         intention.typeText("Finish the release")
-        app.buttons.ci("Done").tap()
         let start = app.buttons.ci("Start focusing")
         XCTAssertTrue(start.waitForExistence(timeout: 3))
         XCTAssertTrue(start.isHittable)
@@ -162,7 +161,7 @@ final class AnchorIOSUITests: XCTestCase {
         let focus = app.buttons.ci("Focus")
         XCTAssertTrue(focus.waitForExistence(timeout: 5))
         focus.tap()
-        let realGoal = app.textFields.ci("What are you focusing on?")
+        let realGoal = app.textFields.ci("Add an activity")
         if realGoal.waitForExistence(timeout: 2) {
             realGoal.tap()
             realGoal.typeText("Draft the launch note")

@@ -55,11 +55,13 @@ public struct ScheduledFocusResolver: Sendable {
         from blocks: [PlanBlockRecord],
         recorded: Set<UUID> = [],
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        currentOnly: Bool = false
     ) -> PlanBlockRecord? {
         let open = blocks
             .filter { block in
-                calendar.isDate(block.plannedStart, inSameDayAs: now)
+                let inSlot = block.plannedStart <= now && now < block.plannedStart.addingTimeInterval(TimeInterval(block.plannedSeconds))
+                return (currentOnly ? inSlot : calendar.isDate(block.plannedStart, inSameDayAs: now))
                     && block.isUnplannedTimeLog != true
                     && (!recorded.contains(block.id) || (block.externalEventKey != nil && block.plannedStart > now))
                     && (block.externalEventKey == nil || block.plannedSeconds < 86_400 || block.state == .inProgress)

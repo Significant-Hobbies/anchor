@@ -600,6 +600,14 @@ struct DayPlanTests {
         active.state = .inProgress
         #expect(resolver.nextBlock(from: [current, active], now: now, calendar: calendar)?.id == active.id)
 
+        #expect(resolver.nextBlock(from: [early, active, upcoming], now: now, currentOnly: true) == nil)
+        #expect(resolver.nextBlock(from: [current, active], now: now, currentOnly: true)?.id == current.id)
+        #expect(resolver.nextBlock(from: [current], recorded: [current.id], now: now, currentOnly: true) == nil)
+        let midnight = calendar.startOfDay(for: now)
+        let overnight = PlanBlockRecord(id: UUID(), title: "Night shift", plannedStart: midnight.addingTimeInterval(-600), plannedSeconds: 1_200)
+        #expect(resolver.nextBlock(from: [overnight], now: midnight, calendar: calendar, currentOnly: true)?.id == overnight.id)
+        #expect(resolver.nextBlock(from: [overnight], now: midnight.addingTimeInterval(600), calendar: calendar, currentOnly: true) == nil)
+
         var completedCurrent = current
         completedCurrent.state = .completed
         #expect(resolver.nextBlock(from: [early, completedCurrent, upcoming], now: now, calendar: calendar)?.id == upcoming.id)
