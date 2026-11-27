@@ -124,6 +124,7 @@ struct DayTimetable: View {
     var onDraftOptions: (String) -> Void = { _ in }
     var onAddAt: (DateInterval, Bool, TimetableColumn) -> Void = { _, _, _ in }
     @State private var draftHeight: CGFloat = 92
+    @State private var gridFrame = CGRect.zero
     #if os(macOS)
     @GestureState private var selection: (interval: DateInterval, column: TimetableColumn)?
     #else
@@ -177,14 +178,28 @@ struct DayTimetable: View {
             let longActuals = dayActuals.filter { $0.end.timeIntervalSince($0.start) >= 86_400 }
             if !longPlans.isEmpty || !longActuals.isEmpty {
                 HStack(alignment: .top, spacing: Space.xxs) {
-                    VStack { ForEach(longPlans) { blockCard($0, height: 70).frame(height: 70).draggable(CalendarDrag(id: $0.id, source: .plan)) } }
+                    VStack {
+                        ForEach(longPlans) { item in
+                            blockCard(item, height: 70).frame(height: 70)
+                                .modifier(CalendarEntryGesture { point, resize in
+                                    drop(CalendarDrag(id: item.id, source: .plan, resizing: resize), at: point)
+                                })
+                        }
+                    }
                         .frame(maxWidth: .infinity)
-                    VStack { ForEach(longActuals) { doneCard($0).frame(height: 70).draggable(CalendarDrag(id: $0.id, source: .actual)) } }
+                    VStack {
+                        ForEach(longActuals) { item in
+                            doneCard(item).frame(height: 70)
+                                .modifier(CalendarEntryGesture { point, resize in
+                                    drop(CalendarDrag(id: item.id, source: .actual, resizing: resize), at: point)
+                                })
+                        }
+                    }
                         .frame(maxWidth: .infinity)
                 }.padding(.leading, railWidth + traceWidth)
             }
             grid
-        }
+        }.coordinateSpace(name: "anchor.day.grid")
     }
 
     private func blockCard(_ entry: Entry, height: CGFloat, compact: Bool = false) -> some View {
@@ -261,7 +276,9 @@ struct DayTimetable: View {
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
                     blockCard(entry, height: height, compact: laneWidth < 180)
                     .frame(width: laneWidth, height: height, alignment: .topLeading)
-                    .movableEntry(CalendarDrag(id: entry.id, source: .plan), resize: true)
+                    .modifier(CalendarEntryGesture { point, resize in
+                        drop(CalendarDrag(id: entry.id, source: .plan, resizing: resize), at: point)
+                    })
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
                         y: bounds.start
@@ -280,18 +297,20 @@ struct DayTimetable: View {
                     let height = bounds.end - bounds.start
                     doneCard(item, height: height)
                     .frame(width: width, height: height)
-                    .movableEntry(CalendarDrag(id: item.id, source: .actual), resize: true)
+                    .modifier(CalendarEntryGesture { point, resize in
+                        drop(CalendarDrag(id: item.id, source: .actual, resizing: resize), at: point)
+                    })
                     .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: bounds.start)
                 }
 
                 if let selection {
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: Radius.sm)
                         .fill(theme.accent.opacity(0.22))
-                        .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(theme.accent) }
+                        .overlay { RoundedRectangle(cornerRadius: Radius.sm).strokeBorder(theme.accent) }
                         .overlay(alignment: .topLeading) {
                             Text("\(selection.interval.start.formatted(date: .omitted, time: .shortened)) – \(selection.interval.end.formatted(date: .omitted, time: .shortened))")
                                 .font(.caption2.monospacedDigit()).padding(.horizontal, 4)
-                                .background(theme.surfaceRaised, in: .rect(cornerRadius: 3))
+                                .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
                                 .fixedSize()
                         }
                         .frame(width: gridWidth, height: selection.interval.duration / 3600 * hourHeight)
@@ -313,18 +332,22 @@ struct DayTimetable: View {
                         .id(draft.id)
                 }
             }
-            .dropDestination(for: CalendarDrag.self) { items, point in
-                guard let item = items.first, point.x >= gridX, point.y >= 0, point.y <= totalHeight else { return false }
-                let stepSeconds = Double(step.rawValue * 60)
-                let offset = (point.y / hourHeight * 3600 / stepSeconds).rounded() * stepSeconds
-                let limit = range.duration - (item.resizing ? 0 : stepSeconds)
-                return onDropEntry(item, point.x < doneX ? .scheduled : .done,
-                                   range.start.addingTimeInterval(min(limit, max(0, offset))))
-            }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("anchor.day.grid")) } action: { gridFrame = $0 }
         }
         .frame(height: max(totalHeight, draft.map { offset(for: $0.start) + draftHeight } ?? 0))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("anchor.today.timetable")
+    }
+
+    private func drop(_ item: CalendarDrag, at location: CGPoint) {
+        let point = CGPoint(x: location.x - gridFrame.minX, y: location.y - gridFrame.minY)
+        let gridX = railWidth + traceWidth
+        let doneX = gridX + (gridFrame.width - gridX + Space.xxs) / 2
+        guard point.x >= gridX, point.x <= doneX + (doneX - gridX), point.y >= 0, point.y <= totalHeight else { return }
+        let increment = Double(step.rawValue * 60)
+        let offset = (point.y / hourHeight * 3600 / increment).rounded() * increment
+        let limit = range.duration - (item.resizing ? 0 : increment)
+        _ = onDropEntry(item, point.x < doneX ? .scheduled : .done, range.start.addingTimeInterval(min(limit, max(0, offset))))
     }
 
     private func offset(for date: Date) -> CGFloat {

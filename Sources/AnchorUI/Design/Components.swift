@@ -374,7 +374,37 @@ private struct AnchorSMButton: View {
         Button(role: configuration.role, action: configuration.trigger) {
             configuration.label
         }
-        .buttonStyle(SMButtonStyle(kind, size: .planner, expands: expands, isDestructive: isDestructive))
+        .buttonStyle(PlannerActionStyle(filled: kind == .brand, expands: expands, destructive: isDestructive))
+    }
+}
+
+private struct PlannerActionStyle: ButtonStyle {
+    @Environment(\.anchorTheme) private var theme
+    @Environment(\.isEnabled) private var enabled
+    let filled: Bool
+    let expands: Bool
+    let destructive: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        let tint = destructive || configuration.role == .destructive ? theme.negative : theme.accent
+        let shape = RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+        configuration.label
+            .font(.custom("Figtree", size: 13, relativeTo: .subheadline).weight(.semibold))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            #if os(macOS)
+            .frame(maxWidth: expands ? .infinity : nil, minHeight: 28)
+            #else
+            .frame(maxWidth: expands ? .infinity : nil, minHeight: 34)
+            #endif
+            .foregroundStyle(filled ? theme.onAccent : destructive ? theme.negative : theme.textPrimary)
+            .background(filled ? tint : theme.surfaceRaised, in: shape)
+            .overlay { shape.strokeBorder(filled ? .clear : theme.hairline) }
+            .opacity(enabled ? (configuration.isPressed ? 0.8 : 1) : 0.4)
+            #if !os(macOS)
+            .frame(minHeight: 44)
+            #endif
+            .contentShape(Rectangle())
     }
 }
 #else
