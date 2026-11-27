@@ -66,10 +66,10 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        XCTAssertTrue(app.staticTexts.ci("Give the day one anchor").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.ci("Add done entry").waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons.ci("Choose date").exists, "The schedule must allow choosing a day.")
 
-        app.buttons.ci("Add the first entry").click()
+        app.buttons.ci("Add scheduled entry").click()
         let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
@@ -94,10 +94,6 @@ final class AnchorMacUITests: XCTestCase {
         let finish = app.descendants(matching: .any).ci("Finished without timing")
         XCTAssertTrue(finish.waitForExistence(timeout: 2))
         finish.click()
-        XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "1 finished"))
-                .firstMatch.waitForExistence(timeout: 3)
-        )
 
         app.buttons.ci("Analysis").click()
         XCTAssertTrue(app.radioButtons.ci("Day review").waitForExistence(timeout: 4))
@@ -110,10 +106,6 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
         app.buttons.ci("Today").click()
         XCTAssertTrue(app.staticTexts.ci("Mac schedule acceptance").waitForExistence(timeout: 4))
-        XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "1 finished"))
-                .firstMatch.waitForExistence(timeout: 3)
-        )
     }
 
     @MainActor
@@ -124,7 +116,7 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add the first entry").click()
+        app.buttons.ci("Add scheduled entry").click()
         let recurringTitle = app.textFields.ci("What will you do?")
         XCTAssertTrue(recurringTitle.waitForExistence(timeout: 3))
         recurringTitle.click()
@@ -188,7 +180,7 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add the first entry").click()
+        app.buttons.ci("Add scheduled entry").click()
         let initialTitle = app.textFields.ci("What will you do?")
         XCTAssertTrue(initialTitle.waitForExistence(timeout: 3))
         initialTitle.click()
@@ -367,7 +359,7 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add the first entry").click()
+        app.buttons.ci("Add scheduled entry").click()
         let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
@@ -542,7 +534,7 @@ final class AnchorMacUITests: XCTestCase {
         app.launch()
 
         app.buttons.ci("Today").click()
-        app.buttons.ci("Add the first entry").click()
+        app.buttons.ci("Add scheduled entry").click()
         let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.click()
@@ -578,10 +570,6 @@ final class AnchorMacUITests: XCTestCase {
         logTitle.typeText("In-flight entry")
         app.buttons.ci("anchor.log.save").click()
         XCTAssertTrue(app.buttons.ci("Edit done entry In-flight entry").waitForExistence(timeout: 4))
-        XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "1 now"))
-                .firstMatch.waitForExistence(timeout: 3)
-        )
 
         // Finishing the open entry records its real span.
         let liveLog = app.buttons.ci("Edit done entry In-flight entry")
@@ -618,10 +606,6 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.datePickers["anchor.log.end"].waitForExistence(timeout: 3))
         app.buttons.ci("anchor.log.save").click()
         XCTAssertTrue(app.buttons.ci("Edit done entry Logged earlier").waitForExistence(timeout: 4))
-        XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "2 finished"))
-                .firstMatch.waitForExistence(timeout: 3)
-        )
         keepScreenshot(app, named: "anchor-timetable-logged")
 
         // Logged entries count as observed time — no "untimed" in the review.

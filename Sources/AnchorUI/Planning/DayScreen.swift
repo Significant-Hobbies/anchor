@@ -45,6 +45,10 @@ struct PlanScreen: View {
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
+    @State private var gridHasViewport = false
+    @State private var gridIsAtStart = true
+    @State private var recenterDay = 0
+    @State private var parkedDraft: AdvancedDraft?
     @State private var showsDayTools = false
     @State private var showsDayCalendarEvents = false
     @State private var loadError: String?
@@ -90,14 +94,6 @@ struct PlanScreen: View {
 
     private var visibleBlocks: [PlanBlock] {
         calendarVisibility.filter(allBlocks)
-    }
-
-    private var dayDisplayBlocks: [PlanBlock] {
-        showsDayCalendarEvents ? visibleBlocks : visibleBlocks.filter { $0.externalEventKey == nil }
-    }
-
-    private var blocks: [PlanBlock] {
-        dayDisplayBlocks.filter { $0.plannedStart >= dayInterval.start && $0.plannedStart < dayInterval.end }
     }
 
     private var copyableBlocks: [PlanBlock] {
@@ -151,7 +147,7 @@ struct PlanScreen: View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
-                if controller.hasSession || (viewMode == .day && Calendar.current.isDateInToday(today)) { focusItem(recorded: data.recordedIDs) }
+                if controller.hasSession && viewMode != .day { focusItem(recorded: data.recordedIDs, jump: { _ in }) }
                 if viewMode == .week {
                     HStack {
                         Text(visibleInterval.start.formatted(date: .abbreviated, time: .omitted) + " – " +
@@ -160,8 +156,6 @@ struct PlanScreen: View {
                         Spacer()
                         calendarsButton.buttonStyle(.borderless)
                     }
-                } else if viewMode == .day {
-                    dayControls
                 }
                 if viewMode != .day {
                     CalendarListButton(isExpanded: $showsDayCalendarEvents)
@@ -194,7 +188,7 @@ struct PlanScreen: View {
                                   hidesCalendarPlans: !showsDayCalendarEvents)
                 } else if viewMode == .week {
                     WeekAgenda(days: visibleDays, actuals: data,
-                               entries: dayDisplayBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
+                               entries: visibleBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
                                openDay: { today = $0; viewMode = .day },
                                add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
                                edit: { editingBlock = $0 })
@@ -203,43 +197,12 @@ struct PlanScreen: View {
                         : visibleBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
                     if showsDayCalendarEvents {
                         if calendarEvents.isEmpty {
-                            Text("No calendar events in this period.").font(.callout).foregroundStyle(theme.textSecondary)
+                            Text("No calendar events in this period.").font(.callout).foregroundStyle(theme.textSecondary).id("anchor.calendar.list")
                         } else {
-                            upcomingCalendarSection(calendarEvents)
+                            upcomingCalendarSection(calendarEvents).id("anchor.calendar.list")
                         }
                     }
 
-                    if !blocks.isEmpty {
-                        daySummary(recorded: data.recordedIDs)
-                    }
-
-                    if timetableEntries.isEmpty {
-                        Card(padding: Space.lg) {
-                            #if os(macOS)
-                            HStack(spacing: Space.lg) {
-                                emptyDayCopy
-                                Spacer(minLength: Space.lg)
-                                Button("add the first entry") { beginDraft(suggestedEntry) }
-                                    .buttonStyle(PrimaryButtonStyle(expands: false))
-                            }
-                            #else
-                            ViewThatFits(in: .horizontal) {
-                                HStack(spacing: Space.lg) {
-                                    emptyDayCopy
-                                    Spacer(minLength: Space.lg)
-                                    Button("add the first entry") { beginDraft(suggestedEntry) }
-                                        .buttonStyle(PrimaryButtonStyle(expands: false))
-                                }
-                                VStack(alignment: .leading, spacing: Space.md) {
-                                    emptyDayCopy
-                                    Button("add the first entry") { beginDraft(suggestedEntry) }
-                                    .buttonStyle(PrimaryButtonStyle())
-                                }
-                            }
-                            #endif
-                        }
-                    }
-                    Text(timetableHint).font(.caption).foregroundStyle(theme.textSecondary)
                     DayTimetable(
                         day: today,
                         entries: timetableEntries.filter { !$0.block.isUnplannedTimeLog },
@@ -266,7 +229,7 @@ struct PlanScreen: View {
                             if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
                         },
                         onAddAt: { interval, dragged, column in
-                            guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
+                            guard dragged || visibleDraft?.column != column || draftTitle.isEmpty else { return }
                             let finalHour = Calendar.current.component(.hour, from: interval.start) == 23
                             beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60),
                                                   revealInGrid: finalHour, column: column))
@@ -279,13 +242,36 @@ struct PlanScreen: View {
             .frame(maxWidth: viewMode == .day ? .infinity : workspaceMaxWidth)
             .frame(maxWidth: .infinity)
         }
+        .onScrollGeometryChange(for: GridViewport.self) { geometry in
+            GridViewport(ready: geometry.containerSize.height > 0 && geometry.contentSize.height > geometry.containerSize.height,
+                         atStart: geometry.visibleRect.minY < 2)
+        } action: { _, viewport in
+            gridHasViewport = viewport.ready
+            gridIsAtStart = viewport.atStart
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(alignment: .leading, spacing: Space.xs) {
                 periodNavigation
+                if viewMode == .day {
+                    HStack(spacing: Space.sm) {
+                        if controller.hasSession || Calendar.current.isDateInToday(today) {
+                            focusItem(recorded: data.recordedIDs) { time in
+                                proxy.scrollTo(DayTimetable.hourAnchor(for: time, on: today), anchor: .top)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                        calendarOptions
+                    }
+                }
                 if viewMode != .review {
                     HStack(spacing: Space.xxs) {
-                        Text("Scheduled").frame(maxWidth: .infinity, alignment: .leading)
-                        Text("Done").frame(maxWidth: .infinity, alignment: .leading)
+                        if viewMode == .day {
+                            columnHeading("Scheduled", actionLabel: "Add scheduled entry") { beginDraft(suggestedEntry) }
+                            columnHeading("Done", actionLabel: "Add done entry") { beginDraft(suggestedActual(data)) }
+                        } else {
+                            Text("Scheduled").frame(maxWidth: .infinity, alignment: .leading)
+                            Text("Done").frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     .font(.headline)
                     .padding(.leading, viewMode == .day ? (timetablePrefs.showsLivedTrace ? 62 : 50) : Space.md)
@@ -306,12 +292,28 @@ struct PlanScreen: View {
                 DispatchQueue.main.async { proxy.scrollTo(id, anchor: .bottom) }
             }
         }
-        .onChange(of: editingBlock != nil || loggingBlock != nil || explainingBlock != nil) { _, anyOpen in
-            if !anyOpen {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    proxy.scrollTo(DayTimetable.nowAnchorID, anchor: .top)
-                }
+        .task(id: gridHasViewport && viewMode == .day ? dayInterval.start : nil) {
+            guard gridHasViewport, viewMode == .day, visibleDraft == nil, openBlockers.isEmpty, loadError == nil, periodSyncError == nil, !checkInLoadFailed else { return }
+            let time = initialGridTime(actuals: data)
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            let hour = DayTimetable.hourAnchor(for: time, on: today)
+            proxy.scrollTo(hour, anchor: .top)
+            #if os(macOS)
+            // AppKit can restore the initial scroll origin after SwiftUI's first layout.
+            // Stop as soon as the grid has moved, or an editor has taken focus.
+            for _ in 0..<4 where hour > dayInterval.start {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled, gridIsAtStart, visibleDraft == nil else { break }
+                proxy.scrollTo(hour, anchor: .top)
             }
+            #endif
+        }
+        .onChange(of: recenterDay) {
+            if viewMode == .day { proxy.scrollTo(DayTimetable.hourAnchor(for: initialGridTime(actuals: data), on: today), anchor: .top) }
+        }
+        .onChange(of: showsDayCalendarEvents) { _, showsList in
+            if showsList && viewMode == .day { proxy.scrollTo("anchor.calendar.list", anchor: .top) }
         }
         .onChange(of: showsDayCalendarEvents) { showsAllCalendarEvents = false }
         .onChange(of: today) { _, _ in showsAllCalendarEvents = false }
@@ -502,14 +504,6 @@ struct PlanScreen: View {
         }
     }
 
-    private var timetableHint: String {
-        #if os(macOS)
-        "Drag across an open time to add an entry in \(gridStep.rawValue)-minute steps."
-        #else
-        "Touch and hold an open time, then drag in \(gridStep.rawValue)-minute steps."
-        #endif
-    }
-
     private func blockEditor(_ block: PlanBlock) -> some View {
         PlanBlockEditor(initialDay: block.plannedStart, block: block) { refresh() }
             .anchorTheme()
@@ -566,18 +560,21 @@ struct PlanScreen: View {
     }
 
     @ViewBuilder
-    private func focusItem(recorded: Set<UUID>) -> some View {
+    private func focusItem(recorded: Set<UUID>, jump: @escaping (Date) -> Void) -> some View {
         if let session = controller.session, controller.hasSession {
             focusRow(controller.isRunning ? "In focus" : "Paused", title: session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent,
                      action: "Open timer", perform: onOpenFocus)
         } else if let record = ScheduledFocusResolver().nextBlock(from: visibleBlocks.filter { !recorded.contains($0.id) && !$0.isUnplannedTimeLog && $0.plannedEnd > calendarReferenceTime }.map { $0.snapshot() }, now: calendarReferenceTime),
                   let block = visibleBlocks.first(where: { $0.id == record.id }) {
             if block.plannedStart > calendarReferenceTime {
-                HStack(spacing: Space.xs) {
-                    Text("Up next · " + block.plannedStart.formatted(date: .omitted, time: .shortened))
+                Button { jump(block.plannedStart) } label: {
+                    HStack(spacing: Space.xs) {
+                        Text("Up next · " + block.plannedStart.formatted(date: .omitted, time: .shortened))
                         .foregroundStyle(theme.textSecondary)
-                    Text(block.title).fontWeight(.semibold)
-                }.font(.subheadline)
+                        Text(block.title).fontWeight(.semibold).lineLimit(1)
+                        Image(systemName: "chevron.right").font(.caption2)
+                    }.font(.subheadline)
+                }.buttonStyle(.plain).accessibilityHint("Show this event on the timetable")
             } else {
                 HStack {
                     focusRow("Now · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
@@ -651,7 +648,10 @@ struct PlanScreen: View {
                     .onChange(of: today) { _, _ in showsDatePicker = false }
             }
             periodArrow(1)
-            Button("Today") { today = Date() }
+            Button("Today") {
+                if Calendar.current.isDateInToday(today) { recenterDay += 1 }
+                today = Date()
+            }
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .accessibilityLabel("Go to today")
         }
@@ -679,39 +679,46 @@ struct PlanScreen: View {
         .accessibilityLabel((direction < 0 ? "Previous " : "Next ") + (viewMode == .week ? "week" : "day"))
     }
 
-    private var addEntryButton: some View {
-        Button { beginDraft(suggestedEntry) } label: { Label("Add", systemImage: "plus") }
-            .accessibilityLabel("Add an entry")
+    private func columnHeading(_ title: String, actionLabel: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: Space.xxs) {
+                Text(title)
+                Image(systemName: "plus.circle").font(.subheadline)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityLabel(actionLabel)
     }
 
-    private var dayControls: some View {
-        HStack(spacing: Space.xs) {
-            addEntryButton
-            Button("Day tools", systemImage: "ellipsis.circle") { showsDayTools = true }
-                .accessibilityIdentifier("anchor.today.tools")
-                .popover(isPresented: $showsDayTools) {
-                    VStack(alignment: .leading, spacing: Space.xxs) {
-                        if !controller.hasSession {
-                            Button("Start an unplanned session", systemImage: "scope") {
-                                showsDayTools = false
-                                onOpenFocus()
-                            }
-                        }
-                        logTimeButton
-                        copyDayButton
-                        calendarsButton
-                        customizeButton
-                        Button(showsDayCalendarEvents ? "Hide calendar list" : "Show calendar list", systemImage: "list.bullet") {
-                            showsDayTools = false
-                            showsDayCalendarEvents.toggle()
-                        }.accessibilityIdentifier("anchor.today.show-calendar-events")
+    private var calendarOptions: some View {
+        Button { showsDayTools = true } label: {
+            Image(systemName: "slider.horizontal.3").frame(minWidth: periodHitSize, minHeight: periodHitSize)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Calendar options")
+        .accessibilityIdentifier("anchor.today.tools")
+        .popover(isPresented: $showsDayTools) {
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                if !controller.hasSession {
+                    Button("Start an unplanned session", systemImage: "scope") {
+                        showsDayTools = false
+                        onOpenFocus()
                     }
-                    .buttonStyle(QuietButtonStyle(expands: true))
-                    .frame(idealWidth: 220)
-                    .padding(Space.sm)
-                    .presentationCompactAdaptation(.popover)
                 }
-        }.buttonStyle(QuietButtonStyle(expands: false))
+                logTimeButton
+                copyDayButton
+                calendarsButton
+                customizeButton
+                Button(showsDayCalendarEvents ? "Hide calendar list" : "Show calendar list", systemImage: "list.bullet") {
+                    showsDayTools = false
+                    showsDayCalendarEvents.toggle()
+                }.accessibilityIdentifier("anchor.today.show-calendar-events")
+            }
+            .buttonStyle(QuietButtonStyle(expands: true))
+            .frame(idealWidth: 220)
+            .padding(Space.sm)
+            .presentationCompactAdaptation(.popover)
+        }
     }
 
     @ViewBuilder private var calendarsButton: some View {
@@ -757,34 +764,21 @@ struct PlanScreen: View {
         )
     }
 
-    private var emptyDayCopy: some View {
-        VStack(alignment: .leading, spacing: Space.xxs) {
-            Text("give the day one anchor")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(theme.textPrimary)
-            Text("Start with the thing worth protecting. Commitments, rest, and recurring routines can take their place around it.")
-                .font(.subheadline)
-                .foregroundStyle(theme.textSecondary)
-        }
+    private func initialGridTime(actuals: CalendarActualData) -> Date {
+        let now = Date()
+        if Calendar.current.isDateInToday(today) { return now.addingTimeInterval(-3600) }
+        let firstPlan = timetableEntries.map(\.block).filter { $0.plannedSeconds < 86_400 }.map(\.plannedStart).min()
+        let firstActual = actuals.calendarEntries(in: dayInterval).filter { $0.end.timeIntervalSince($0.start) < 86_400 }.map(\.start).min()
+        return [firstPlan, firstActual].compactMap { $0 }.min()
+            ?? Calendar.current.date(bySettingHour: timetablePrefs.startHour, minute: 0, second: 0, of: today) ?? today
     }
 
-    private func daySummary(recorded: Set<UUID>) -> some View {
-        let completed = blocks.filter { $0.state == .completed || recorded.contains($0.id) }.count
-        let active = blocks.filter { !recorded.contains($0.id) && (isCurrent($0) || $0.state == .inProgress) }.count
-        let ahead = blocks.filter { !recorded.contains($0.id) && $0.state == .planned && $0.plannedStart > calendarReferenceTime }.count
-        return HStack(spacing: Space.xs) {
-            Image(systemName: "scribble.variable")
-                .foregroundStyle(theme.accent)
-            Text(blocks.isEmpty
-                 ? "The page is open. Start with one honest block."
-                 : "\(completed) finished · \(active) now · \(ahead) ahead")
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(theme.textSecondary)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, Space.xxs)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("anchor.today.completion")
+    private func suggestedActual(_ data: CalendarActualData) -> EditorSeed {
+        let step = Double(gridStep.rawValue * 60)
+        let end = Calendar.current.isDateInToday(today) ? Date() : initialGridTime(actuals: data).addingTimeInterval(step)
+        let offset = floor(end.timeIntervalSince(dayInterval.start) / step) * step
+        let start = max(0, min(offset - step, dayInterval.duration - step))
+        return EditorSeed(start: dayInterval.start.addingTimeInterval(start), minutes: gridStep.rawValue, column: .done)
     }
 
     private var visibleDraft: EditorSeed? {
@@ -793,8 +787,19 @@ struct PlanScreen: View {
     }
 
     private func beginDraft(_ seed: EditorSeed) {
-        if let previous = editorSeed, !Calendar.current.isDate(previous.start, inSameDayAs: seed.start) {
+        let pending = parkedDraft
+        if let previous = editorSeed, previous.column != seed.column {
+            parkedDraft = draftTitle.isEmpty ? nil : AdvancedDraft(seed: previous, title: draftTitle)
             draftTitle = ""
+        } else if let previous = editorSeed, !Calendar.current.isDate(previous.start, inSameDayAs: seed.start) {
+            draftTitle = ""
+        }
+        if let pending, pending.seed.column == seed.column, Calendar.current.isDate(pending.seed.start, inSameDayAs: seed.start) {
+            if editorSeed?.column == seed.column || editorSeed == nil { parkedDraft = nil }
+            editorSeed = pending.seed
+            draftTitle = pending.title
+            draftError = nil
+            return
         }
         draftError = nil
         editorSeed = seed
@@ -916,6 +921,11 @@ struct PlanScreen: View {
     }
 }
 
+
+private struct GridViewport: Equatable {
+    let ready: Bool
+    let atStart: Bool
+}
 
 private struct AdvancedDraft: Identifiable {
     let seed: EditorSeed
