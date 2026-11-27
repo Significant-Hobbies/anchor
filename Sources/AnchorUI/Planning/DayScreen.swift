@@ -564,7 +564,7 @@ struct PlanScreen: View {
         if let session = controller.session, controller.hasSession {
             focusRow(controller.isRunning ? "In focus" : "Paused", title: session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent,
                      action: "Open timer", perform: onOpenFocus)
-        } else if let record = ScheduledFocusResolver().nextBlock(from: visibleBlocks.filter { !recorded.contains($0.id) && !$0.isUnplannedTimeLog && $0.plannedEnd > calendarReferenceTime }.map { $0.snapshot() }, now: calendarReferenceTime),
+        } else if let record = ScheduledFocusResolver().nextBlock(from: visibleBlocks.filter { $0.plannedEnd > calendarReferenceTime }.map { $0.snapshot() }, recorded: recorded, now: calendarReferenceTime),
                   let block = visibleBlocks.first(where: { $0.id == record.id }) {
             if block.plannedStart > calendarReferenceTime {
                 Button { jump(block.plannedStart) } label: {

@@ -305,9 +305,11 @@ public struct CompactPanel: View {
         }
     }
 
+    private var calendarVisibility = CalendarBlockVisibility()
+
     private var scheduledBlock: PlanBlock? {
         guard let record = ScheduledFocusResolver().nextBlock(
-            from: blocks.filter { $0.externalEventKey == nil }.map { $0.snapshot() },
+            from: calendarVisibility.filter(blocks).map { $0.snapshot() },
             now: now
         ) else { return nil }
         return blocks.first { $0.id == record.id }
