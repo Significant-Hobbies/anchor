@@ -579,7 +579,7 @@ public struct RootView: View {
             ForEach(AnchorTab.destinations) { item in
                 NavigationStack {
                     screen(for: item)
-                        .navigationTitle(item.label)
+                        .navigationTitle(item == .history ? "Insights" : item.label)
                         .toolbar {
                             ToolbarItem(placement: .primaryAction) {
                                 Button { navigation.showSettings() } label: {

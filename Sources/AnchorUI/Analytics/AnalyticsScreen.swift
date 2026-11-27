@@ -96,7 +96,9 @@ public struct AnalyticsScreen: View {
             let overview = engine.overview(records)
 
             VStack(alignment: .leading, spacing: Space.lg) {
+                #if os(macOS)
                 Text("Insights").font(.title.bold())
+                #endif
                 rangePicker
                 CalendarActuals(blocks: calendarVisibility.filter(plans), sessions: sessions, allBlocks: plans) { data in
                     ObservedHabitsCard(entries: data.entries, blocks: calendarVisibility.filter(plans), days: range.days)

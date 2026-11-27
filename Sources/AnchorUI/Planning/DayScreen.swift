@@ -574,6 +574,7 @@ struct PlanScreen: View {
                 today = Date()
             }
                 .buttonStyle(QuietButtonStyle(expands: false))
+                .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel("Go to today")
         }
     }
