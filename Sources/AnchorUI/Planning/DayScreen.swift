@@ -39,6 +39,7 @@ struct PlanScreen: View {
     @State private var draftTitle = ""
     @State private var draftError: String?
     @State private var showsCustomize = false
+    @State private var activityTags: [String: ActivityCategory] = [:]
     @State private var editingBlock: PlanBlock?
     @State private var editingCalendarEvent: PlanBlock?
     @State private var explainingBlock: PlanBlock?
@@ -127,7 +128,21 @@ struct PlanScreen: View {
 
     var body: some View {
         CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks, editTimeLog: { loggingBlock = $0 }) { data in
+            let period = visibleInterval
+            let plans = visibleBlocks.filter { $0.plannedStart < period.end && $0.plannedEnd > period.start }
+            let titles = Set(plans.map(\.title) + data.calendarEntries(in: period).map(\.title))
             calendar(data)
+                .environment(\.calendarActivityTags, activityTags)
+                .task(id: titles) {
+                    if activityTags.count > 512 { activityTags = activityTags.filter { titles.contains($0.key) } }
+                    let tagger = TaggingService()
+                    for title in titles.sorted() where activityTags[title] == nil {
+                        guard !Task.isCancelled else { return }
+                        let category = await tagger.classifyActivity(title)
+                        guard !Task.isCancelled else { return }
+                        activityTags[title] = category
+                    }
+                }
         }
     }
 
@@ -263,7 +278,7 @@ struct PlanScreen: View {
                 }
             }
             .padding(Space.lg)
-            .frame(maxWidth: workspaceMaxWidth)
+            .frame(maxWidth: viewMode == .day ? .infinity : workspaceMaxWidth)
             .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -281,7 +296,7 @@ struct PlanScreen: View {
             }
                 .padding(.horizontal, Space.lg)
                 .padding(.vertical, Space.xs)
-                .frame(maxWidth: workspaceMaxWidth, alignment: .leading)
+                .frame(maxWidth: viewMode == .day ? .infinity : workspaceMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 .background(theme.canvas)
                 .overlay(alignment: .bottom) { Rectangle().fill(theme.hairline).frame(height: 0.5) }

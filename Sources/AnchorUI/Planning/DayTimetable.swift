@@ -95,6 +95,7 @@ struct DayTimetable: View {
         var outcome: PlannerOutcome? = nil
     }
 
+    @Environment(\.calendarActivityTags) private var activityTags
     @Environment(\.anchorTheme) private var theme
 
     let day: Date
@@ -182,7 +183,7 @@ struct DayTimetable: View {
     }
 
     private func blockCard(_ entry: Entry, height: CGFloat, compact: Bool = false) -> some View {
-        TimetableBlockCard(entry: entry, height: height, compact: compact, actuals: actuals, dimsFinished: dimsFinished,
+        TimetableBlockCard(entry: entry, height: height, compact: compact, category: activityTags[entry.block.title] ?? .suggestion(for: entry.block.title), actuals: actuals, dimsFinished: dimsFinished,
                            onCheckIn: { onCheckIn(entry.block) }, onStart: { onStart(entry.block) },
                            onOpenFocus: onOpenFocus, onComplete: { onComplete(entry.block) },
                            onEdit: { onEdit(entry.block) }, onRemove: { onRemove(entry.block) },
@@ -190,7 +191,8 @@ struct DayTimetable: View {
     }
 
     private func doneCard(_ item: DayLedgerEntry, height: CGFloat = 70) -> some View {
-        Button { actuals.edit(item) } label: {
+        let category = activityTags[item.title] ?? .suggestion(for: item.title)
+        return Button { actuals.edit(item) } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).font(height < 38 ? .caption2.weight(.semibold) : .subheadline.weight(.semibold)).lineLimit(height < 38 ? 1 : 2)
                 if height >= 38 {
@@ -204,8 +206,14 @@ struct DayTimetable: View {
             .padding(.horizontal, Space.xxs)
             .padding(.vertical, height < 38 ? 0 : Space.xxs)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
+            .padding(.leading, Space.xxs)
+            .background(category.calendarColor.opacity(0.16), in: .rect(cornerRadius: Radius.sm))
+            .overlay(alignment: .leading) {
+                Capsule().fill(category.calendarColor).frame(width: 3).padding(.vertical, 2)
+            }
         }
+        .help(category.rawValue.capitalized)
+        .accessibilityValue(category.rawValue.capitalized)
         .buttonStyle(.plain)
         .disabled(!actuals.available && !actuals.storedLogIDs.contains(item.id))
         .accessibilityLabel("Edit done entry " + item.title)
@@ -341,7 +349,7 @@ struct DayTimetable: View {
     private func hourMarks(width: CGFloat) -> some View {
         ForEach(0...hourCount, id: \.self) { tick in
             let y = CGFloat(tick) * hourHeight
-            HStack(alignment: .top, spacing: Space.xxs) {
+            HStack(alignment: .center, spacing: Space.xxs) {
                 Text(range.start.addingTimeInterval(TimeInterval(tick) * 3600).formatted(.dateTime.hour()))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(theme.textTertiary)
@@ -350,7 +358,7 @@ struct DayTimetable: View {
                     .fill(theme.hairline)
                     .frame(height: 1)
             }
-            .frame(width: width, alignment: .topLeading)
+            .frame(width: width, height: 1, alignment: .center)
             .background(alignment: .topLeading) {
                 let hour = Calendar.current.component(.hour, from: range.start.addingTimeInterval(Double(tick) * 3600))
                 if tick < hourCount && (hour < windowStartHour || hour >= windowEndHour) {
@@ -482,6 +490,7 @@ private struct TimetableBlockCard: View {
     let entry: DayTimetable.Entry
     let height: CGFloat
     let compact: Bool
+    let category: ActivityCategory
     let actuals: CalendarActualData
     var dimsFinished: Bool = true
     let onCheckIn: () -> Void
@@ -506,13 +515,13 @@ private struct TimetableBlockCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             RoundedRectangle(cornerRadius: 1.5)
-                .fill(stateTint)
+                .fill(category.calendarColor)
                 .frame(width: 3)
                 .padding(.vertical, height < 38 ? 2 : 5)
                 .padding(.leading, 5)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .top, spacing: Space.xxs) {
+                HStack(alignment: .center, spacing: Space.xxs) {
                     CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil)
                     Button { showsActions = true } label: {
                         Text(block.title)
@@ -525,6 +534,7 @@ private struct TimetableBlockCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(actionLabel)
+                    .accessibilityValue(category.rawValue.capitalized)
                     if !compact && height >= 38 { actionsButton }
 
                 }
@@ -546,19 +556,22 @@ private struct TimetableBlockCard: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             Button { showsActions = true } label: {
-                RoundedRectangle(cornerRadius: Radius.sm).fill(cardFill).contentShape(Rectangle())
+                RoundedRectangle(cornerRadius: Radius.sm).fill(cardFill)
+                    .overlay { RoundedRectangle(cornerRadius: Radius.sm).fill(category.calendarColor.opacity(0.14)) }
+                    .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityHidden(true)
         }
         .overlay {
             RoundedRectangle(cornerRadius: Radius.sm)
                 .strokeBorder(
-                    entry.isCurrent || block.state == .inProgress ? theme.accent.opacity(0.4) : theme.hairline,
+                    entry.outcome != nil ? stateTint : entry.isCurrent || block.state == .inProgress ? theme.accent.opacity(0.4) : theme.hairline,
                     style: StrokeStyle(
                         lineWidth: entry.isCurrent || block.state == .inProgress ? 1.4 : 1,
                         dash: block.state == .skipped || block.state == .moved ? [4, 3] : []
                     )
                 ).allowsHitTesting(false)
         }
+        .help(category.rawValue.capitalized)
         .opacity(cardOpacity)
         .popover(isPresented: $showsActions, arrowEdge: actionsArrow) {
             VStack(alignment: .leading, spacing: Space.xxs) {
