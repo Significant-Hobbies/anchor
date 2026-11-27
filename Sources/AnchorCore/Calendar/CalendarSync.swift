@@ -196,6 +196,7 @@ public struct CalendarSyncReport: Sendable, Equatable {
     public var detachments: [UUID] = []
     /// Accounts whose fetch failed — their blocks were left completely alone.
     public var failedAccounts: Set<String> = []
+    public var failureReasons: [String: String] = [:]
     public var syncedAt: Date
 
     public init(syncedAt: Date) {
@@ -245,7 +246,7 @@ public struct CalendarSyncService: Sendable {
                 batch.events += events
                 batch.fetchedCalendars[account.id] = account.selectedCalendarIDs
             } catch {
-                batch.failedAccountIDs.insert(account.id)
+                batch.failureReasons[account.id] = GoogleCalendarError.importMessage(for: error)
             }
         }
         return batch
@@ -258,7 +259,7 @@ public struct CalendarEventBatch: Sendable {
     fileprivate var window: DateInterval
     fileprivate var events: [GoogleCalendarEvent] = []
     fileprivate var fetchedCalendars: [String: Set<String>] = [:]
-    fileprivate var failedAccountIDs: Set<String> = []
+    fileprivate var failureReasons: [String: String] = [:]
 
     public func reconcile(
         blocks: [PlanBlockRecord], eligibleAccountIDs: Set<String>? = nil,
@@ -272,7 +273,8 @@ public struct CalendarEventBatch: Sendable {
             removedEventKeys: removedEventKeys
         )
         var report = CalendarSyncReport(syncedAt: now)
-        report.failedAccounts = failedAccountIDs.intersection(eligibleAccountIDs ?? failedAccountIDs)
+        report.failureReasons = failureReasons.filter { eligibleAccountIDs?.contains($0.key) ?? true }
+        report.failedAccounts = Set(report.failureReasons.keys)
         report.creations = plan.creations
         report.updates = plan.updates
         report.deletions = plan.deletions

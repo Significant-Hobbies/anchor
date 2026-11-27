@@ -215,10 +215,13 @@ struct DayTimetable: View {
         let category = activityTags[item.title] ?? .suggestion(for: item.title)
         return Button { if interaction.acceptsTap { actuals.edit(item) } } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).font(height < 38 ? .caption2.weight(.semibold) : .subheadline.weight(.semibold)).lineLimit(height < 38 ? 1 : 2)
+                HStack(spacing: 3) {
+                    Image(systemName: category.calendarSymbol).font(.caption2).accessibilityHidden(true)
+                    Text(item.title).font(height < 38 ? .caption2.weight(.semibold) : .subheadline.weight(.semibold)).lineLimit(height < 38 ? 1 : 2)
+                }
                 if height >= 38 {
                     if actuals.recordedIDs.contains(item.id) {
-                        Text(item.start, style: .time).font(.caption2.monospacedDigit())
+                        Text("\(category.rawValue.capitalized) · \(item.start.formatted(date: .omitted, time: .shortened))").font(.caption2.monospacedDigit()).lineLimit(1)
                     } else {
                         Text("In progress").font(.caption2)
                     }
@@ -551,21 +554,15 @@ private struct TimetableBlockCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(category.calendarColor)
-                .frame(width: 3)
-                .padding(.vertical, height < 38 ? 2 : 5)
-                .padding(.leading, 5)
-
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .center, spacing: Space.xxs) {
-                    CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil,
+                    CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : compact && height < 56 ? 18 : nil,
                                         showsLabel: !compact && height >= 38 && block.plannedEnd <= Date(), acceptsTap: { interaction.acceptsTap })
                     Button { if interaction.acceptsTap { showsActions = true } } label: {
-                        Text(block.title)
+                        Label(block.title, systemImage: category.calendarSymbol)
                             .font(height < 38 ? .caption2.weight(.semibold) : compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                             .foregroundStyle(Color.black.opacity(0.91))
-                            .lineLimit(height < 38 ? 1 : 2)
+                            .lineLimit(height < 56 ? 1 : 2)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
@@ -576,9 +573,9 @@ private struct TimetableBlockCard: View {
                     if !compact && height >= 38 { actionsButton }
 
                 }
-                if height >= 56 {
+                if height >= (compact ? 38 : 56) {
                     let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated
-                    Text("\(block.plannedStart.formatted(date: dateStyle, time: .shortened)) – \(block.plannedEnd.formatted(date: dateStyle, time: .shortened))")
+                    Text("\(category.rawValue.capitalized) · \(block.plannedStart.formatted(date: dateStyle, time: .shortened)) – \(block.plannedEnd.formatted(date: dateStyle, time: .shortened))")
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(Color.black.opacity(0.76))
                         .lineLimit(1)
@@ -589,7 +586,7 @@ private struct TimetableBlockCard: View {
             }
             .padding(.leading, Space.xs)
             .padding(.trailing, 2)
-            .padding(.vertical, height < 38 ? 0 : Space.xxs)
+            .padding(.vertical, height < 56 ? 0 : Space.xxs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
@@ -670,8 +667,6 @@ private struct TimetableBlockCard: View {
                 Text(projectName)
                 Text("·")
             }
-            Text(category.rawValue.capitalized)
-            Text("·")
             Text(block.flexibility.label)
             if block.templateID != nil {
                 Text("·")

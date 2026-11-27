@@ -26,14 +26,10 @@ public struct PreferenceGroup<Content: View>: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             VStack(alignment: .leading, spacing: 2) {
-                #if !os(watchOS) && canImport(SaaSMakerUI)
-                SMSectionHeader(title.lowercased(), size: 17)
-                    .accessibilityLabel(title)
-                #else
                 Text(title)
                     .font(.system(.headline, design: .rounded).weight(.semibold))
                     .foregroundStyle(theme.textPrimary)
-                #endif
+
                 if let subtitle {
                     Text(subtitle)
                         .font(.caption)
@@ -183,7 +179,7 @@ private struct PreferenceRowContent<Trailing: View>: View {
                 .background((tint ?? theme.textSecondary).opacity(0.10), in: .circle)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title.lowercased())
+                Text(title)
                     .accessibilityLabel(title)
                     .font(.body.weight(.medium))
                     .fixedSize(horizontal: false, vertical: true)

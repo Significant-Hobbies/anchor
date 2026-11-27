@@ -309,6 +309,8 @@ struct CalendarCoordinatorTests {
         let coordinator = makeCoordinator(defaults: defaults, credentials: credentials)
         let issue = await coordinator.sync(context: context, window: period)
         #expect(issue != nil && issue == coordinator.status)
+        #expect(issue?.contains("Me — ") == true)
+        #expect(issue?.contains("Previously imported entries were kept.") == true)
         #expect(coordinator.lastSyncedAt == nil)
         #expect(try context.fetch(FetchDescriptor<PlanBlock>()).map(\.id) == [imported.id])
     }

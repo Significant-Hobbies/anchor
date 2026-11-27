@@ -13,6 +13,18 @@ public struct FocusScreen: View {
     private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
+    @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
+    @State private var minutes = 25
+    @State private var notes = ""
+    @State private var goalID: UUID?
+    @State private var projectID: UUID?
+    @State private var tagIDs: [String] = []
+    @State private var detailsExpanded = false
+    @State private var showsEditor = false
+    @State private var checkInBlock: PlanBlock?
+    @State private var checkInReadFailed = false
+    @State private var previousCheckIn: PlannerCheckIn?
     private let controller: FocusController
     @State private var now = Date()
     @FocusState private var editingActivity: Bool
@@ -34,15 +46,12 @@ public struct FocusScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Space.md) {
                         let slot = scheduledBlock
+                        DoodleScene("FocusDoodle",
+                                    eyebrow: slot == nil ? nil : "Scheduled now",
+                                    title: slot?.title ?? "Open time",
+                                    message: slot.map { timeRange($0) } ?? "Nothing scheduled right now.",
+                                    compact: true)
                         if let block = slot, replacingID != block.id {
-                            Text("Scheduled now")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(theme.textSecondary)
-                            Text(block.title)
-                                .font(.largeTitle.weight(.semibold))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text("\(block.plannedStart.formatted(date: .omitted, time: .shortened)) – \(block.plannedEnd.formatted(date: .omitted, time: .shortened))")
-                                .foregroundStyle(theme.textSecondary)
                             Button("Start focusing") { start(block) }
                                 .buttonStyle(PrimaryButtonStyle(expands: false))
                             Button("Do something else") {
@@ -69,12 +78,15 @@ public struct FocusScreen: View {
                                 }
                                 .submitLabel(.go)
                                 .onSubmit { startActivity(expectedSlot: slot?.id) }
+                            if slot == nil {
+                                sessionOptions
+                            }
                             HStack(spacing: Space.md) {
                                 Button(replacingID != nil && slot == nil ? "Start unplanned session" : "Start focusing") {
                                     startActivity(expectedSlot: slot?.id)
                                 }
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
-                                    .disabled(trimmedActivity.isEmpty)
+                                    .disabled(trimmedActivity.isEmpty && (slot != nil || selectedGoal == nil))
                                 if replacingID != nil {
                                     Button("Cancel") {
                                         activity = ""
@@ -84,12 +96,33 @@ public struct FocusScreen: View {
                                 }
                             }
                         }
+                        Divider()
+                        if let next = nextAppointment {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text("Up next").font(.caption).foregroundStyle(theme.textSecondary)
+                                Text(next.title).font(.headline)
+                                Text(next.plannedStart.formatted(date: Calendar.current.isDateInToday(next.plannedStart) ? .omitted : .abbreviated, time: .shortened))
+                                    .font(.subheadline).foregroundStyle(theme.textSecondary)
+                            }
+                        }
+                        Button("Add to schedule", systemImage: "calendar.badge.plus") { showsEditor = true }
+                            .buttonStyle(QuietButtonStyle(expands: false))
+                        if let last = lastFinishedBlock {
+                            Button("Check in on " + last.title, systemImage: "checkmark.circle") {
+                                do {
+                                    guard let store = context.plannerCheckInStore else { throw CocoaError(.fileReadUnknown) }
+                                    previousCheckIn = try store.load().records[last.id]
+                                    checkInBlock = last
+                                } catch { checkInReadFailed = true }
+                            }
+                            .buttonStyle(.plain)
+                        }
                         if let message = loadError ?? controller.lastError {
                             Label(message, systemImage: "exclamationmark.triangle")
                                 .foregroundStyle(theme.negative)
                         }
                     }
-                    .frame(maxWidth: 480, alignment: .leading)
+                    .frame(maxWidth: 620, alignment: .leading)
                     .padding(Space.lg)
                     .frame(maxWidth: .infinity)
                 }
@@ -112,23 +145,77 @@ public struct FocusScreen: View {
             CaptureSheet(controller: controller)
                 .anchorTheme()
         }
+        .alert("Couldn’t open this check-in", isPresented: $checkInReadFailed) {
+            Button("OK") {}
+        } message: {
+            Text("Check that Anchor can access its local planner store and try again.")
+        }
+        .sheet(isPresented: $showsEditor) {
+            PlanBlockEditor(initialDay: Date()) { refreshSchedule() }.anchorTheme()
+        }
+        .sheet(item: $checkInBlock) { block in
+            PlannerCheckInSheet(entry: PlannerCheckIn(block: block), previous: previousCheckIn,
+                                onSave: context.savePlannerCheckIn).anchorTheme()
+        }
         .onChange(of: controller.session?.id) { refreshSchedule() }
     }
+
+    private func timeRange(_ block: PlanBlock) -> String {
+        block.plannedStart.formatted(date: .omitted, time: .shortened) + " – " + block.plannedEnd.formatted(date: .omitted, time: .shortened)
+    }
+
+    private var lastFinishedBlock: PlanBlock? {
+        guard let session = sessions.first(where: { $0.startedAt <= now }), session.state == .finished,
+              let end = session.endedAt, Calendar.current.isDateInToday(end) else { return nil }
+        return calendarVisibility.filter(blocks).first { $0.sessionID == session.id }
+    }
+
+    private var sessionOptions: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Picker("Duration", selection: $minutes) {
+                ForEach(Array(stride(from: 5, through: 180, by: 5)), id: \.self) { value in
+                    Text("\(value) min").tag(value)
+                }
+            }
+            .pickerStyle(.menu)
+            .fixedSize()
+            DisclosureGroup("Session details", isExpanded: $detailsExpanded) {
+                VStack(alignment: .leading, spacing: Space.md) {
+                    Picker("Goal", selection: $goalID) {
+                        Text("No goal").tag(nil as UUID?)
+                        ForEach(goals.filter { !$0.isArchived }) { goal in
+                            Text(goal.title).tag(Optional(goal.id))
+                        }
+                    }
+                    ProjectPicker(selectedID: $projectID)
+                    SavedTagPicker(selectedIDs: $tagIDs)
+                    TextField("Session notes", text: $notes, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                }
+                .padding(.vertical, Space.sm)
+            }
+            .tint(theme.textSecondary)
+        }
+    }
+
+    private var selectedGoal: Goal? { goals.first { $0.id == goalID && !$0.isArchived } }
 
     private var trimmedActivity: String {
         activity.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func startActivity(expectedSlot: UUID?) {
-        guard !controller.hasSession, !trimmedActivity.isEmpty else { return }
+        guard !controller.hasSession, !trimmedActivity.isEmpty || (expectedSlot == nil && selectedGoal != nil) else { return }
         now = Date()
         let current = scheduledBlock
         guard current?.id == expectedSlot else { return }
         if let block = current, replacingID == block.id {
             start(block, intent: trimmedActivity)
-        } else if controller.start(goal: nil, intent: trimmedActivity, minutes: 25) != nil {
-            activity = ""
-            replacingID = nil
+        } else if controller.start(goal: selectedGoal,
+                                   intent: trimmedActivity, minutes: minutes,
+                                   project: projects.first { $0.id == projectID && !$0.isArchived },
+                                   notes: notes, tagIDStrings: tagIDs) != nil {
+            clearDraft()
         }
     }
 
@@ -191,8 +278,17 @@ public struct FocusScreen: View {
             loadError = controller.lastError ?? "Anchor could not start this planned session. Please try again."
             return
         }
+        clearDraft()
+    }
+
+    private func clearDraft() {
         replacingID = nil
         activity = ""
+        notes = ""
+        goalID = nil
+        projectID = nil
+        tagIDs = []
+        detailsExpanded = false
     }
 }
 
@@ -435,11 +531,11 @@ public struct RootView: View {
                         }
                         .navigationDestination(isPresented: $navigation.showsSettings) {
                             SettingsScreen(storeKind: storeKind, onShowOnboarding: showOnboarding, remindersCoordinator: remindersCoordinator, calendarCoordinator: calendarCoordinator)
-                                .navigationTitle("settings")
+                                .navigationTitle("Settings")
                                 .toolbar(.hidden, for: .tabBar)
                         }
                 }
-                .tabItem { Label(item.label.lowercased(), systemImage: item.symbolName)
+                .tabItem { Label(item.label, systemImage: item.symbolName)
                     .accessibilityLabel(item.label) }
                 .tag(item)
             }

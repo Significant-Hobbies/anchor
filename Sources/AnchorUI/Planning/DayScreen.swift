@@ -134,9 +134,13 @@ struct PlanScreen: View {
                     Label("Updating calendar events…", systemImage: "arrow.triangle.2.circlepath")
                         .font(.footnote).foregroundStyle(theme.textSecondary)
                 } else if let periodSyncError {
-                    HStack {
-                        Text(periodSyncError).font(.footnote).foregroundStyle(theme.caution)
-                        Button("Retry") { refreshRequest = UUID() }
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        Label("Calendar sync", systemImage: "exclamationmark.triangle").font(.headline)
+                        Text(periodSyncError).font(.subheadline).foregroundStyle(theme.textSecondary)
+                        HStack {
+                            Button("Retry") { refreshRequest = UUID() }
+                            Button("Manage calendars") { showsCalendars = true }
+                        }
                     }
                 }
                 if checkInLoadFailed {
@@ -216,24 +220,18 @@ struct PlanScreen: View {
                         dateNavigation
                         if Calendar.current.isDateInToday(today) { status.fixedSize(horizontal: true, vertical: false) }
                         Spacer(minLength: 0)
-                        calendarOptions
+                        calendarOptions(data)
                     }
                     VStack(alignment: .leading, spacing: Space.xxs) {
                         HStack {
                             dateNavigation
                             Spacer(minLength: 0)
-                            calendarOptions
+                            calendarOptions(data)
                         }
                         if Calendar.current.isDateInToday(today) { status }
                     }
                 }
-                HStack(spacing: Space.xxs) {
-                    columnHeading("Scheduled", actionLabel: "Add scheduled entry") { beginDraft(suggestedEntry) }
-                    columnHeading("Done", actionLabel: "Add done entry") { beginDraft(suggestedActual(data)) }
-                }
-                .font(.headline)
-                .padding(.leading, timetablePrefs.showsLivedTrace ? 62 : 50)
-                .accessibilityIdentifier("anchor.calendar.columns")
+
             }
                 .padding(.horizontal, Space.lg)
                 .padding(.vertical, Space.xs)
@@ -600,19 +598,11 @@ struct PlanScreen: View {
         .accessibilityLabel(direction < 0 ? "Previous day" : "Next day")
     }
 
-    private func columnHeading(_ title: String, actionLabel: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: Space.xxs) {
-                Text(title)
-                Image(systemName: "plus.circle").font(.subheadline)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityLabel(actionLabel)
-    }
-
-    private var calendarOptions: some View {
+    private func calendarOptions(_ data: CalendarActualData) -> some View {
         Menu {
+            Button("Add scheduled entry", systemImage: "calendar.badge.plus") { beginDraft(suggestedEntry) }
+            Button("Add done entry", systemImage: "checkmark.circle") { beginDraft(suggestedActual(data)) }
+            Divider()
             calendarsButton
             customizeButton
             Divider()
