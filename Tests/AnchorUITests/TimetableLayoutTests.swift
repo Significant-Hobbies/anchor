@@ -68,76 +68,36 @@ struct TimetableLayoutTests {
         #expect(placements[4] == .init(lane: 2, laneCount: 3))
     }
 
-    @Test("Minimum rendered height is part of the collision box")
-    func minSpanLanesCloseButNonOverlappingBlocks() {
-        // Two 15-minute blocks 20 minutes apart don't overlap on the clock,
-        // but their cards (minimum rendered height) collide — without minSpan
-        // the second card would cover the first card's action control.
-        let without = TimetableLayout.place([(0, 900), (1_200, 2_100)])
-        #expect(without[0] == .init(lane: 0, laneCount: 1))
-        #expect(without[1] == .init(lane: 0, laneCount: 1))
-        let withMin = TimetableLayout.place([(0, 900), (1_200, 2_100)], minSpan: 2_571)
-        #expect(withMin[0] == .init(lane: 0, laneCount: 2))
-        #expect(withMin[1] == .init(lane: 1, laneCount: 2))
+    @Test("Quarter-hour cards fit back to back in one lane")
+    func quarterHourCards() {
+        let first = TimetableLayout.cardBounds(from: 0, to: 14, in: 56)
+        let next = TimetableLayout.cardBounds(from: 14, to: 28, in: 56)
+        #expect(first.start == 0 && first.end == 13)
+        #expect(next.start == 14 && next.end == 27)
+        #expect(TimetableLayout.place([first, next]).allSatisfy { $0.laneCount == 1 })
     }
 
-    @Test("The visible window covers early blocks and the current hour")
-    func displayRangeCoversNowAndBlocks() {
+    @Test("Short rows at midnight stay inside the day and keep both actions reachable")
+    func lastSlotCollision() {
+        let first = TimetableLayout.cardBounds(from: 42, to: 51, in: 56)
+        let last = TimetableLayout.cardBounds(from: 51, to: 56, in: 56)
+        #expect(last.end == 56)
+        #expect(TimetableLayout.place([first, last]).allSatisfy { $0.laneCount == 2 })
+    }
+
+    @Test("The last five minutes are selectable on standard and daylight-saving days")
+    func fullDayRange() throws {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let dayStart = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
-        // Fixed early/daytime/late clocks exercise the window without wall-clock dependence.
-        for (hour, expectedStartHour) in [(0, 0), (2, 1), (12, 5), (23, 5)] {
-            let now = dayStart.addingTimeInterval(Double(hour) * 3_600)
-            let range = TimetableLayout.displayRange(
-                for: dayStart,
-                intervals: [(5 * 3_600, 6 * 3_600)],
-                now: now,
-                calendar: calendar
-            )
-            #expect(range.start == dayStart.addingTimeInterval(Double(expectedStartHour) * 3_600))
-            #expect(range.contains(now))
-            #expect(range.contains(dayStart.addingTimeInterval(5 * 3_600)))
-            #expect(range.contains(dayStart.addingTimeInterval(6 * 3_600)))
+        calendar.timeZone = try #require(TimeZone(identifier: "America/New_York"))
+        for month in [1, 3, 11] {
+            let day = try #require(calendar.date(from: DateComponents(year: 2026, month: month, day: month == 3 ? 8 : 1)))
+            let range = TimetableLayout.displayRange(for: day, calendar: calendar)
+            let bottom = CGFloat(range.duration / 3600) * 56
+            let slot = TimetableLayout.selection(from: bottom, to: bottom, hourHeight: 56, range: range, step: .five)
+            #expect(calendar.component(.hour, from: slot.start) == 23)
+            #expect(calendar.component(.minute, from: slot.start) == 55)
+            #expect(slot.end == calendar.date(byAdding: .day, value: 1, to: day))
         }
-    }
-
-    @Test("A day without context defaults to a working window")
-    func displayRangeDefaults() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let day = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
-        let range = TimetableLayout.displayRange(for: day, intervals: [], now: day.addingTimeInterval(24 * 3_600), calendar: calendar)
-        #expect(range.start == day.addingTimeInterval(7 * 3_600))
-        #expect(range.end == day.addingTimeInterval(22 * 3_600))
-    }
-
-    @Test("The owner's window replaces the default and still grows for outlying entries")
-    func displayRangeHonoursOwnerWindow() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let day = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
-        let custom = TimetableLayout.displayRange(
-            for: day,
-            intervals: [],
-            now: day.addingTimeInterval(24 * 3_600),
-            calendar: calendar,
-            windowStartHour: 9,
-            windowEndHour: 18
-        )
-        #expect(custom.start == day.addingTimeInterval(9 * 3_600))
-        #expect(custom.end == day.addingTimeInterval(18 * 3_600))
-
-        let expanded = TimetableLayout.displayRange(
-            for: day,
-            intervals: [(23 * 3_600, 24 * 3_600)],
-            now: day.addingTimeInterval(24 * 3_600),
-            calendar: calendar,
-            windowStartHour: 9,
-            windowEndHour: 18
-        )
-        #expect(expanded.start == day.addingTimeInterval(9 * 3_600))
-        #expect(expanded.end == day.addingTimeInterval(24 * 3_600))
     }
 }
 #endif

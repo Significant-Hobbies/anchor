@@ -4,6 +4,7 @@ import SwiftUI
 
 struct WeekAgenda: View {
     @Environment(\.anchorTheme) private var theme
+    @Environment(\.calendarActivityTags) private var activityTags
     let days: [Date]
     let actuals: CalendarActualData
     let entries: [PlanBlock]
@@ -51,7 +52,7 @@ struct WeekAgenda: View {
                         VStack(alignment: .leading, spacing: Space.xs) {
                             ForEach(actuals.calendarEntries(in: DateInterval(start: day, end: end))) { entry in
                                 Button { actuals.edit(entry) } label: {
-                                    row(actuals.recordedIDs.contains(entry.id) ? entry.title : entry.title + " · In progress", at: entry.start, day: day)
+                                    row(entry.title, at: entry.start, day: day, ongoing: !actuals.recordedIDs.contains(entry.id))
                                 }.buttonStyle(.plain)
                                 .disabled(!actuals.available && !actuals.storedLogIDs.contains(entry.id))
                                 .accessibilityLabel("Edit done entry " + entry.title)
@@ -63,12 +64,17 @@ struct WeekAgenda: View {
         }
         .accessibilityIdentifier("anchor.planner.week")
     }
-    private func row(_ title: String, at start: Date, day: Date) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(.subheadline.weight(.medium))
+    private func row(_ title: String, at start: Date, day: Date, ongoing: Bool = false) -> some View {
+        let category = activityTags[title] ?? .suggestion(for: title)
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(ongoing ? title + " · In progress" : title).font(.subheadline.weight(.medium))
             if start < day { Text("Continues").font(.caption) }
             else { Text(start, style: .time).font(.caption.monospacedDigit()) }
-        }.multilineTextAlignment(.leading)
+        }
+        .padding(.leading, Space.xs)
+        .overlay(alignment: .leading) { Capsule().fill(category.calendarColor).frame(width: 3) }
+        .help(category.rawValue.capitalized)
+        .multilineTextAlignment(.leading)
     }
 }
 #endif

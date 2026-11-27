@@ -39,6 +39,7 @@ struct PlanScreen: View {
     @State private var draftTitle = ""
     @State private var draftError: String?
     @State private var showsCustomize = false
+    @State private var activityTags: [String: ActivityCategory] = [:]
     @State private var editingBlock: PlanBlock?
     @State private var editingCalendarEvent: PlanBlock?
     @State private var explainingBlock: PlanBlock?
@@ -127,7 +128,21 @@ struct PlanScreen: View {
 
     var body: some View {
         CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks, editTimeLog: { loggingBlock = $0 }) { data in
+            let period = visibleInterval
+            let plans = visibleBlocks.filter { $0.plannedStart < period.end && $0.plannedEnd > period.start }
+            let titles = Set(plans.map(\.title) + data.calendarEntries(in: period).map(\.title))
             calendar(data)
+                .environment(\.calendarActivityTags, activityTags)
+                .task(id: titles) {
+                    if activityTags.count > 512 { activityTags = activityTags.filter { titles.contains($0.key) } }
+                    let tagger = TaggingService()
+                    for title in titles.sorted() where activityTags[title] == nil {
+                        guard !Task.isCancelled else { return }
+                        let category = await tagger.classifyActivity(title)
+                        guard !Task.isCancelled else { return }
+                        activityTags[title] = category
+                    }
+                }
         }
     }
 
@@ -254,14 +269,16 @@ struct PlanScreen: View {
                         },
                         onAddAt: { interval, dragged, column in
                             guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
-                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false, column: column))
+                            let finalHour = Calendar.current.component(.hour, from: interval.start) == 23
+                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60),
+                                                  revealInGrid: finalHour, column: column))
                         }
                     )
 
                 }
             }
             .padding(Space.lg)
-            .frame(maxWidth: workspaceMaxWidth)
+            .frame(maxWidth: viewMode == .day ? .infinity : workspaceMaxWidth)
             .frame(maxWidth: .infinity)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -279,21 +296,10 @@ struct PlanScreen: View {
             }
                 .padding(.horizontal, Space.lg)
                 .padding(.vertical, Space.xs)
-                .frame(maxWidth: workspaceMaxWidth, alignment: .leading)
+                .frame(maxWidth: viewMode == .day ? .infinity : workspaceMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 .background(theme.canvas)
                 .overlay(alignment: .bottom) { Rectangle().fill(theme.hairline).frame(height: 0.5) }
-        }
-        .safeAreaInset(edge: .bottom) {
-            if viewMode == .day && !timetableEntries.isEmpty {
-                Button("add an entry") { beginDraft(suggestedEntry) }
-                    .buttonStyle(PrimaryButtonStyle(expands: false))
-                    .frame(maxWidth: workspaceMaxWidth, alignment: .trailing)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, Space.lg)
-                    .padding(.vertical, Space.xs)
-                    .background(.bar)
-            }
         }
         // A toolbar draft can start offscreen. Its bottom edge is the editor's
         // bottom edge, including when the software keyboard resizes the timetable.
@@ -666,11 +672,17 @@ struct PlanScreen: View {
         .accessibilityLabel((direction < 0 ? "Previous " : "Next ") + (viewMode == .week ? "week" : "day"))
     }
 
+    private var addEntryButton: some View {
+        Button { beginDraft(suggestedEntry) } label: { Label("Add", systemImage: "plus") }
+            .accessibilityLabel("Add an entry")
+    }
+
     private var dayControls: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             if horizontalSizeClass == .compact {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     HStack(spacing: Space.xs) {
+                        addEntryButton
                         copyDayButton
                         logTimeButton
                     }
@@ -683,6 +695,7 @@ struct PlanScreen: View {
                 .buttonStyle(QuietButtonStyle(expands: false))
             } else {
                 HStack(spacing: Space.xs) {
+                    addEntryButton
                     copyDayButton
                     logTimeButton
                     calendarsButton
@@ -968,7 +981,7 @@ struct TimetableOptionsSheet: View {
                                 }
                             }
                             .accessibilityIdentifier("anchor.timetable.end-hour")
-                            Text("Entries outside these hours still appear — the grid grows to include them.")
+                            Text("Hours outside this window are shaded. You can add entries anywhere on the 24-hour timetable.")
                                 .font(.caption)
                                 .foregroundStyle(theme.textTertiary)
                         }

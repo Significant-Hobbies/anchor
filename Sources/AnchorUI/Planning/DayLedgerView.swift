@@ -193,12 +193,14 @@ private struct LedgerRows: View {
 struct CalendarCheckButton: View {
     let block: PlanBlock
     let data: CalendarActualData
+    var rowHeight: CGFloat? = nil
 
     var body: some View {
         let checked = data.recordedIDs.contains(block.id)
         Button { data.check(block) } label: {
             Image(systemName: checked ? "checkmark.square.fill" : "square")
-                .frame(minWidth: 24, minHeight: 28)
+                .font(rowHeight == nil ? .body : .caption2)
+                .frame(minWidth: 24, minHeight: rowHeight ?? 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

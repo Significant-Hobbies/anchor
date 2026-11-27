@@ -562,7 +562,22 @@ func runDiagnostics(allowsOnDeviceModel: Bool = true) async -> Bool {
         print("\(ok ? "ok  " : "MISS") \(title) -> \(result.theme.rawValue) (expected \(expected.rawValue))")
     }
     print("Goals: \(goalsCorrect)/\(goals.count)")
-    return correct == cases.count && goalsCorrect == goals.count
+    var activities: [(String, ActivityCategory)] = [
+        ("Daily Engineering StandUp", .meeting), ("Product Data Sync", .meeting),
+        ("Gym", .fitness), ("Game", .leisure), ("Lunch", .meal)
+    ]
+    if allowsOnDeviceModel && availability.isAvailable {
+        // Deliberately omit all keyword cues to exercise structured model output.
+        activities.append(("Strength training at the weight room", .fitness))
+    }
+    var activitiesCorrect = 0
+    for (title, expected) in activities {
+        let result = await service.classifyActivity(title)
+        if result == expected { activitiesCorrect += 1 }
+        print("\(title) -> \(result.rawValue) (expected \(expected.rawValue))")
+    }
+    print("Activities: \(activitiesCorrect)/\(activities.count)")
+    return correct == cases.count && goalsCorrect == goals.count && activitiesCorrect == activities.count
 }
 
 /// The stdio loop. Blocking reads on the main actor are correct here: the

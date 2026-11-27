@@ -32,10 +32,7 @@ enum TimetableLayout {
     /// Greedy lane packing inside each overlap cluster. A new cluster begins
     /// when an interval starts at or after the running latest end, so separate
     /// clusters never share lanes. Results are keyed by input index.
-    /// `minSpan` stretches each interval's collision box to at least that
-    /// length so cards rendered with a minimum pixel height — which can
-    /// collide even when their clock times don't overlap — still get lanes.
-    static func place(_ intervals: [(TimeInterval, TimeInterval)], minSpan: TimeInterval = 0) -> [Placement] {
+    static func place(_ intervals: [(Double, Double)]) -> [Placement] {
         var result = [Placement](repeating: Placement(lane: 0, laneCount: 1), count: intervals.count)
         var laneEnds: [TimeInterval] = []
         var cluster: [Int] = []
@@ -47,8 +44,7 @@ enum TimetableLayout {
         }
 
         for i in intervals.indices.sorted(by: { intervals[$0].0 < intervals[$1].0 }) {
-            let (start, rawEnd) = intervals[i]
-            let end = max(rawEnd, start + minSpan)
+            let (start, end) = intervals[i]
             if start >= clusterMaxEnd && !cluster.isEmpty {
                 finishCluster()
                 cluster.removeAll()
@@ -68,37 +64,20 @@ enum TimetableLayout {
         return result
     }
 
-    /// The hour window the grid draws. Defaults to a working day
-    /// (7:00–22:00, owner-adjustable) and expands to cover every block plus
-    /// the current hour when the day being viewed is today.
-    static func displayRange(
-        for day: Date,
-        intervals: [(TimeInterval, TimeInterval)],
-        now: Date,
-        calendar: Calendar = .current,
-        windowStartHour: Int = 7,
-        windowEndHour: Int = 22
-    ) -> DateInterval {
-        let startOfDay = calendar.startOfDay(for: day)
-        var startHour = Double(max(0, min(windowStartHour, 23)))
-        var endHour = Double(max(Int(startHour) + 1, min(windowEndHour, 24)))
-        for (start, end) in intervals {
-            startHour = min(startHour, floor(start / 3600))
-            endHour = max(endHour, ceil(end / 3600))
-        }
-        if calendar.isDate(day, inSameDayAs: now) {
-            let nowHour = Double(calendar.component(.hour, from: now))
-                + Double(calendar.component(.minute, from: now)) / 60
-            startHour = min(startHour, floor(nowHour) - 1)
-            endHour = max(endHour, ceil(nowHour) + 1)
-        }
-        startHour = max(0, min(startHour, 23))
-        endHour = min(24, max(endHour, startHour + 1))
-        return DateInterval(
-            start: startOfDay.addingTimeInterval(startHour * 3600),
-            end: startOfDay.addingTimeInterval(endHour * 3600)
-        )
+    static let minimumRowHeight: CGFloat = 13
+    static let rowGap: CGFloat = 1
+
+    static func cardBounds(from start: CGFloat, to end: CGFloat, in totalHeight: CGFloat) -> (start: Double, end: Double) {
+        let y = max(0, start)
+        let height = max(minimumRowHeight, min(totalHeight, end) - y - rowGap)
+        let top = min(y, totalHeight - height)
+        return (top, top + height)
     }
+
+    static func displayRange(for day: Date, calendar: Calendar = .current) -> DateInterval {
+        calendar.dateInterval(of: .day, for: day)!
+    }
+
 }
 
 /// The day as a real timetable: an hour rail on the left, blocks at their
@@ -116,6 +95,7 @@ struct DayTimetable: View {
         var outcome: PlannerOutcome? = nil
     }
 
+    @Environment(\.calendarActivityTags) private var activityTags
     @Environment(\.anchorTheme) private var theme
 
     let day: Date
@@ -152,14 +132,7 @@ struct DayTimetable: View {
     static let nowAnchorID = "anchor.timetable.now"
 
     private let railWidth: CGFloat = 50
-    private let minCardHeight: CGFloat = 40
     private var traceWidth: CGFloat { showsLivedTrace ? 12 : 0 }
-
-    /// Seconds a card occupies for lane packing: its rendered height, which is
-    /// at least `minCardHeight` (+padding) regardless of the clock-time span.
-    private var minCollisionSpan: TimeInterval {
-        (minCardHeight + 4) / hourHeight * 3600
-    }
 
     private var timedEntries: [Entry] { entries.filter { $0.block.plannedSeconds < 86_400 } }
 
@@ -171,23 +144,7 @@ struct DayTimetable: View {
     private var doneEntries: [DayLedgerEntry] { dayActuals.filter { $0.end.timeIntervalSince($0.start) < 86_400 } }
 
     private var range: DateInterval {
-        let midnight = Calendar.current.startOfDay(for: day)
-        var intervals = timedEntries.map { entry in
-            let start = entry.block.plannedStart.timeIntervalSince(midnight)
-            return (start, start + Double(entry.block.plannedSeconds))
-        }
-        intervals += doneEntries.map { ($0.start.timeIntervalSince(midnight), $0.end.timeIntervalSince(midnight)) }
-        if let draft {
-            let start = draft.start.timeIntervalSince(midnight)
-            intervals.append((start, start + Double(draft.minutes * 60)))
-        }
-        return TimetableLayout.displayRange(
-            for: day,
-            intervals: intervals,
-            now: Date(),
-            windowStartHour: windowStartHour,
-            windowEndHour: windowEndHour
-        )
+        TimetableLayout.displayRange(for: day)
     }
 
     private var hourCount: Int {
@@ -195,17 +152,13 @@ struct DayTimetable: View {
     }
 
     private var totalHeight: CGFloat {
-        CGFloat(hourCount) * hourHeight
+        CGFloat(range.duration / 3600) * hourHeight
     }
 
     private var placements: [UUID: TimetableLayout.Placement] {
-        let placed = TimetableLayout.place(
-            timedEntries.map { entry in
-                let start = entry.block.plannedStart.timeIntervalSince(range.start)
-                return (start, start + Double(entry.block.plannedSeconds))
-            },
-            minSpan: minCollisionSpan
-        )
+        let placed = TimetableLayout.place(timedEntries.map {
+            cardBounds(start: $0.block.plannedStart, end: $0.block.plannedEnd)
+        })
         var result: [UUID: TimetableLayout.Placement] = [:]
         for (index, entry) in timedEntries.enumerated() {
             result[entry.id] = placed[index]
@@ -230,27 +183,37 @@ struct DayTimetable: View {
     }
 
     private func blockCard(_ entry: Entry, height: CGFloat, compact: Bool = false) -> some View {
-        TimetableBlockCard(entry: entry, height: height, compact: compact, actuals: actuals, dimsFinished: dimsFinished,
+        TimetableBlockCard(entry: entry, height: height, compact: compact, category: activityTags[entry.block.title] ?? .suggestion(for: entry.block.title), actuals: actuals, dimsFinished: dimsFinished,
                            onCheckIn: { onCheckIn(entry.block) }, onStart: { onStart(entry.block) },
                            onOpenFocus: onOpenFocus, onComplete: { onComplete(entry.block) },
                            onEdit: { onEdit(entry.block) }, onRemove: { onRemove(entry.block) },
                            onExplain: { onExplain(entry.block) }, onLogActual: { onLogActual(entry.block) })
     }
 
-    private func doneCard(_ item: DayLedgerEntry) -> some View {
-        Button { actuals.edit(item) } label: {
+    private func doneCard(_ item: DayLedgerEntry, height: CGFloat = 70) -> some View {
+        let category = activityTags[item.title] ?? .suggestion(for: item.title)
+        return Button { actuals.edit(item) } label: {
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(2)
-                if actuals.recordedIDs.contains(item.id) {
-                    Text(item.start, style: .time).font(.caption2.monospacedDigit())
-                } else {
-                    Text("In progress").font(.caption2)
+                Text(item.title).font(height < 38 ? .caption2.weight(.semibold) : .subheadline.weight(.semibold)).lineLimit(height < 38 ? 1 : 2)
+                if height >= 38 {
+                    if actuals.recordedIDs.contains(item.id) {
+                        Text(item.start, style: .time).font(.caption2.monospacedDigit())
+                    } else {
+                        Text("In progress").font(.caption2)
+                    }
                 }
             }
-            .padding(Space.xxs)
+            .padding(.horizontal, Space.xxs)
+            .padding(.vertical, height < 38 ? 0 : Space.xxs)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
+            .padding(.leading, Space.xxs)
+            .background(category.calendarColor.opacity(0.16), in: .rect(cornerRadius: Radius.sm))
+            .overlay(alignment: .leading) {
+                Capsule().fill(category.calendarColor).frame(width: 3).padding(.vertical, 2)
+            }
         }
+        .help(category.rawValue.capitalized)
+        .accessibilityValue(category.rawValue.capitalized)
         .buttonStyle(.plain)
         .disabled(!actuals.available && !actuals.storedLogIDs.contains(item.id))
         .accessibilityLabel("Edit done entry " + item.title)
@@ -263,8 +226,8 @@ struct DayTimetable: View {
             let doneX = gridX + gridWidth + Space.xxs
             let recorded = doneEntries
             let lanes = TimetableLayout.place(recorded.map {
-                (max(0, $0.start.timeIntervalSince(range.start)), min(range.duration, $0.end.timeIntervalSince(range.start)))
-            }, minSpan: minCollisionSpan)
+                cardBounds(start: $0.start, end: $0.end)
+            })
             ZStack(alignment: .topLeading) {
                 hourMarks(width: proxy.size.width)
 
@@ -286,13 +249,15 @@ struct DayTimetable: View {
 
                 ForEach(timedEntries) { entry in
                     let placement = placements[entry.id] ?? TimetableLayout.Placement(lane: 0, laneCount: 1)
+                    let bounds = cardBounds(start: entry.block.plannedStart, end: entry.block.plannedEnd)
+                    let height = bounds.end - bounds.start
                     let laneGap = Space.xxs
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
-                    blockCard(entry, height: cardHeight(for: entry), compact: laneWidth < 180)
-                    .frame(width: laneWidth, height: cardHeight(for: entry), alignment: .topLeading)
+                    blockCard(entry, height: height, compact: laneWidth < 180)
+                    .frame(width: laneWidth, height: height, alignment: .topLeading)
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
-                        y: cardTop(for: entry)
+                        y: bounds.start
                     )
                 }
 
@@ -304,11 +269,11 @@ struct DayTimetable: View {
                 ForEach(Array(recorded.enumerated()), id: \.element.id) { index, item in
                     let lane = lanes[index]
                     let width = max(1, (gridWidth - CGFloat(lane.laneCount - 1) * Space.xxs) / CGFloat(lane.laneCount))
-                    let y = max(0, offset(for: item.start))
-                    let height = max(minCardHeight, min(totalHeight, offset(for: item.end)) - y - 4)
-                    doneCard(item)
+                    let bounds = cardBounds(start: item.start, end: item.end)
+                    let height = bounds.end - bounds.start
+                    doneCard(item, height: height)
                     .frame(width: width, height: height)
-                    .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: y + 2)
+                    .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: bounds.start)
                 }
 
                 if let selection {
@@ -377,20 +342,14 @@ struct DayTimetable: View {
         #endif
     }
 
-    private func cardTop(for entry: Entry) -> CGFloat {
-        max(0, offset(for: entry.block.plannedStart)) + 2
-    }
-
-    private func cardHeight(for entry: Entry) -> CGFloat {
-        let visibleSeconds = min(range.end, entry.block.plannedEnd).timeIntervalSince(max(range.start, entry.block.plannedStart))
-        let span = visibleSeconds / 3600 * hourHeight
-        return max(minCardHeight, span - 4)
+    private func cardBounds(start: Date, end: Date) -> (start: Double, end: Double) {
+        TimetableLayout.cardBounds(from: offset(for: start), to: offset(for: end), in: totalHeight)
     }
 
     private func hourMarks(width: CGFloat) -> some View {
         ForEach(0...hourCount, id: \.self) { tick in
             let y = CGFloat(tick) * hourHeight
-            HStack(alignment: .top, spacing: Space.xxs) {
+            HStack(alignment: .center, spacing: Space.xxs) {
                 Text(range.start.addingTimeInterval(TimeInterval(tick) * 3600).formatted(.dateTime.hour()))
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(theme.textTertiary)
@@ -399,7 +358,15 @@ struct DayTimetable: View {
                     .fill(theme.hairline)
                     .frame(height: 1)
             }
-            .frame(width: width, alignment: .topLeading)
+            .frame(width: width, height: 1, alignment: .center)
+            .background(alignment: .topLeading) {
+                let hour = Calendar.current.component(.hour, from: range.start.addingTimeInterval(Double(tick) * 3600))
+                if tick < hourCount && (hour < windowStartHour || hour >= windowEndHour) {
+                    Rectangle().fill(theme.textPrimary.opacity(0.035))
+                        .frame(width: max(0, width - railWidth), height: hourHeight)
+                        .offset(x: railWidth)
+                }
+            }
             .offset(y: y)
             .accessibilityHidden(true)
             .allowsHitTesting(false)
@@ -523,6 +490,7 @@ private struct TimetableBlockCard: View {
     let entry: DayTimetable.Entry
     let height: CGFloat
     let compact: Bool
+    let category: ActivityCategory
     let actuals: CalendarActualData
     var dimsFinished: Bool = true
     let onCheckIn: () -> Void
@@ -547,26 +515,27 @@ private struct TimetableBlockCard: View {
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             RoundedRectangle(cornerRadius: 1.5)
-                .fill(stateTint)
+                .fill(category.calendarColor)
                 .frame(width: 3)
-                .padding(.vertical, 5)
+                .padding(.vertical, height < 38 ? 2 : 5)
                 .padding(.leading, 5)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .top, spacing: Space.xxs) {
-                    CalendarCheckButton(block: block, data: actuals)
+                HStack(alignment: .center, spacing: Space.xxs) {
+                    CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil)
                     Button { showsActions = true } label: {
                         Text(block.title)
-                            .font(compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                            .font(height < 38 ? .caption2.weight(.semibold) : compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
                             .foregroundStyle(theme.textPrimary)
-                            .lineLimit(2)
+                            .lineLimit(height < 38 ? 1 : 2)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(actionLabel)
-                    if !compact { actionsButton }
+                    .accessibilityValue(category.rawValue.capitalized)
+                    if !compact && height >= 38 { actionsButton }
 
                 }
                 if height >= 56 {
@@ -582,24 +551,27 @@ private struct TimetableBlockCard: View {
             }
             .padding(.leading, Space.xs)
             .padding(.trailing, 2)
-            .padding(.vertical, Space.xxs)
+            .padding(.vertical, height < 38 ? 0 : Space.xxs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             Button { showsActions = true } label: {
-                RoundedRectangle(cornerRadius: Radius.sm).fill(cardFill).contentShape(Rectangle())
+                RoundedRectangle(cornerRadius: Radius.sm).fill(cardFill)
+                    .overlay { RoundedRectangle(cornerRadius: Radius.sm).fill(category.calendarColor.opacity(0.14)) }
+                    .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityHidden(true)
         }
         .overlay {
             RoundedRectangle(cornerRadius: Radius.sm)
                 .strokeBorder(
-                    entry.isCurrent || block.state == .inProgress ? theme.accent.opacity(0.4) : theme.hairline,
+                    entry.outcome != nil ? stateTint : entry.isCurrent || block.state == .inProgress ? theme.accent.opacity(0.4) : theme.hairline,
                     style: StrokeStyle(
                         lineWidth: entry.isCurrent || block.state == .inProgress ? 1.4 : 1,
                         dash: block.state == .skipped || block.state == .moved ? [4, 3] : []
                     )
                 ).allowsHitTesting(false)
         }
+        .help(category.rawValue.capitalized)
         .opacity(cardOpacity)
         .popover(isPresented: $showsActions, arrowEdge: actionsArrow) {
             VStack(alignment: .leading, spacing: Space.xxs) {
