@@ -247,14 +247,14 @@ struct PlanScreen: View {
                         draft: visibleDraft,
                         draftTitle: $draftTitle,
                         draftError: draftError,
-                        onSaveDraft: saveDraft,
+                        onSaveDraft: { saveDraft(data) },
                         onCancelDraft: clearDraft,
                         onDraftOptions: { title in
                             if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
                         },
-                        onAddAt: { interval, dragged in
+                        onAddAt: { interval, dragged, column in
                             guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
-                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
+                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false, column: column))
                         }
                     )
 
@@ -783,9 +783,16 @@ struct PlanScreen: View {
         draftError = nil
     }
 
-    private func saveDraft() {
+    private func saveDraft(_ actuals: CalendarActualData) {
         let title = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let seed = visibleDraft, !title.isEmpty else { return }
+        if seed.column == .done {
+            let entry = DayLedgerEntry(id: seed.id, title: title, start: seed.start,
+                                       end: seed.start.addingTimeInterval(Double(seed.minutes * 60)))
+            if actuals.available && actuals.record(entry) { clearDraft() }
+            // The ledger presenter reports save errors and keeps this draft open.
+            return
+        }
         let block = PlanBlock(title: title, plannedStart: seed.start, plannedSeconds: seed.minutes * 60)
         context.insert(block)
         do {
@@ -889,12 +896,15 @@ private struct AdvancedDraft: Identifiable {
     var id: UUID { seed.id }
 }
 
+enum TimetableColumn { case scheduled, done }
+
 struct EditorSeed: Identifiable {
     let id = UUID()
     let start: Date
     var minutes = 30
     var dayIsFull = false
     var revealInGrid = true
+    var column = TimetableColumn.scheduled
 }
 
 /// Day bounds use AnchorPreferences. Grid increments and alerts are device preferences.

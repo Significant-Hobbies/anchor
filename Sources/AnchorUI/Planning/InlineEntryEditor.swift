@@ -8,6 +8,11 @@ struct InlineEntryEditor: View {
     @Environment(\.anchorTheme) private var theme
     @FocusState private var focused: Bool
     let seed: EditorSeed
+    let compact: Bool
+    private var prompt: String {
+        if compact { return seed.column == .done ? "Activity" : "Plan title" }
+        return seed.column == .done ? "What happened?" : "What will you do?"
+    }
     @Binding var title: String
     let error: String?
     let save: () -> Void
@@ -22,31 +27,11 @@ struct InlineEntryEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: Space.xs) {
-                #if os(macOS)
-                MacEntryTitleField(title: $title, save: save, cancel: cancel)
-                    .frame(minHeight: 22)
-                #else
-                TextField("What will you do?", text: $title)
-                    .textFieldStyle(.plain)
-                    .font(.subheadline.weight(.semibold))
-                    .focused($focused)
-                    .submitLabel(.done)
-                    .onSubmit(save)
-                #endif
-                Button(action: save) { actionIcon("checkmark") }
-                    .accessibilityLabel("Save")
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Menu {
-                    Button("More options…") { options(title) }
-                    Button("Cancel", action: cancel)
-                } label: { actionIcon("ellipsis.circle") }
-                #if os(macOS)
-                .menuStyle(.borderlessButton)
-                #endif
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .accessibilityLabel("Entry actions")
+            if compact {
+                titleField
+                HStack(spacing: Space.xxs) { controls }
+            } else {
+                HStack(spacing: Space.xs) { titleField; controls }
             }
             Text("\(seed.start.formatted(date: .omitted, time: .shortened)) – \(seed.start.addingTimeInterval(Double(seed.minutes * 60)).formatted(date: .omitted, time: .shortened))")
                 .font(.caption.monospacedDigit())
@@ -69,6 +54,38 @@ struct InlineEntryEditor: View {
         #endif
     }
 
+    @ViewBuilder private var titleField: some View {
+        #if os(macOS)
+        MacEntryTitleField(prompt: prompt, title: $title, save: save, cancel: cancel)
+            .frame(minHeight: 22)
+            .accessibilityLabel(seed.column == .done ? "What happened?" : "What will you do?")
+        #else
+        TextField(prompt, text: $title)
+            .accessibilityLabel(seed.column == .done ? "What happened?" : "What will you do?")
+            .textFieldStyle(.plain)
+            .font(.subheadline.weight(.semibold))
+            .focused($focused)
+            .submitLabel(.done)
+            .onSubmit(save)
+        #endif
+    }
+
+    @ViewBuilder private var controls: some View {
+        Button(action: save) { actionIcon("checkmark") }
+            .accessibilityLabel("Save")
+            .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        Menu {
+            if seed.column == .scheduled { Button("More options…") { options(title) } }
+            Button("Cancel", action: cancel)
+        } label: { actionIcon("ellipsis.circle") }
+        #if os(macOS)
+        .menuStyle(.borderlessButton)
+        #endif
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Entry actions")
+    }
+
     private func actionIcon(_ name: String) -> some View {
         Image(systemName: name)
             .frame(width: actionSize, height: actionSize)
@@ -78,6 +95,7 @@ struct InlineEntryEditor: View {
 #if os(macOS)
 /// AppKit's field editor receives Escape before the enclosing SwiftUI view.
 private struct MacEntryTitleField: NSViewRepresentable {
+    let prompt: String
     @Binding var title: String
     let save: () -> Void
     let cancel: () -> Void
@@ -100,7 +118,7 @@ private struct MacEntryTitleField: NSViewRepresentable {
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.placeholderString = "What will you do?"
+        field.placeholderString = prompt
         field.font = .systemFont(ofSize: NSFont.systemFontSize, weight: .semibold)
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
