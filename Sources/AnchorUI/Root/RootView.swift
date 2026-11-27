@@ -6,8 +6,7 @@ import AnchorCore
 import SwiftData
 import SwiftUI
 
-/// The focus surface: composer when idle, live session when running, capture
-/// sheet on top of either.
+/// Focus opens on the current time slot or a single activity field.
 public struct FocusScreen: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.modelContext) private var context
@@ -16,21 +15,12 @@ public struct FocusScreen: View {
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
     private let controller: FocusController
     @State private var now = Date()
-    @State private var showsAdHocComposer = false
-    @State private var showsBlockEditor = false
-    @State private var isChangingActivity = false
-    @State private var actualIntent = ""
+    @State private var activity = ""
+    @State private var replacingID: UUID?
+    @State private var recorded = Set<UUID>()
     @State private var loadError: String?
-    @State private var checkInBlock: PlanBlock?
-    @State private var previousCheckIn: PlannerCheckIn?
-    @State private var checkInReadFailed = false
 
-    private let alternativePlanID: UUID?
-
-    public init(controller: FocusController, composeWhenIdle: Bool = false, alternativePlanID: UUID? = nil) {
-        self.alternativePlanID = alternativePlanID
-        _isChangingActivity = State(initialValue: alternativePlanID != nil)
-        _showsAdHocComposer = State(initialValue: composeWhenIdle)
+    public init(controller: FocusController) {
         self.controller = controller
     }
 
@@ -39,99 +29,62 @@ public struct FocusScreen: View {
             theme.canvas.ignoresSafeArea()
             if controller.hasSession {
                 RunningSessionView(controller: controller, nextBlock: nextAppointment)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
-            } else if let block = scheduledBlock, !showsAdHocComposer {
-                scheduledStart(block)
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else {
-                VStack(spacing: 0) {
-                    if !showsAdHocComposer {
-                        Spacer()
-                        FocusPreludeStage(
-                            eyebrow: "focus",
-                            title: "Begin with one clear thing",
-                            message: "No block is waiting for you. Name what matters now, and Anchor will hold everything else at the edge."
-                        ) {
-                            #if os(macOS)
-                            HStack(spacing: Space.sm) {
-                                Button("start focusing") {
-                                    withAnimation(Motion.gentle) { showsAdHocComposer = true }
-                                }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Space.md) {
+                        if let block = scheduledBlock, replacingID != block.id, activity.isEmpty {
+                            Text("Scheduled now")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(theme.textSecondary)
+                            Text(block.title)
+                                .font(.largeTitle.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("\(block.plannedStart.formatted(date: .omitted, time: .shortened)) – \(block.plannedEnd.formatted(date: .omitted, time: .shortened))")
+                                .foregroundStyle(theme.textSecondary)
+                            Button("Start focusing") { start(block) }
+                                .buttonStyle(PrimaryButtonStyle(expands: false))
+                            Button("Do something else") { replacingID = block.id }
+                                .buttonStyle(.plain)
+                        } else {
+                            TextField("Add an activity", text: $activity)
+                                .textFieldStyle(.roundedBorder)
+                                .controlSize(.large)
+                                .submitLabel(.go)
+                                .onSubmit(startActivity)
+                            HStack(spacing: Space.md) {
+                                Button("Start focusing", action: startActivity)
                                     .buttonStyle(PrimaryButtonStyle(expands: false))
-                                    .accessibilityIdentifier("anchor.focus.start-unplanned")
-                                Button("add to schedule") { showsBlockEditor = true }
-                                    .buttonStyle(QuietButtonStyle(expands: false))
+                                    .disabled(trimmedActivity.isEmpty)
+                                if replacingID != nil {
+                                    Button("Cancel") {
+                                        activity = ""
+                                        replacingID = nil
+                                    }
+                                        .buttonStyle(.plain)
+                                }
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            #else
-                            Button("start focusing") {
-                                withAnimation(Motion.gentle) { showsAdHocComposer = true }
-                            }
-                                .buttonStyle(PrimaryButtonStyle())
-                                .accessibilityIdentifier("anchor.focus.start-unplanned")
-                            Button("add to schedule") { showsBlockEditor = true }
-                                .buttonStyle(QuietButtonStyle())
-                            #endif
                         }
-                        .padding(Space.lg)
-                        .frame(maxWidth: 980)
-                        Spacer()
-                    } else {
-                        StartComposer(error: controller.lastError) { goal, intent, minutes, project, notes, tagIDs in
-                            let started = withAnimation(Motion.gentle) {
-                                controller.start(
-                                    goal: goal,
-                                    intent: intent,
-                                    minutes: minutes,
-                                    project: project,
-                                    notes: notes,
-                                    tagIDStrings: tagIDs
-                                )
-                            }
-                            guard started != nil else { return false }
-                            showsAdHocComposer = false
-                            return true
+                        if let message = loadError ?? controller.lastError {
+                            Label(message, systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(theme.negative)
                         }
                     }
+                    .frame(maxWidth: 480, alignment: .leading)
+                    .padding(Space.lg)
+                    .frame(maxWidth: .infinity)
                 }
-                .transition(.opacity)
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            if !controller.hasSession, !showsAdHocComposer, let block = lastFinishedBlock {
-                Button("Check in on \(block.title)", systemImage: "checkmark.circle") {
-                    do {
-                        guard let store = context.plannerCheckInStore else { throw CocoaError(.fileReadUnknown) }
-                        previousCheckIn = try store.load().records[block.id]
-                        checkInBlock = block
-                    } catch { checkInReadFailed = true }
-                }
-                .buttonStyle(QuietButtonStyle(expands: false))
-                .accessibilityIdentifier("anchor.focus.check-in")
-                .padding(.horizontal, Space.md)
-                .padding(.vertical, Space.xs)
-            }
-        }
-        .sheet(item: $checkInBlock) { block in
-            PlannerCheckInSheet(entry: PlannerCheckIn(block: block), previous: previousCheckIn,
-                                onSave: context.savePlannerCheckIn)
-                .anchorTheme()
-        }
-        .alert("Couldn’t open this check-in", isPresented: $checkInReadFailed) {
-            Button("OK") {}
-        } message: {
-            Text("Check that Anchor can access its local planner store and try again.")
-        }
-        .animation(Motion.gentle, value: controller.hasSession)
         .task {
-            refreshSchedule()
-            if !controller.hasSession && scheduledBlock == nil && lastFinishedBlock == nil { showsAdHocComposer = true }
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
                 now = Date()
                 refreshSchedule()
+                let boundary = blocks.flatMap { [$0.plannedStart, $0.plannedEnd] }.filter { $0 > now }.min()
+                let interval = min(30, boundary?.timeIntervalSinceNow ?? 30)
+                try? await Task.sleep(for: .seconds(max(0.05, interval)))
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in refreshSchedule() }
         .sheet(isPresented: Binding(
             get: { controller.isCapturing },
             set: { controller.isCapturing = $0 }
@@ -139,17 +92,21 @@ public struct FocusScreen: View {
             CaptureSheet(controller: controller)
                 .anchorTheme()
         }
-        .sheet(isPresented: $showsBlockEditor) {
-            PlanBlockEditor(initialDay: now) { refreshSchedule() }
-                .anchorTheme()
-        }
         .onChange(of: controller.session?.id) { refreshSchedule() }
     }
 
-    private var lastFinishedBlock: PlanBlock? {
-        guard let latest = sessions.first(where: { $0.startedAt <= Date() }), latest.state == .finished,
-              let endedAt = latest.endedAt, Calendar.current.isDateInToday(endedAt) else { return nil }
-        return calendarVisibility.filter(blocks).first { $0.sessionID == latest.id }
+    private var trimmedActivity: String {
+        activity.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func startActivity() {
+        guard !controller.hasSession, !trimmedActivity.isEmpty else { return }
+        if let block = scheduledBlock, replacingID == block.id {
+            start(block, intent: trimmedActivity)
+        } else if controller.start(goal: nil, intent: trimmedActivity, minutes: 25) != nil {
+            activity = ""
+            replacingID = nil
+        }
     }
 
     private var nextAppointment: PlanBlock? {
@@ -161,67 +118,18 @@ public struct FocusScreen: View {
     }
 
     private var scheduledBlock: PlanBlock? {
-        if let alternativePlanID { return calendarVisibility.filter(blocks).first { $0.id == alternativePlanID } }
-        guard let record = ScheduledFocusResolver().nextBlock(from: calendarVisibility.filter(blocks).map { $0.snapshot() }, now: now) else {
-            return nil
-        }
-        return blocks.first { $0.id == record.id }
-    }
-
-    private func scheduledStart(_ block: PlanBlock) -> some View {
-        ScrollView {
-            VStack(spacing: Space.lg) {
-                FocusPreludeStage(
-                    eyebrow: block.plannedStart <= now && now < block.plannedEnd ? "Now" : (block.plannedStart > now ? "Up next" : "Still open"),
-                    title: block.title,
-                    message: "\(block.plannedStart.formatted(date: .omitted, time: .shortened)) · \(Format.duration(Double(block.plannedSeconds))). Everything else can wait at the edge."
-                ) {
-                    VStack(spacing: Space.sm) {
-                        if isChangingActivity {
-                            TextField("Name the actual activity", text: $actualIntent, axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(1...3)
-                                .accessibilityLabel("Name the actual activity")
-                        }
-                        Button(isChangingActivity ? "start actual activity" : "start this block") {
-                            start(block)
-                        }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(isChangingActivity && actualIntent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                        Button(isChangingActivity ? "use the scheduled block" : "i’m doing something else") {
-                            withAnimation(Motion.snappy) { isChangingActivity.toggle() }
-                            actualIntent = ""
-                        }
-                        .buttonStyle(QuietButtonStyle())
-                        Button("start an unplanned block") {
-                            withAnimation(Motion.gentle) { showsAdHocComposer = true }
-                        }
-                        .buttonStyle(QuietButtonStyle())
-                    }
-                }
-
-                if let loadError {
-                    Label(loadError, systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote)
-                        .foregroundStyle(theme.negative)
-                }
-
-                if let nextAppointment, nextAppointment.id != block.id {
-                    Text("Up next · " + nextAppointment.title + " · " + nextAppointment.plannedStart.formatted(date: Calendar.current.isDateInToday(nextAppointment.plannedStart) ? .omitted : .abbreviated, time: .shortened))
-                        .font(.subheadline).foregroundStyle(theme.textSecondary)
-                }
-            }
-            .padding(Space.lg)
-            .frame(maxWidth: 980)
-            .frame(maxWidth: .infinity)
-        }
+        let visible = calendarVisibility.filter(blocks)
+        let current = ScheduledFocusResolver().nextBlock(from: visible.map { $0.snapshot() }, recorded: recorded, now: now, currentOnly: true)
+        return visible.first { $0.id == current?.id }
     }
 
     private func refreshSchedule() {
         do {
             _ = try DayPlanService(context: context).materialize(day: now)
             reconcileLinkedSessions()
+            if let url = context.plannerSidecarURL {
+                recorded = Set(try DayLedgerStore(storeURL: url).load().entries.compactMap(\.sourcePlanID))
+            }
             loadError = nil
         } catch {
             loadError = "Anchor could not refresh today’s schedule."
@@ -243,10 +151,11 @@ public struct FocusScreen: View {
         if context.hasChanges { try? context.save() }
     }
 
-    private func start(_ block: PlanBlock) {
-        let trimmedActual = actualIntent.trimmingCharacters(in: .whitespacesAndNewlines)
-        let intent = isChangingActivity ? trimmedActual : block.title
-        guard !intent.isEmpty else { return }
+    private func start(_ block: PlanBlock, intent: String? = nil) {
+        guard !controller.hasSession, block.plannedStart <= Date(), Date() < block.plannedEnd else {
+            now = Date()
+            return
+        }
         do {
             try PlanBlockFocusStarter.start(
                 block,
@@ -259,8 +168,8 @@ public struct FocusScreen: View {
             loadError = controller.lastError ?? "Anchor could not start this planned session. Please try again."
             return
         }
-        isChangingActivity = false
-        actualIntent = ""
+        replacingID = nil
+        activity = ""
     }
 }
 
@@ -297,91 +206,6 @@ enum PlanBlockFocusStarter {
 /// authored scene enough room to carry emotion while the action remains the
 /// first operational read. The same component reflows rather than forking the
 /// Mac and iPhone product.
-private struct FocusPreludeStage<Actions: View>: View {
-    @Environment(\.anchorTheme) private var theme
-    private let eyebrow: String
-    private let title: String
-    private let message: String
-    private let actions: Actions
-
-    init(
-        eyebrow: String,
-        title: String,
-        message: String,
-        @ViewBuilder actions: () -> Actions
-    ) {
-        self.eyebrow = eyebrow
-        self.title = title
-        self.message = message
-        self.actions = actions()
-    }
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            horizontal
-            vertical
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var horizontal: some View {
-        HStack(alignment: .center, spacing: Space.xxl) {
-            VStack(alignment: .leading, spacing: Space.lg) {
-                copy(titleFont: .system(size: 40, weight: .semibold, design: .rounded))
-                actions
-            }
-            .frame(width: 390, alignment: .leading)
-
-            Image("FocusDoodle")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 460, height: 320)
-                .clipped()
-                .accessibilityHidden(true)
-        }
-        .frame(minWidth: 898, minHeight: 440)
-        .frame(maxWidth: .infinity)
-    }
-
-    private var vertical: some View {
-        VStack(alignment: .leading, spacing: Space.lg) {
-            copy(titleFont: .system(.largeTitle, design: .rounded).weight(.semibold))
-            artwork
-                .frame(maxWidth: .infinity)
-            actions
-        }
-        .frame(maxWidth: 560)
-        .frame(maxWidth: .infinity)
-    }
-
-    private func copy(titleFont: Font) -> some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            Text(eyebrow.uppercased())
-                .font(.system(.caption, design: .rounded).weight(.semibold))
-                .tracking(1.2)
-                .foregroundStyle(theme.textTertiary)
-            Text(title)
-                .font(titleFont)
-                .foregroundStyle(theme.textPrimary)
-                .fixedSize(horizontal: false, vertical: true)
-            DrawnUnderline(width: 82, animated: true)
-            Text(message)
-                .font(.body)
-                .foregroundStyle(theme.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var artwork: some View {
-        Image("FocusDoodle")
-            .resizable()
-            .scaledToFit()
-            .frame(maxHeight: 320)
-            .accessibilityHidden(true)
-    }
-}
-
-/// Tabs, shared by both platforms so the two apps stay conceptually identical.
 public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
     case focus, today, history
 

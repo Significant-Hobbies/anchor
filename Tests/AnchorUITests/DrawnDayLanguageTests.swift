@@ -18,7 +18,7 @@ struct DrawnDayLanguageTests {
 
         #expect(components.contains("public struct DrawnTrace"))
         #expect(components.contains("public struct InterruptionKnotMark"))
-        #expect(focus.contains("FocusPreludeStage"))
+        #expect(focus.contains("RunningSessionView"))
         #expect(running.contains("InterruptionKnotMark"))
         #expect(day.contains("DayTimetable"))
         #expect(timetable.contains("DayRailShape"))

@@ -21,7 +21,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.buttons.ci("Focus").exists)
         app.buttons.ci("Focus").click()
 
-        let intention = app.textFields.ci("What are you focusing on?")
+        let intention = app.textFields.ci("Add an activity")
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
         intention.click()
         intention.typeText("Mac focus acceptance")
