@@ -12,7 +12,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
         app.tabBars.buttons.ci("Today").tap()
-        let add = app.buttons.ci("Add the first entry")
+        let add = app.buttons.ci("Add scheduled entry")
         XCTAssertTrue(add.waitForExistence(timeout: 5))
         add.tap()
         let title = app.textFields.ci("What will you do?")
@@ -183,9 +183,9 @@ final class AnchorIOSUITests: XCTestCase {
         app.launch()
 
         app.tabBars.buttons.ci("Today").tap()
-        XCTAssertTrue(app.staticTexts.ci("Give the day one anchor").waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.ci("Add done entry").waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons.ci("Choose date").exists, "The schedule must allow choosing a day.")
-        app.buttons.ci("Add the first entry").tap()
+        app.buttons.ci("Add scheduled entry").tap()
         let title = app.textFields.ci("What will you do?")
         XCTAssertTrue(title.waitForExistence(timeout: 3))
         title.tap()
@@ -235,7 +235,7 @@ final class AnchorIOSUITests: XCTestCase {
         // Seed through the existing editor, then stress the same stored entry
         // under pseudolocalization. No production fixture or UI hook is needed.
         launchTodayVariant(app, doublesLabels: false)
-        let add = app.buttons.ci("Add the first entry")
+        let add = app.buttons.ci("Add scheduled entry")
         XCTAssertTrue(add.waitForExistence(timeout: 5))
         add.tap()
         let title = app.textFields.ci("What will you do?")

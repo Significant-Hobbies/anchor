@@ -194,14 +194,21 @@ struct CalendarCheckButton: View {
     let block: PlanBlock
     let data: CalendarActualData
     var rowHeight: CGFloat? = nil
+    var showsLabel = false
 
     var body: some View {
         let checked = data.recordedIDs.contains(block.id)
         Button { data.check(block) } label: {
-            Image(systemName: checked ? "checkmark.square.fill" : "square")
-                .font(rowHeight == nil ? .body : .caption2)
-                .frame(minWidth: 24, minHeight: rowHeight ?? 28)
-                .contentShape(Rectangle())
+            HStack(spacing: Space.xxs) {
+                Image(systemName: checked ? "checkmark.square.fill" : "square")
+                    .font(rowHeight == nil ? .body : .caption2)
+                if showsLabel {
+                    Text(checked ? "Done" : "Mark done").font(.caption2.weight(.medium))
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minWidth: 24, minHeight: rowHeight ?? 28)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!data.available)

@@ -129,7 +129,11 @@ struct DayTimetable: View {
     @State private var selection: (interval: DateInterval, column: TimetableColumn)?
     #endif
 
-    static let nowAnchorID = "anchor.timetable.now"
+    static func hourAnchor(for time: Date, on day: Date) -> Date {
+        let midnight = Calendar.current.startOfDay(for: day)
+        let hour = max(0, floor(time.timeIntervalSince(midnight) / 3600))
+        return midnight.addingTimeInterval(hour * 3600)
+    }
 
     private let railWidth: CGFloat = 50
     private var traceWidth: CGFloat { showsLivedTrace ? 12 : 0 }
@@ -293,11 +297,6 @@ struct DayTimetable: View {
                 }
 
                 if Calendar.current.isDateInToday(day) {
-                    Color.clear
-                        .frame(height: 1)
-                        .id(Self.nowAnchorID)
-                        .offset(y: max(0, offset(for: Date()) - hourHeight))
-                        .allowsHitTesting(false)
                     nowLine(width: proxy.size.width)
                 }
                 if let draft {
@@ -347,29 +346,32 @@ struct DayTimetable: View {
     }
 
     private func hourMarks(width: CGFloat) -> some View {
-        ForEach(0...hourCount, id: \.self) { tick in
-            let y = CGFloat(tick) * hourHeight
-            HStack(alignment: .center, spacing: Space.xxs) {
-                Text(range.start.addingTimeInterval(TimeInterval(tick) * 3600).formatted(.dateTime.hour()))
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(theme.textTertiary)
-                    .frame(width: railWidth - 4, alignment: .trailing)
-                Rectangle()
-                    .fill(theme.hairline)
-                    .frame(height: 1)
-            }
-            .frame(width: width, height: 1, alignment: .center)
-            .background(alignment: .topLeading) {
-                let hour = Calendar.current.component(.hour, from: range.start.addingTimeInterval(Double(tick) * 3600))
-                if tick < hourCount && (hour < windowStartHour || hour >= windowEndHour) {
-                    Rectangle().fill(theme.textPrimary.opacity(0.035))
-                        .frame(width: max(0, width - railWidth), height: hourHeight)
-                        .offset(x: railWidth)
+        VStack(spacing: 0) {
+            ForEach(0...hourCount, id: \.self) { tick in
+                let time = range.start.addingTimeInterval(Double(tick) * 3600)
+                HStack(alignment: .center, spacing: Space.xxs) {
+                    Text(time.formatted(.dateTime.hour()))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(theme.textTertiary)
+                        .frame(width: railWidth - 4, alignment: .trailing)
+                    Rectangle()
+                        .fill(theme.hairline)
+                        .frame(height: 1)
                 }
+                .frame(width: width, height: 1, alignment: .center)
+                .background(alignment: .topLeading) {
+                    let hour = Calendar.current.component(.hour, from: time)
+                    if tick < hourCount && (hour < windowStartHour || hour >= windowEndHour) {
+                        Rectangle().fill(theme.textPrimary.opacity(0.035))
+                            .frame(width: max(0, width - railWidth), height: hourHeight)
+                            .offset(x: railWidth)
+                    }
+                }
+                .frame(height: tick < hourCount ? hourHeight : 1, alignment: .top)
+                .id(time)
+                .accessibilityHidden(true)
+                .allowsHitTesting(false)
             }
-            .offset(y: y)
-            .accessibilityHidden(true)
-            .allowsHitTesting(false)
         }
     }
 
@@ -522,7 +524,8 @@ private struct TimetableBlockCard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .center, spacing: Space.xxs) {
-                    CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil)
+                    CalendarCheckButton(block: block, data: actuals, rowHeight: height < 38 ? height : nil,
+                                        showsLabel: !compact && height >= 38 && block.plannedEnd <= Date())
                     Button { showsActions = true } label: {
                         Text(block.title)
                             .font(height < 38 ? .caption2.weight(.semibold) : compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
