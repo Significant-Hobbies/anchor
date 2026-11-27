@@ -58,8 +58,10 @@ struct InlineEntryEditor: View {
         #if os(macOS)
         MacEntryTitleField(prompt: prompt, title: $title, save: save, cancel: cancel)
             .frame(minHeight: 22)
+            .accessibilityLabel(seed.column == .done ? "What happened?" : "What will you do?")
         #else
         TextField(prompt, text: $title)
+            .accessibilityLabel(seed.column == .done ? "What happened?" : "What will you do?")
             .textFieldStyle(.plain)
             .font(.subheadline.weight(.semibold))
             .focused($focused)

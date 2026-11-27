@@ -790,7 +790,7 @@ struct PlanScreen: View {
             let entry = DayLedgerEntry(id: seed.id, title: title, start: seed.start,
                                        end: seed.start.addingTimeInterval(Double(seed.minutes * 60)))
             if actuals.available && actuals.record(entry) { clearDraft() }
-            else { draftError = "Couldn’t save this entry. Try again." }
+            // The ledger presenter reports save errors and keeps this draft open.
             return
         }
         let block = PlanBlock(title: title, plannedStart: seed.start, plannedSeconds: seed.minutes * 60)

@@ -142,6 +142,7 @@ struct DayTimetable: View {
     var onCancelDraft: () -> Void = {}
     var onDraftOptions: (String) -> Void = { _ in }
     var onAddAt: (DateInterval, Bool, TimetableColumn) -> Void = { _, _, _ in }
+    @State private var draftHeight: CGFloat = 92
     #if os(macOS)
     @GestureState private var selection: (interval: DateInterval, column: TimetableColumn)?
     #else
@@ -272,10 +273,12 @@ struct DayTimetable: View {
                     .offset(x: gridX)
                     .accessibilityHidden(true)
 
-                selectionSurface(.done)
-                    .frame(width: gridWidth, height: totalHeight)
-                    .offset(x: doneX)
-                    .accessibilityHidden(true)
+                if actuals.available {
+                    selectionSurface(.done)
+                        .frame(width: gridWidth, height: totalHeight)
+                        .offset(x: doneX)
+                        .accessibilityHidden(true)
+                }
 
                 if showsLivedTrace {
                     livedTraces
@@ -336,13 +339,14 @@ struct DayTimetable: View {
                     InlineEntryEditor(seed: draft, compact: gridWidth < 235, title: draftTitle, error: draftError,
                                       save: onSaveDraft, cancel: onCancelDraft, options: onDraftOptions)
                         .frame(width: gridWidth)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { draftHeight = $0 }
                         .padding(.top, max(0, offset(for: draft.start)))
                         .padding(.leading, draft.column == .done ? doneX : gridX)
                         .id(draft.id)
                 }
             }
         }
-        .frame(height: max(totalHeight, draft.map { offset(for: $0.start) + 92 } ?? 0))
+        .frame(height: max(totalHeight, draft.map { offset(for: $0.start) + draftHeight } ?? 0))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("anchor.today.timetable")
     }
