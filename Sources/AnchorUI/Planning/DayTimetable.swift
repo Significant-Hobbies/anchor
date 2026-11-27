@@ -223,8 +223,8 @@ struct DayTimetable: View {
         }
     }
 
-    private func blockCard(_ entry: Entry, height: CGFloat) -> some View {
-        TimetableBlockCard(entry: entry, height: height, actuals: actuals, dimsFinished: dimsFinished,
+    private func blockCard(_ entry: Entry, height: CGFloat, compact: Bool = false) -> some View {
+        TimetableBlockCard(entry: entry, height: height, compact: compact, actuals: actuals, dimsFinished: dimsFinished,
                            onCheckIn: { onCheckIn(entry.block) }, onStart: { onStart(entry.block) },
                            onOpenFocus: onOpenFocus, onComplete: { onComplete(entry.block) },
                            onEdit: { onEdit(entry.block) }, onRemove: { onRemove(entry.block) },
@@ -256,7 +256,7 @@ struct DayTimetable: View {
                     let placement = placements[entry.id] ?? TimetableLayout.Placement(lane: 0, laneCount: 1)
                     let laneGap = Space.xxs
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
-                    blockCard(entry, height: cardHeight(for: entry))
+                    blockCard(entry, height: cardHeight(for: entry), compact: laneWidth < 180)
                     .frame(width: laneWidth, height: cardHeight(for: entry), alignment: .topLeading)
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
@@ -284,6 +284,7 @@ struct DayTimetable: View {
                         .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
                     }
                     .buttonStyle(.plain)
+                    .disabled(!actuals.available)
                     .accessibilityLabel("Edit done entry " + item.title)
                     .frame(width: width, height: height)
                     .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: y + 2)
@@ -498,6 +499,7 @@ private struct TimetableBlockCard: View {
 
     let entry: DayTimetable.Entry
     let height: CGFloat
+    let compact: Bool
     let actuals: CalendarActualData
     var dimsFinished: Bool = true
     let onCheckIn: () -> Void
@@ -522,14 +524,19 @@ private struct TimetableBlockCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .top, spacing: Space.xxs) {
                     CalendarCheckButton(block: block, data: actuals)
-                    Text(block.title)
-                        .onTapGesture { showsActions = true }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(height < 58 ? 1 : 2)
-                        .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
-                    actionsButton
+                    Button { showsActions = true } label: {
+                        Text(block.title)
+                            .font(compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                            .foregroundStyle(theme.textPrimary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(actionLabel)
+                    if !compact { actionsButton }
+
                 }
                 if height >= 56 {
                     let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated

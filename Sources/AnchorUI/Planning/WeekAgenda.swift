@@ -54,6 +54,7 @@ struct WeekAgenda: View {
                                 Button { actuals.edit(entry) } label: {
                                     row(entry.title, at: entry.start, day: day)
                                 }.buttonStyle(.plain)
+                                .disabled(!actuals.available)
                                 .accessibilityLabel("Edit done entry " + entry.title)
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading)
