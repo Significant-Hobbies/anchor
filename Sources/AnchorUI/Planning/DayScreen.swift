@@ -45,6 +45,7 @@ struct PlanScreen: View {
     @State private var explainingBlock: PlanBlock?
     @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
+    @State private var showsDayTools = false
     @State private var showsDayCalendarEvents = false
     @State private var loadError: String?
     @State private var showsAllCalendarEvents = false
@@ -161,14 +162,11 @@ struct PlanScreen: View {
                     }
                 } else if viewMode == .day {
                     dayControls
-                    DisclosureGroup("Day comparison") {
-                        DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
-                                      hidesCalendarPlans: !showsDayCalendarEvents)
-                    }
                 }
-                CalendarListButton(isExpanded: $showsDayCalendarEvents)
-                    .accessibilityIdentifier("anchor.today.show-calendar-events")
-                    .onChange(of: showsDayCalendarEvents) { showsAllCalendarEvents = false }
+                if viewMode != .day {
+                    CalendarListButton(isExpanded: $showsDayCalendarEvents)
+                        .accessibilityIdentifier("anchor.today.show-calendar-events")
+                }
                 if isLoadingPeriod {
                     Label("Updating calendar events…", systemImage: "arrow.triangle.2.circlepath")
                         .font(.footnote).foregroundStyle(theme.textSecondary)
@@ -315,6 +313,7 @@ struct PlanScreen: View {
                 }
             }
         }
+        .onChange(of: showsDayCalendarEvents) { showsAllCalendarEvents = false }
         .onChange(of: today) { _, _ in showsAllCalendarEvents = false }
         }
         .background(theme.canvas)
@@ -571,19 +570,27 @@ struct PlanScreen: View {
         if let session = controller.session, controller.hasSession {
             focusRow(controller.isRunning ? "In focus" : "Paused", title: session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent,
                      action: "Open timer", perform: onOpenFocus)
-        } else if let record = ScheduledFocusResolver().nextBlock(from: dayDisplayBlocks.filter { !recorded.contains($0.id) }.map { $0.snapshot() }, now: calendarReferenceTime),
-                  let block = dayDisplayBlocks.first(where: { $0.id == record.id }) {
-            HStack {
-                focusRow((block.plannedStart > calendarReferenceTime ? "Up next" : "Now") + " · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
-                     title: block.title, action: "Start focus") { start(block) }
-                Menu {
-                    if let onChangeActivity {
-                        Button("Do something else in this slot") { onChangeActivity(block) }
-                    }
-                    Button("Start an unplanned session", action: onOpenFocus)
-                } label: { Image(systemName: "ellipsis.circle") }
-                .menuIndicator(.hidden)
-                .accessibilityLabel("More focus actions")
+        } else if let record = ScheduledFocusResolver().nextBlock(from: visibleBlocks.filter { !recorded.contains($0.id) && !$0.isUnplannedTimeLog && $0.plannedEnd > calendarReferenceTime }.map { $0.snapshot() }, now: calendarReferenceTime),
+                  let block = visibleBlocks.first(where: { $0.id == record.id }) {
+            if block.plannedStart > calendarReferenceTime {
+                HStack(spacing: Space.xs) {
+                    Text("Up next · " + block.plannedStart.formatted(date: .omitted, time: .shortened))
+                        .foregroundStyle(theme.textSecondary)
+                    Text(block.title).fontWeight(.semibold)
+                }.font(.subheadline)
+            } else {
+                HStack {
+                    focusRow("Now · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
+                         title: block.title, action: "Start focus") { start(block) }
+                    Menu {
+                        if let onChangeActivity {
+                            Button("Do something else in this slot") { onChangeActivity(block) }
+                        }
+                        Button("Start an unplanned session", action: onOpenFocus)
+                    } label: { Image(systemName: "ellipsis.circle") }
+                    .menuIndicator(.hidden)
+                    .accessibilityLabel("More focus actions")
+                }
             }
         } else {
             Button("Start focus", systemImage: "scope", action: onOpenFocus)
@@ -678,49 +685,51 @@ struct PlanScreen: View {
     }
 
     private var dayControls: some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            if horizontalSizeClass == .compact {
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    HStack(spacing: Space.xs) {
-                        addEntryButton
-                        copyDayButton
+        HStack(spacing: Space.xs) {
+            addEntryButton
+            Button("Day tools", systemImage: "ellipsis.circle") { showsDayTools = true }
+                .accessibilityIdentifier("anchor.today.tools")
+                .popover(isPresented: $showsDayTools) {
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        if !controller.hasSession {
+                            Button("Start an unplanned session", systemImage: "scope") {
+                                showsDayTools = false
+                                onOpenFocus()
+                            }
+                        }
                         logTimeButton
-                    }
-                    HStack {
+                        copyDayButton
                         calendarsButton
                         customizeButton
-                        Spacer(minLength: 0)
+                        Button(showsDayCalendarEvents ? "Hide calendar list" : "Show calendar list", systemImage: "list.bullet") {
+                            showsDayTools = false
+                            showsDayCalendarEvents.toggle()
+                        }.accessibilityIdentifier("anchor.today.show-calendar-events")
                     }
+                    .buttonStyle(QuietButtonStyle(expands: true))
+                    .frame(idealWidth: 220)
+                    .padding(Space.sm)
+                    .presentationCompactAdaptation(.popover)
                 }
-                .buttonStyle(QuietButtonStyle(expands: false))
-            } else {
-                HStack(spacing: Space.xs) {
-                    addEntryButton
-                    copyDayButton
-                    logTimeButton
-                    calendarsButton
-                    customizeButton
-                }
-                .buttonStyle(QuietButtonStyle(expands: false))
-            }
-        }
+        }.buttonStyle(QuietButtonStyle(expands: false))
     }
 
     @ViewBuilder private var calendarsButton: some View {
         if calendarCoordinator != nil {
-            Button("calendars", systemImage: "calendar") { showsCalendars = true }
+            Button("calendars", systemImage: "calendar") { showsDayTools = false; showsCalendars = true }
                 .accessibilityIdentifier("anchor.today.calendars")
         }
     }
 
     private var copyDayButton: some View {
-        Button("copy day", systemImage: "doc.on.doc") { showsCopyDay = true }
+        Button("copy day", systemImage: "doc.on.doc") { showsDayTools = false; showsCopyDay = true }
             .disabled(copyableBlocks.isEmpty)
             .accessibilityIdentifier("anchor.today.copy-day")
     }
 
     private var logTimeButton: some View {
         Button("log time", systemImage: "clock.arrow.circlepath") {
+            showsDayTools = false
             showsLogSheet = true
         }
         .accessibilityIdentifier("anchor.today.log-time")
@@ -728,6 +737,7 @@ struct PlanScreen: View {
 
     private var customizeButton: some View {
         Button("customize", systemImage: "slider.horizontal.3") {
+            showsDayTools = false
             showsCustomize = true
         }
         .accessibilityIdentifier("anchor.today.customize")
@@ -869,6 +879,10 @@ struct PlanScreen: View {
     }
 
     private func start(_ block: PlanBlock) {
+        guard block.plannedEnd > Date() else {
+            calendarReferenceTime = Date()
+            return
+        }
         guard !controller.hasSession else {
             onOpenFocus()
             return

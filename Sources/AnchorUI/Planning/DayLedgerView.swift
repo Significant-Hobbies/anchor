@@ -205,6 +205,7 @@ struct CalendarCheckButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!data.available)
+        .help(checked ? "Edit the copy in Done" : "Mark as done and copy to Done")
         .accessibilityLabel((checked ? "Edit done entry for " : "Mark done: ") + block.title)
         .accessibilityIdentifier("anchor.calendar.check." + block.id.uuidString)
     }

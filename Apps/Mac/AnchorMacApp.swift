@@ -104,8 +104,6 @@ private struct AnchorNavigationCommands: Commands {
                 .keyboardShortcut("1", modifiers: .command)
             Button("Today") { route(to: .today) }
                 .keyboardShortcut("2", modifiers: .command)
-            Button("Habits") { route(to: .habits) }
-                .keyboardShortcut("3", modifiers: .command)
             Button("Analysis") { route(to: .history) }
                 .keyboardShortcut("4", modifiers: .command)
         }

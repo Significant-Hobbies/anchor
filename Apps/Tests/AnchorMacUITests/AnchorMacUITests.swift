@@ -86,7 +86,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(actions.waitForExistence(timeout: 3))
         scrollIntoVisibleTimetable(actions, in: app.scrollViews.firstMatch)
         actions.click()
-        XCTAssertTrue(app.descendants(matching: .any).ci("Start focus").waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.buttons.ci("Mark as done").waitForExistence(timeout: 3), app.debugDescription)
         XCTAssertTrue(app.descendants(matching: .any).ci("Edit entry").exists)
         XCTAssertFalse(app.buttons.ci("Explain a change").exists)
         app.buttons.ci("More").click()
@@ -117,7 +117,7 @@ final class AnchorMacUITests: XCTestCase {
     }
 
     @MainActor
-    func testUsualWeekMaterialisesWhileHabitStaysFlexibleAndPersists() throws {
+    func testUsualWeekMaterialisesAndPersists() throws {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "usual-week")
@@ -137,25 +137,10 @@ final class AnchorMacUITests: XCTestCase {
 
         XCTAssertFalse(app.otherElements["anchor.today.daily-check-in"].exists)
 
-        app.buttons.ci("Habits").click()
-        XCTAssertTrue(app.staticTexts.ci("Your habits").waitForExistence(timeout: 4))
-        app.buttons.ci("Add a habit").click()
-        let habitTitle = app.textFields.ci("What will you do?")
-        XCTAssertTrue(habitTitle.waitForExistence(timeout: 3))
-        habitTitle.click()
-        habitTitle.typeText("Mac reset walk")
-        app.buttons.ci("Save").click()
-        XCTAssertTrue(element(containing: "Mac reset walk", in: app).waitForExistence(timeout: 4))
-
         app.terminate()
         app.launch()
-        app.buttons.ci("Habits").click()
-        XCTAssertTrue(element(containing: "Mac reset walk", in: app).waitForExistence(timeout: 4))
         app.buttons.ci("Today").click()
         XCTAssertTrue(app.staticTexts.ci("Mac weekly planning").waitForExistence(timeout: 4))
-        // Unscheduled habits stay on Habits — Today is the timetable only.
-        XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
-        XCTAssertFalse(app.staticTexts.ci("Mac reset walk").exists)
     }
 
     @MainActor
@@ -165,128 +150,34 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "behavior-profile")
         app.launch()
 
-        app.buttons.ci("Habits").click()
-        let editor = app.buttons.ci("anchor.habits.behavior-profile")
-        XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.click()
-
+        func openPatterns() {
+            app.buttons.ci("Settings").click()
+            let editor = app.buttons.ci("anchor.settings.patterns")
+            XCTAssertTrue(editor.waitForExistence(timeout: 5))
+            editor.click()
+        }
+        openPatterns()
         let shortVideos = app.buttons.ci("Short videos")
         XCTAssertTrue(shortVideos.waitForExistence(timeout: 4))
         shortVideos.click()
         XCTAssertTrue(app.staticTexts.ci("anchor.profile.saved").waitForExistence(timeout: 3))
-        app.buttons.ci("Done").click()
-        XCTAssertTrue(editor.waitForExistence(timeout: 3))
-        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
-
         app.terminate()
         app.launch()
-        app.buttons.ci("Habits").click()
-        XCTAssertTrue(editor.waitForExistence(timeout: 4))
-        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+        openPatterns()
+        XCTAssertTrue(shortVideos.waitForExistence(timeout: 4))
+        XCTAssertEqual(shortVideos.value as? String, "Selected")
     }
 
     @MainActor
-    func testHabitsCanBeAddedEditedAndRescheduled() throws {
+    func testHabitsAreDerivedInAnalysis() {
         let app = XCUIApplication()
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
-        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "habit-management")
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-observed-\(UUID().uuidString).store"
         app.launch()
-
-        app.buttons.ci("Habits").click()
-        XCTAssertTrue(app.buttons.ci("anchor.habits.add").waitForExistence(timeout: 5))
-        app.buttons.ci("anchor.habits.add").click()
-        let title = app.textFields.ci("What will you do?")
-        XCTAssertTrue(title.waitForExistence(timeout: 3))
-        title.click()
-        title.typeText("Two-day reset")
-        app.buttons.ci("Save").click()
-
-        XCTAssertTrue(element(containing: "Two-day reset", in: app).waitForExistence(timeout: 4))
-        XCTAssertTrue(element(containing: "this week", in: app).exists)
-        XCTAssertTrue(element(containing: "Any time", in: app).exists)
-        let checkOff = app.buttons.ci("anchor.habits.complete")
-        XCTAssertTrue(checkOff.exists)
-        checkOff.click()
-        XCTAssertTrue(app.buttons.ci("Undo check-off").waitForExistence(timeout: 3))
-        app.terminate()
-        app.launch()
-        app.buttons.ci("Habits").click()
-        XCTAssertTrue(app.buttons.ci("Undo check-off").waitForExistence(timeout: 4))
-        app.buttons.ci("Undo check-off").click()
-        XCTAssertTrue(app.buttons.ci("anchor.habits.complete").exists)
-
-        let habitMenu = app.menuButtons["More actions for Two-day reset"]
-        XCTAssertTrue(habitMenu.waitForExistence(timeout: 4))
-        habitMenu.click()
-        let editHabit = app.menuItems.ci("Edit habit")
-        XCTAssertTrue(editHabit.waitForExistence(timeout: 3))
-        editHabit.click()
-        let editedTitle = app.textFields.ci("What will you do?")
-        editedTitle.click()
-        editedTitle.typeKey("a", modifierFlags: .command)
-        editedTitle.typeText("Two-day reset edited")
-        app.buttons.ci("Save").click()
-        XCTAssertTrue(element(containing: "Two-day reset edited", in: app).waitForExistence(timeout: 4))
-
-        // Habits live on the Habits tab; Today stays free of them until one is
-        // scheduled at a time, which places it on the timetable.
-        app.buttons.ci("Today").click()
-        XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
-
-        app.buttons.ci("Habits").click()
-        let schedule = app.buttons.ci("Schedule")
-        XCTAssertTrue(schedule.waitForExistence(timeout: 4))
-        schedule.click()
-        let placeHabitTitle = app.staticTexts.ci("Place habit")
-        XCTAssertTrue(placeHabitTitle.waitForExistence(timeout: 3))
-        app.buttons.ci("Save").click()
-        XCTAssertTrue(placeHabitTitle.waitForNonExistence(timeout: 4))
-
-        app.buttons.ci("Today").click()
-        XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 4))
-        XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "Two-day reset edited"))
-                .firstMatch.waitForExistence(timeout: 4)
-        )
-
-        keepScreenshot(app, named: "anchor-build19-mac-scheduled-habit-today")
-    }
-
-    @MainActor
-    func testHabitCanBeArchivedInspectedAndRestored() throws {
-        let app = XCUIApplication()
-        app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
-        app.launchEnvironment["ANCHOR_STORE_PATH"] = isolatedStore(named: "habit-archive")
-        app.launch()
-
-        app.buttons.ci("Habits").click()
-        XCTAssertTrue(app.buttons.ci("anchor.habits.add").waitForExistence(timeout: 5))
-        app.buttons.ci("anchor.habits.add").click()
-        let title = app.textFields.ci("What will you do?")
-        XCTAssertTrue(title.waitForExistence(timeout: 3))
-        title.click()
-        title.typeText("Evening reset")
-        app.buttons.ci("Save").click()
-
-        let habitMenu = app.menuButtons["More actions for Evening reset"]
-        XCTAssertTrue(habitMenu.waitForExistence(timeout: 4))
-        habitMenu.click()
-        XCTAssertTrue(app.menuItems.ci("Archive habit").waitForExistence(timeout: 3))
-        app.menuItems.ci("Archive habit").click()
-
-        let archivedToggle = app.buttons.ci("anchor.habits.archived-toggle")
-        XCTAssertTrue(archivedToggle.waitForExistence(timeout: 4))
-        XCTAssertEqual(archivedToggle.value as? String, "expanded")
-        XCTAssertTrue(app.buttons.ci("Inspect Evening reset").waitForExistence(timeout: 3))
-
-        app.buttons.ci("Inspect Evening reset").click()
-        XCTAssertTrue(app.textFields.ci("What will you do?").waitForExistence(timeout: 3))
-        app.buttons.ci("Cancel").click()
-
-        XCTAssertTrue(app.buttons.ci("Restore").waitForExistence(timeout: 3))
-        app.buttons.ci("Restore").click()
-        XCTAssertTrue(element(containing: "Evening reset", in: app).waitForExistence(timeout: 4))
-        XCTAssertTrue(archivedToggle.waitForNonExistence(timeout: 3))
+        XCTAssertFalse(app.buttons.ci("Habits").exists)
+        app.buttons.ci("Analysis").click()
+        app.radioButtons.ci("Insights").click()
+        XCTAssertTrue(app.staticTexts.ci("Habit insights").waitForExistence(timeout: 4))
     }
 
     @MainActor
@@ -306,6 +197,7 @@ final class AnchorMacUITests: XCTestCase {
         app.descendants(matching: .any).ci("More options…").firstMatch.click()
         app.checkBoxes.ci("Repeat weekly").click()
         app.sheets.firstMatch.buttons["anchor.plan.editor.save"].click()
+        app.buttons.ci("anchor.today.tools").click()
         app.buttons.ci("anchor.today.customize").click()
         let usualWeek = app.buttons.ci("anchor.timetable.routines")
         XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))
@@ -414,7 +306,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.buttons.ci("Everything parked").exists)
         XCTAssertTrue(app.buttons.ci("Sessions").exists)
 
-        app.radioButtons.ci("Trends").click()
+        app.radioButtons.ci("Insights").click()
         XCTAssertTrue(app.staticTexts.ci("When you focus").waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts.ci("Weekday rhythm").exists)
 
@@ -524,28 +416,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Continue with")).firstMatch.click()
         XCTAssertTrue(app.staticTexts.ci("What do you want that time to make room for?").waitForExistence(timeout: 4))
         app.buttons.matching(NSPredicate(format: "label ==[c] %@", "More creativity")).firstMatch.click()
-        app.buttons.ci("Show me how Anchor protects it").click()
-
-        XCTAssertTrue(app.staticTexts.ci("Turn that time into something concrete.").waitForExistence(timeout: 4))
-        let shapeHabits = app.buttons.ci("Shape these habits")
-        XCTAssertTrue(shapeHabits.waitForExistence(timeout: 3))
-        // The onboarding scroll view can report the visible SwiftUI button as
-        // unhittable to XCTest. Click its on-screen center as the user would.
-        let window = app.windows.firstMatch
-        let frame = shapeHabits.frame
-        XCTAssertTrue(window.frame.contains(frame))
-        window.coordinate(withNormalizedOffset: .zero)
-            .withOffset(CGVector(dx: frame.midX - window.frame.minX, dy: frame.midY - window.frame.minY))
-            .click()
-        XCTAssertTrue(app.staticTexts.ci("Choose when each habit is available.").waitForExistence(timeout: 4))
-
-        let monday = app.buttons.ci("Monday")
-        XCTAssertTrue(monday.waitForExistence(timeout: 2))
-        XCTAssertEqual(monday.value as? String, "Selected")
-        monday.click()
-        XCTAssertEqual(monday.value as? String, "Not selected")
-
-        app.buttons.ci("Save habits and continue").click()
+        app.buttons.ci("Continue").click()
 
         XCTAssertTrue(app.staticTexts.ci("One account for your Significant Hobbies.").waitForExistence(timeout: 4))
         #if ANCHOR_LOCAL_ONLY
@@ -685,7 +556,9 @@ final class AnchorMacUITests: XCTestCase {
         // Customize — the timetable's own options plus the door to usual week.
         let viewport = app.scrollViews.firstMatch
         let customize = app.buttons.ci("anchor.today.customize")
-        scrollIntoVisibleTimetable(customize, in: viewport)
+        let tools = app.buttons.ci("anchor.today.tools")
+        scrollIntoVisibleTimetable(tools, in: viewport)
+        tools.click()
         customize.click()
         XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.start-hour"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.descendants(matching: .any)["anchor.timetable.lived-trace"].exists)
@@ -696,7 +569,8 @@ final class AnchorMacUITests: XCTestCase {
 
         // Quick log — "still happening" captures an open entry without a timer.
         let logTime = app.buttons.ci("anchor.today.log-time")
-        scrollIntoVisibleTimetable(logTime, in: viewport)
+        scrollIntoVisibleTimetable(tools, in: viewport)
+        tools.click()
         logTime.click()
         let logTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(logTitle.waitForExistence(timeout: 3))
@@ -722,7 +596,8 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.log.save").click()
 
         // Retroactive log — toggling "Still happening" off records a past span.
-        scrollIntoVisibleTimetable(logTime, in: viewport)
+        scrollIntoVisibleTimetable(tools, in: viewport)
+        tools.click()
         logTime.click()
         let retroTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(retroTitle.waitForExistence(timeout: 3))

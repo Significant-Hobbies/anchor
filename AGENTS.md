@@ -5,10 +5,7 @@
 
 ## What Anchor is
 
-A private day planner and focus timer for macOS, iOS and watchOS. Its four primary
-surfaces are Focus, Today, Habits, and History: schedule the day, execute the
-current block, capture interruptions, and compare the planned day with the lived
-one. Storage is SwiftData + CloudKit, with optional Personal Platform session
+A private day planner and focus timer for macOS, iOS and watchOS. Today combines the schedule, actual entries and focus timer. Analysis compares planned and recorded activity and derives habits from distinct recorded days. Storage is SwiftData + CloudKit, with optional Personal Platform session
 summaries; grouping and tagging use Apple's on-device foundation model. Ships
 under Significant Hobbies (`com.significanthobbies.anchor`).
 

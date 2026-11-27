@@ -149,19 +149,19 @@ private struct VisualCatalogRenderer {
                 TodayScreen(controller: controller, onOpenFocus: {})
             },
             page("habits-phone", width: 402, height: 874) {
-                HabitsScreen()
+                HistoryScreen(section: .trends)
             },
             page("habits-390", width: 390, height: 874, horizontalSizeClass: .compact) {
-                HabitsScreen()
+                HistoryScreen(section: .trends)
             },
             page("habits-768", width: 768, height: 900, horizontalSizeClass: .regular) {
-                HabitsScreen()
+                HistoryScreen(section: .trends)
             },
             page("habits-1440", width: 1_440, height: 900, horizontalSizeClass: .regular) {
-                HabitsScreen()
+                HistoryScreen(section: .trends)
             },
             page("habits-mac", width: 1_200, height: 800) {
-                HabitsScreen()
+                HistoryScreen(section: .trends)
             },
             page("history-day-phone", width: 402, height: 874) {
                 HistoryScreen(section: .day)
