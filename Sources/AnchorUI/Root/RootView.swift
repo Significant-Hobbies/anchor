@@ -143,9 +143,7 @@ public struct FocusScreen: View {
             PlanBlockEditor(initialDay: now) { refreshSchedule() }
                 .anchorTheme()
         }
-        .onChange(of: controller.hasSession) { _, hasSession in
-            if !hasSession { refreshSchedule() }
-        }
+        .onChange(of: controller.session?.id) { refreshSchedule() }
     }
 
     private var lastFinishedBlock: PlanBlock? {

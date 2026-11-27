@@ -403,7 +403,7 @@ struct PlanScreen: View {
                 }
             }
         }
-        .onChange(of: controller.hasSession) { reconcileSessions() }
+        .onChange(of: controller.session?.id) { reconcileSessions() }
     }
 
     private func reloadCheckIns() {
@@ -768,7 +768,7 @@ struct PlanScreen: View {
             return data.move(updated, drag.resizing)
         }
         let seconds = Int(updated.end.timeIntervalSince(updated.start))
-        if drag.source == .actual {
+        if drag.source == .actual && plan == nil {
             let copy = PlanBlock(title: original.title, details: original.notes, plannedStart: updated.start, plannedSeconds: seconds)
             context.insert(copy)
             do { try context.save(); return true }
