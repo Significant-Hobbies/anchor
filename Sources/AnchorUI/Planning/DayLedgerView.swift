@@ -67,7 +67,7 @@ private struct LedgerRows: View {
                     pair {
                         Button {
                             if let actual { data.edit(actual) }
-                            else { data.record(plan) }
+                            else { _ = data.record(plan) }
                         } label: {
                             HStack(alignment: .top, spacing: Space.xs) {
                                 Image(systemName: actual == nil ? "square" : "checkmark.square.fill")
@@ -211,7 +211,7 @@ struct CalendarCheckButton: View {
 struct CalendarActualData {
     let entries: [DayLedgerEntry]
     let edit: (DayLedgerEntry) -> Void
-    let record: (DayLedgerEntry) -> Void
+    let record: (DayLedgerEntry) -> Bool
     let available: Bool
 
     let storedLogIDs: Set<UUID>
@@ -219,7 +219,7 @@ struct CalendarActualData {
     let recordedIDs: Set<UUID>
 
     init(entries: [DayLedgerEntry], edit: @escaping (DayLedgerEntry) -> Void,
-         record: @escaping (DayLedgerEntry) -> Void, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = []) {
+         record: @escaping (DayLedgerEntry) -> Bool, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = []) {
         self.storedLogIDs = storedLogIDs
         self.ongoing = ongoing
         self.entries = entries
@@ -238,7 +238,7 @@ struct CalendarActualData {
     func check(_ block: PlanBlock) {
         guard available else { return }
         if let existing = entries.first(where: { $0.id == block.id }) { edit(existing); return }
-        record(DayLedgerEntry(id: block.id, title: block.title, start: block.plannedStart,
+        _ = record(DayLedgerEntry(id: block.id, title: block.title, start: block.plannedStart,
                               end: block.plannedEnd, notes: block.details, sourcePlanID: block.id))
     }
 }
@@ -354,9 +354,9 @@ struct CalendarActuals<Content: View>: View {
         NotificationCenter.default.post(name: .actualEntriesChanged, object: nil)
     }
 
-    private func persist(_ entry: DayLedgerEntry, replacing previous: DayLedgerEntry?) {
-        do { try save(entry, replacing: previous) }
-        catch { reload(); self.error = "Couldn’t save this entry. Reload and try again." }
+    private func persist(_ entry: DayLedgerEntry, replacing previous: DayLedgerEntry?) -> Bool {
+        do { try save(entry, replacing: previous); return true }
+        catch { reload(); self.error = "Couldn’t save this entry. Reload and try again."; return false }
     }
 }
 

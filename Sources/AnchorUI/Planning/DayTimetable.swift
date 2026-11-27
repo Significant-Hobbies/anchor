@@ -141,11 +141,11 @@ struct DayTimetable: View {
     var onSaveDraft: () -> Void = {}
     var onCancelDraft: () -> Void = {}
     var onDraftOptions: (String) -> Void = { _ in }
-    var onAddAt: (DateInterval, Bool) -> Void = { _, _ in }
+    var onAddAt: (DateInterval, Bool, TimetableColumn) -> Void = { _, _, _ in }
     #if os(macOS)
-    @GestureState private var selection: DateInterval?
+    @GestureState private var selection: (interval: DateInterval, column: TimetableColumn)?
     #else
-    @State private var selection: DateInterval?
+    @State private var selection: (interval: DateInterval, column: TimetableColumn)?
     #endif
 
     static let nowAnchorID = "anchor.timetable.now"
@@ -267,9 +267,14 @@ struct DayTimetable: View {
             ZStack(alignment: .topLeading) {
                 hourMarks(width: proxy.size.width)
 
-                selectionSurface
+                selectionSurface(.scheduled)
                     .frame(width: gridWidth, height: totalHeight)
                     .offset(x: gridX)
+                    .accessibilityHidden(true)
+
+                selectionSurface(.done)
+                    .frame(width: gridWidth, height: totalHeight)
+                    .offset(x: doneX)
                     .accessibilityHidden(true)
 
                 if showsLivedTrace {
@@ -308,13 +313,13 @@ struct DayTimetable: View {
                         .fill(theme.accent.opacity(0.22))
                         .overlay { RoundedRectangle(cornerRadius: 4).strokeBorder(theme.accent) }
                         .overlay(alignment: .topLeading) {
-                            Text("\(selection.start.formatted(date: .omitted, time: .shortened)) – \(selection.end.formatted(date: .omitted, time: .shortened))")
+                            Text("\(selection.interval.start.formatted(date: .omitted, time: .shortened)) – \(selection.interval.end.formatted(date: .omitted, time: .shortened))")
                                 .font(.caption2.monospacedDigit()).padding(.horizontal, 4)
                                 .background(theme.surfaceRaised, in: .rect(cornerRadius: 3))
                                 .fixedSize()
                         }
-                        .frame(width: gridWidth, height: selection.duration / 3600 * hourHeight)
-                        .offset(x: gridX, y: offset(for: selection.start))
+                        .frame(width: gridWidth, height: selection.interval.duration / 3600 * hourHeight)
+                        .offset(x: selection.column == .done ? doneX : gridX, y: offset(for: selection.interval.start))
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
@@ -328,11 +333,11 @@ struct DayTimetable: View {
                     nowLine(width: proxy.size.width)
                 }
                 if let draft {
-                    InlineEntryEditor(seed: draft, title: draftTitle, error: draftError,
+                    InlineEntryEditor(seed: draft, compact: gridWidth < 235, title: draftTitle, error: draftError,
                                       save: onSaveDraft, cancel: onCancelDraft, options: onDraftOptions)
-                        .frame(width: proxy.size.width - gridX)
+                        .frame(width: gridWidth)
                         .padding(.top, max(0, offset(for: draft.start)))
-                        .padding(.leading, gridX)
+                        .padding(.leading, draft.column == .done ? doneX : gridX)
                         .id(draft.id)
                 }
             }
@@ -350,18 +355,18 @@ struct DayTimetable: View {
         TimetableLayout.selection(from: drag.startLocation.y, to: drag.location.y, hourHeight: hourHeight, range: range, step: step)
     }
 
-    private var selectionSurface: some View {
+    private func selectionSurface(_ column: TimetableColumn) -> some View {
         #if os(macOS)
         let surface = Color.clear.contentShape(Rectangle())
         return surface.gesture(DragGesture(minimumDistance: 0)
-            .updating($selection) { drag, selected, _ in selected = interval(for: drag) }
-            .onEnded { drag in onAddAt(interval(for: drag), abs(drag.translation.height) >= 3) })
+            .updating($selection) { drag, selected, _ in selected = (interval(for: drag), column) }
+            .onEnded { drag in onAddAt(interval(for: drag), abs(drag.translation.height) >= 3, column) })
         #else
         return TimetableTouchSurface { start, end in
-            selection = TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step)
+            selection = (TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step), column)
         } finish: { start, end, dragged in
             selection = nil
-            onAddAt(TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step), dragged)
+            onAddAt(TimetableLayout.selection(from: start, to: end, hourHeight: hourHeight, range: range, step: step), dragged, column)
         } cancel: {
             selection = nil
         }

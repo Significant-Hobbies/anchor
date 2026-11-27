@@ -15,7 +15,7 @@ struct TimetableLayoutTests {
         var recorded: [DayLedgerEntry] = []
         var edited: DayLedgerEntry?
         func calendar() -> CalendarActualData {
-            CalendarActualData(entries: recorded, edit: { edited = $0 }, record: { recorded.append($0) }, available: true)
+            CalendarActualData(entries: recorded, edit: { edited = $0 }, record: { recorded.append($0); return true }, available: true)
         }
 
         calendar().check(block)
