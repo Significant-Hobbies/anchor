@@ -126,10 +126,16 @@ struct PlanScreen: View {
     }
 
     var body: some View {
+        CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks) { data in
+            calendar(data)
+        }
+    }
+
+    private func calendar(_ data: CalendarActualData) -> some View {
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Space.lg) {
-                if controller.hasSession || (viewMode == .day && Calendar.current.isDateInToday(today)) { focusItem }
+                if controller.hasSession || (viewMode == .day && Calendar.current.isDateInToday(today)) { focusItem(recorded: data.recordedIDs) }
                 if viewMode == .week {
                     HStack {
                         Text(visibleInterval.start.formatted(date: .abbreviated, time: .omitted) + " – " +
@@ -174,13 +180,11 @@ struct PlanScreen: View {
                     DayLedgerView(day: today, blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks,
                                   hidesCalendarPlans: !showsDayCalendarEvents)
                 } else if viewMode == .week {
-                    CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks) { data in
-                        WeekAgenda(days: visibleDays, actuals: data,
-                                   entries: dayDisplayBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
-                                   openDay: { today = $0; viewMode = .day },
-                                   add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
-                                   edit: { editingBlock = $0 })
-                    }
+                    WeekAgenda(days: visibleDays, actuals: data,
+                               entries: dayDisplayBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
+                               openDay: { today = $0; viewMode = .day },
+                               add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
+                               edit: { editingBlock = $0 })
                 } else {
                     let calendarEvents = Calendar.current.isDateInToday(today) ? upcomingCalendarEvents(at: calendarReferenceTime)
                         : visibleBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
@@ -193,7 +197,7 @@ struct PlanScreen: View {
                     }
 
                     if !blocks.isEmpty {
-                        daySummary
+                        daySummary(recorded: data.recordedIDs)
                     }
 
                     if timetableEntries.isEmpty {
@@ -223,38 +227,36 @@ struct PlanScreen: View {
                         }
                     }
                     Text(timetableHint).font(.caption).foregroundStyle(theme.textSecondary)
-                    CalendarActuals(blocks: visibleBlocks, sessions: sessions, allBlocks: allBlocks) { data in
-                        DayTimetable(
-                            day: today,
-                            entries: timetableEntries.filter { !$0.block.isUnplannedTimeLog },
-                            actuals: data,
-                            step: gridStep,
-                            windowStartHour: timetablePrefs.startHour,
-                            windowEndHour: timetablePrefs.endHour,
-                            showsLivedTrace: timetablePrefs.showsLivedTrace,
-                            dimsFinished: timetablePrefs.dimsFinished,
-                            onCheckIn: openCheckIn,
-                            onStart: start,
-                            onOpenFocus: onOpenFocus,
-                            onComplete: complete,
-                            onEdit: { editingBlock = $0 },
-                            onRemove: { removal = CalendarEventRemoval($0) },
-                            onExplain: { explainingBlock = $0 },
-                            onLogActual: { loggingBlock = $0 },
-                            draft: visibleDraft,
-                            draftTitle: $draftTitle,
-                            draftError: draftError,
-                            onSaveDraft: saveDraft,
-                            onCancelDraft: clearDraft,
-                            onDraftOptions: { title in
-                                if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
-                            },
-                            onAddAt: { interval, dragged in
-                                guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
-                                beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
-                            }
-                        )
-                    }
+                    DayTimetable(
+                        day: today,
+                        entries: timetableEntries.filter { !$0.block.isUnplannedTimeLog },
+                        actuals: data,
+                        step: gridStep,
+                        windowStartHour: timetablePrefs.startHour,
+                        windowEndHour: timetablePrefs.endHour,
+                        showsLivedTrace: timetablePrefs.showsLivedTrace,
+                        dimsFinished: timetablePrefs.dimsFinished,
+                        onCheckIn: openCheckIn,
+                        onStart: start,
+                        onOpenFocus: onOpenFocus,
+                        onComplete: complete,
+                        onEdit: { editingBlock = $0 },
+                        onRemove: { removal = CalendarEventRemoval($0) },
+                        onExplain: { explainingBlock = $0 },
+                        onLogActual: { loggingBlock = $0 },
+                        draft: visibleDraft,
+                        draftTitle: $draftTitle,
+                        draftError: draftError,
+                        onSaveDraft: saveDraft,
+                        onCancelDraft: clearDraft,
+                        onDraftOptions: { title in
+                            if let seed = visibleDraft { advancedDraft = AdvancedDraft(seed: seed, title: title) }
+                        },
+                        onAddAt: { interval, dragged in
+                            guard dragged || visibleDraft == nil || draftTitle.isEmpty else { return }
+                            beginDraft(EditorSeed(start: interval.start, minutes: Int(interval.duration / 60), revealInGrid: false))
+                        }
+                    )
 
                 }
             }
@@ -559,11 +561,11 @@ struct PlanScreen: View {
     }
 
     @ViewBuilder
-    private var focusItem: some View {
+    private func focusItem(recorded: Set<UUID>) -> some View {
         if let session = controller.session, controller.hasSession {
             focusRow(controller.isRunning ? "In focus" : "Paused", title: session.intent.isEmpty ? session.goal?.title ?? "Focus session" : session.intent,
                      action: "Open timer", perform: onOpenFocus)
-        } else if let record = ScheduledFocusResolver().nextBlock(from: dayDisplayBlocks.map { $0.snapshot() }, now: calendarReferenceTime),
+        } else if let record = ScheduledFocusResolver().nextBlock(from: dayDisplayBlocks.filter { !recorded.contains($0.id) }.map { $0.snapshot() }, now: calendarReferenceTime),
                   let block = dayDisplayBlocks.first(where: { $0.id == record.id }) {
             HStack {
                 focusRow((block.plannedStart > calendarReferenceTime ? "Up next" : "Now") + " · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
@@ -743,10 +745,10 @@ struct PlanScreen: View {
         }
     }
 
-    private var daySummary: some View {
-        let completed = blocks.filter { $0.state == .completed }.count
-        let active = blocks.filter { isCurrent($0) || $0.state == .inProgress }.count
-        let ahead = blocks.filter { $0.state == .planned && $0.plannedStart > calendarReferenceTime }.count
+    private func daySummary(recorded: Set<UUID>) -> some View {
+        let completed = blocks.filter { $0.state == .completed || recorded.contains($0.id) }.count
+        let active = blocks.filter { !recorded.contains($0.id) && (isCurrent($0) || $0.state == .inProgress) }.count
+        let ahead = blocks.filter { !recorded.contains($0.id) && $0.state == .planned && $0.plannedStart > calendarReferenceTime }.count
         return HStack(spacing: Space.xs) {
             Image(systemName: "scribble.variable")
                 .foregroundStyle(theme.accent)

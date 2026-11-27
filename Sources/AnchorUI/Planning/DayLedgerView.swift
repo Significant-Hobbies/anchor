@@ -195,7 +195,7 @@ struct CalendarCheckButton: View {
     let data: CalendarActualData
 
     var body: some View {
-        let checked = data.entries.contains { $0.id == block.id }
+        let checked = data.recordedIDs.contains(block.id)
         Button { data.check(block) } label: {
             Image(systemName: checked ? "checkmark.square.fill" : "square")
                 .frame(minWidth: 24, minHeight: 28)
@@ -213,6 +213,17 @@ struct CalendarActualData {
     let edit: (DayLedgerEntry) -> Void
     let record: (DayLedgerEntry) -> Void
     let available: Bool
+
+    let recordedIDs: Set<UUID>
+
+    init(entries: [DayLedgerEntry], edit: @escaping (DayLedgerEntry) -> Void,
+         record: @escaping (DayLedgerEntry) -> Void, available: Bool) {
+        self.entries = entries
+        self.edit = edit
+        self.record = record
+        self.available = available
+        self.recordedIDs = Set(entries.map(\.id))
+    }
 
     func check(_ block: PlanBlock) {
         guard available else { return }
