@@ -527,6 +527,14 @@ private struct TimetableBlockCard: View {
 
     private var block: PlanBlock { entry.block }
 
+    private var actionsArrow: Edge {
+        #if os(macOS)
+        .trailing
+        #else
+        .top
+        #endif
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             RoundedRectangle(cornerRadius: 1.5)
@@ -584,7 +592,7 @@ private struct TimetableBlockCard: View {
                 ).allowsHitTesting(false)
         }
         .opacity(cardOpacity)
-        .popover(isPresented: $showsActions, arrowEdge: .trailing) {
+        .popover(isPresented: $showsActions, arrowEdge: actionsArrow) {
             VStack(alignment: .leading, spacing: Space.xxs) {
                 if showsMore {
                     actionRow("Back", icon: "chevron.left") { showsMore = false }
