@@ -149,7 +149,7 @@ struct SavedTagPicker: View {
 
             if isCreating {
                 HStack(spacing: Space.xs) {
-                    TextField("deep work", text: $newName)
+                    TextField("Tag name", text: $newName)
                         .textFieldStyle(.plain)
                         .padding(.horizontal, Space.sm)
                         .padding(.vertical, Space.xs)

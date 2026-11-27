@@ -219,6 +219,16 @@ struct DemoDataTests {
     }
 
     @MainActor
+    @Test("Screenshot fixtures cannot populate even an empty persistent store")
+    func refusesDiskStore() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".store")
+        let container = try AnchorStore.makeContainer(kind: .localOnly, url: url)
+        DemoData.seedIfNeeded(into: container.mainContext)
+        #expect(try container.mainContext.fetchCount(FetchDescriptor<FocusSession>()) == 0)
+        #expect(try container.mainContext.fetchCount(FetchDescriptor<Goal>()) == 0)
+    }
+
+    @MainActor
     @Test("Seeded history is deterministic, so screenshots don't churn")
     func seedingIsDeterministic() throws {
         func fingerprint() throws -> [String] {

@@ -18,10 +18,10 @@ final class AnchorMacUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_STORE_PATH"] = storePath
         app.launch()
 
-        XCTAssertFalse(app.buttons.ci("Focus").exists)
-        app.buttons.ci("Start focus").click()
+        XCTAssertTrue(app.buttons.ci("Focus").exists)
+        app.buttons.ci("Focus").click()
 
-        let intention = app.textFields.ci("Ship the auth flow")
+        let intention = app.textFields.ci("What are you focusing on?")
         XCTAssertTrue(intention.waitForExistence(timeout: 5))
         intention.click()
         intention.typeText("Mac focus acceptance")
@@ -29,7 +29,7 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts.ci("Mac focus acceptance").waitForExistence(timeout: 4))
 
         app.buttons.ci("Log interruption").click()
-        let note = app.textFields.ci("Slack from Ravi about the invoice")
+        let note = app.textFields.ci("What interrupted you?")
         XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.click()
         note.typeText("Synthetic interruption")

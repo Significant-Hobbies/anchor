@@ -134,6 +134,8 @@ public enum AnchorStore {
             }
         }
 
+        if DemoData.isRequested { return isolatedDemoContainer() }
+
         for kind in resilientStoreKinds(
             hasExplicitStorePath: ProcessInfo.processInfo.environment["ANCHOR_STORE_PATH"]?.isEmpty == false
         ) {
@@ -145,11 +147,17 @@ public enum AnchorStore {
         fatalError("Anchor could not open any model container.")
     }
 
+    @MainActor private static func isolatedDemoContainer() -> (container: ModelContainer, kind: StoreKind) {
+        do { return (try makeContainer(kind: .inMemory), .inMemory) }
+        catch { fatalError("Could not create the temporary demo store: \(error)") }
+    }
+
     /// DebugLocal and other explicitly unsigned shells must never start a
     /// CloudKit mirror. Container construction can appear to succeed before
     /// Core Data discovers the missing entitlement on its background queue, so
     /// this boundary cannot rely on the catch-and-fallback path above.
     @MainActor public static func makeLocalResilientContainer(url: URL? = nil) -> (container: ModelContainer, kind: StoreKind) {
+        if DemoData.isRequested { return isolatedDemoContainer() }
         do { return (try makeContainer(kind: .localOnly, url: url), .localOnly) }
         catch is PrivateNoteMigrationFailure { return preserveLocalStoreAfterNoteFailure(url: url) }
         catch { /* Existing local-store resilience for non-migration errors. */ }

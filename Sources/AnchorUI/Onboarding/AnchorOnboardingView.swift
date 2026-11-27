@@ -343,7 +343,7 @@ public struct AnchorOnboardingView: View {
                         .font(.caption2.weight(.semibold))
                         .tracking(1.1)
                         .foregroundStyle(theme.textTertiary)
-                    TextField("Finish the release", text: $goal, axis: .vertical)
+                    TextField("Your focus goal", text: $goal, axis: .vertical)
                         .textFieldStyle(.plain)
                         .font(.title3.weight(.medium))
                         .focused($focusedField, equals: .goal)
@@ -413,7 +413,7 @@ public struct AnchorOnboardingView: View {
                     .multilineTextAlignment(.center)
             }
             Card(padding: Space.lg) {
-                TextField("Check the build status", text: $thought, axis: .vertical)
+                TextField("What came to mind?", text: $thought, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.title3.weight(.medium))
                     .focused($focusedField, equals: .thought)

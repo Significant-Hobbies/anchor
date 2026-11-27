@@ -1,14 +1,14 @@
 import Foundation
 import SwiftData
 
-/// Plausible history, for screenshots and for trying the analytics before you
-/// have three weeks of your own data.
-///
-/// Only runs when `ANCHOR_DEMO_DATA=1` is set, and only into an empty store, so
-/// it can never touch real history.
+/// Screenshot and test fixtures. The writer only accepts in-memory stores.
 public enum DemoData {
     public static var isRequested: Bool {
+        #if DEBUG
         ProcessInfo.processInfo.environment["ANCHOR_DEMO_DATA"] == "1"
+        #else
+        false
+        #endif
     }
 
     /// Which tab to open on, for screenshots and manual QA. Honoured only in
@@ -67,8 +67,9 @@ public enum DemoData {
     /// Inserts roughly three weeks of history. No-op if anything already exists.
     @MainActor
     public static func seedIfNeeded(into context: ModelContext) {
-        let existing = (try? context.fetchCount(FetchDescriptor<FocusSession>())) ?? 0
-        guard existing == 0 else { return }
+        let configurations = context.container.configurations
+        guard !configurations.isEmpty, configurations.allSatisfy(\.isStoredInMemoryOnly),
+              (try? context.fetchCount(FetchDescriptor<FocusSession>())) == 0 else { return }
 
         var random = Random(state: 0xA9C4_1F02)
         let calendar = Calendar.current

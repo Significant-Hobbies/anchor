@@ -138,7 +138,7 @@ struct AppArchitectureTests {
         #expect(model.contains("public final class HabitCompletion"))
         #expect(model.contains("!template.isBehaviorHabit && template.applies"))
         #expect(lifecycle.contains("public struct HabitDayService"))
-        #expect(AnchorTab.destinations == [.today, .history])
+        #expect(AnchorTab.destinations == [.today, .focus, .history])
         #expect(!today.contains("anchor.today.habits"))
         #expect(today.contains("A suggestion, never a reservation"))
         #expect(today.contains("available all day"))
