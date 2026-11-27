@@ -1,11 +1,35 @@
 #if os(macOS)
 import Foundation
+import AnchorCore
 import Testing
 
 @testable import AnchorUI
 
 @Suite("Timetable layout")
 struct TimetableLayoutTests {
+    @Test("One check copies the scheduled slot and a later check opens the edited actual")
+    @MainActor
+    func copyToDone() throws {
+        let start = Date(timeIntervalSinceReferenceDate: 3_600)
+        let block = PlanBlock(title: "Write notes", details: "First draft", plannedStart: start, plannedSeconds: 900)
+        var recorded: [DayLedgerEntry] = []
+        var edited: DayLedgerEntry?
+        func calendar() -> CalendarActualData {
+            CalendarActualData(entries: recorded, edit: { edited = $0 }, record: { recorded.append($0) }, available: true)
+        }
+
+        calendar().check(block)
+        let entry = try #require(recorded.first)
+        #expect(entry.sourcePlanID == block.id && entry.id == block.id)
+        #expect(entry.title == block.title && entry.notes == block.details)
+        #expect(entry.start == start && entry.end == start.addingTimeInterval(900))
+        recorded[0].title = "Review with team"
+        recorded[0].start = start.addingTimeInterval(300)
+        calendar().check(block)
+        #expect(recorded.count == 1 && edited == recorded.first)
+        #expect(block.title == "Write notes" && block.plannedStart == start)
+    }
+
     @Test("Dragging selects whole quarter hours in either direction and stays inside the grid")
     func quarterHourSelection() {
         let start = Date(timeIntervalSinceReferenceDate: 0)

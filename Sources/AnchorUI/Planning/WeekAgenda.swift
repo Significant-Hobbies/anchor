@@ -5,6 +5,7 @@ import SwiftUI
 struct WeekAgenda: View {
     @Environment(\.anchorTheme) private var theme
     let days: [Date]
+    let actuals: CalendarActualData
     let entries: [PlanBlock]
     let openDay: (Date) -> Void
     let add: (Date) -> Void
@@ -36,30 +37,38 @@ struct WeekAgenda: View {
                         .buttonStyle(.borderless)
                         .accessibilityLabel("Add an entry for \(day.formatted(date: .complete, time: .omitted))")
                     }
-                    ForEach(blocks) { block in
-                        Button { edit(block) } label: {
-                            HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
-                                Group {
-                                    if block.plannedStart < day { Text("Continues") }
-                                    else { Text(block.plannedStart, format: .dateTime.hour().minute()) }
-                                }
-                                    .font(.subheadline.monospacedDigit())
-                                    .foregroundStyle(theme.textSecondary)
-                                Text(block.title).font(.body.weight(.medium))
-                                Spacer(minLength: 0)
-                                if block.externalEventKey != nil {
-                                    Image(systemName: "calendar").font(.caption).foregroundStyle(theme.textSecondary)
+                    HStack(alignment: .top, spacing: Space.sm) {
+                        VStack(alignment: .leading, spacing: Space.xs) {
+                            ForEach(blocks) { block in
+                                HStack(alignment: .top, spacing: Space.xxs) {
+                                    CalendarCheckButton(block: block, data: actuals)
+                                    Button { edit(block) } label: {
+                                        row(block.title, at: block.plannedStart, day: day)
+                                    }.buttonStyle(.plain)
                                 }
                             }
-                            .padding(.vertical, Space.xs)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        VStack(alignment: .leading, spacing: Space.xs) {
+                            ForEach(actuals.calendarEntries(in: DateInterval(start: day, end: end))) { entry in
+                                Button { actuals.edit(entry) } label: {
+                                    row(actuals.recordedIDs.contains(entry.id) ? entry.title : entry.title + " · In progress", at: entry.start, day: day)
+                                }.buttonStyle(.plain)
+                                .disabled(!actuals.available && !actuals.storedLogIDs.contains(entry.id))
+                                .accessibilityLabel("Edit done entry " + entry.title)
+                            }
+                        }.frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
         }
         .accessibilityIdentifier("anchor.planner.week")
+    }
+    private func row(_ title: String, at start: Date, day: Date) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.subheadline.weight(.medium))
+            if start < day { Text("Continues").font(.caption) }
+            else { Text(start, style: .time).font(.caption.monospacedDigit()) }
+        }.multilineTextAlignment(.leading)
     }
 }
 #endif

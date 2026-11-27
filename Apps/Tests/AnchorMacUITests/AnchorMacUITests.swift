@@ -86,9 +86,11 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(actions.waitForExistence(timeout: 3))
         scrollIntoVisibleTimetable(actions, in: app.scrollViews.firstMatch)
         actions.click()
-        XCTAssertTrue(app.descendants(matching: .any).ci("Start now").waitForExistence(timeout: 3), app.debugDescription)
-        XCTAssertTrue(app.descendants(matching: .any).ci("Edit or move").exists)
-        XCTAssertTrue(app.descendants(matching: .any).ci("Explain a change").exists)
+        XCTAssertTrue(app.descendants(matching: .any).ci("Start focus").waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any).ci("Edit entry").exists)
+        XCTAssertFalse(app.buttons.ci("Explain a change").exists)
+        app.buttons.ci("More").click()
+        XCTAssertTrue(app.buttons.ci("Explain a change").exists)
         let finish = app.descendants(matching: .any).ci("Finished without timing")
         XCTAssertTrue(finish.waitForExistence(timeout: 2))
         finish.click()
@@ -500,7 +502,8 @@ final class AnchorMacUITests: XCTestCase {
         XCTAssertTrue(completedActions.waitForExistence(timeout: 4))
         scrollIntoVisibleTimetable(completedActions, in: app.scrollViews.firstMatch)
         completedActions.click()
-        XCTAssertTrue(app.descendants(matching: .any).ci("Edit or move").waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any).ci("Edit entry").waitForExistence(timeout: 3), app.debugDescription)
+        app.buttons.ci("More").click()
         XCTAssertFalse(app.descendants(matching: .any).ci("Log actual time…").exists)
     }
 
@@ -700,22 +703,23 @@ final class AnchorMacUITests: XCTestCase {
         logTitle.click()
         logTitle.typeText("In-flight entry")
         app.buttons.ci("anchor.log.save").click()
-        XCTAssertTrue(app.staticTexts.ci("In-flight entry").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons.ci("Edit done entry In-flight entry").waitForExistence(timeout: 4))
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "1 now"))
                 .firstMatch.waitForExistence(timeout: 3)
         )
 
         // Finishing the open entry records its real span.
-        let inFlightActions = app.buttons.matching(
-            NSPredicate(format: "identifier == %@ AND label ENDSWITH[c] %@", "anchor.today.block-actions", "Actions for In-flight entry")
-        ).firstMatch
-        XCTAssertTrue(inFlightActions.waitForExistence(timeout: 3))
-        scrollIntoVisibleTimetable(inFlightActions, in: viewport)
-        inFlightActions.click()
-        let finish = app.buttons.ci("Finish now")
-        XCTAssertTrue(finish.waitForExistence(timeout: 3))
-        finish.click()
+        let liveLog = app.buttons.ci("Edit done entry In-flight entry")
+        scrollIntoVisibleTimetable(liveLog, in: viewport)
+        liveLog.click()
+        let liveToggle = app.checkBoxes.ci("anchor.log.still-happening")
+        XCTAssertTrue(liveToggle.waitForExistence(timeout: 3))
+        let liveScroll = app.scrollViews.containing(.checkBox, identifier: "anchor.log.still-happening").firstMatch
+        for _ in 0..<4 { liveScroll.swipeUp() }
+        liveToggle.click()
+        XCTAssertTrue(app.datePickers["anchor.log.end"].waitForExistence(timeout: 3))
+        app.buttons.ci("anchor.log.save").click()
 
         // Retroactive log — toggling "Still happening" off records a past span.
         scrollIntoVisibleTimetable(logTime, in: viewport)
@@ -738,7 +742,7 @@ final class AnchorMacUITests: XCTestCase {
         // missed click would silently save the entry as still in progress.
         XCTAssertTrue(app.datePickers["anchor.log.end"].waitForExistence(timeout: 3))
         app.buttons.ci("anchor.log.save").click()
-        XCTAssertTrue(app.staticTexts.ci("Logged earlier").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons.ci("Edit done entry Logged earlier").waitForExistence(timeout: 4))
         XCTAssertTrue(
             app.staticTexts.matching(NSPredicate(format: "value CONTAINS[c] %@", "2 finished"))
                 .firstMatch.waitForExistence(timeout: 3)
@@ -754,7 +758,7 @@ final class AnchorMacUITests: XCTestCase {
         app.terminate()
         app.launch()
         app.buttons.ci("Today").click()
-        XCTAssertTrue(app.staticTexts.ci("Logged earlier").waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons.ci("Edit done entry Logged earlier").waitForExistence(timeout: 4))
         XCTAssertTrue(app.descendants(matching: .any)["anchor.today.timetable"].waitForExistence(timeout: 3))
     }
 

@@ -120,6 +120,7 @@ struct DayTimetable: View {
 
     let day: Date
     let entries: [Entry]
+    let actuals: CalendarActualData
     var hourHeight: CGFloat = 56
     var step: TimetableStep = .five
     var windowStartHour: Int = 7
@@ -161,12 +162,20 @@ struct DayTimetable: View {
 
     private var timedEntries: [Entry] { entries.filter { $0.block.plannedSeconds < 86_400 } }
 
+    private var dayActuals: [DayLedgerEntry] {
+        guard let period = Calendar.current.dateInterval(of: .day, for: day) else { return [] }
+        return actuals.calendarEntries(in: period)
+    }
+
+    private var doneEntries: [DayLedgerEntry] { dayActuals.filter { $0.end.timeIntervalSince($0.start) < 86_400 } }
+
     private var range: DateInterval {
         let midnight = Calendar.current.startOfDay(for: day)
         var intervals = timedEntries.map { entry in
             let start = entry.block.plannedStart.timeIntervalSince(midnight)
             return (start, start + Double(entry.block.plannedSeconds))
         }
+        intervals += doneEntries.map { ($0.start.timeIntervalSince(midnight), $0.end.timeIntervalSince(midnight)) }
         if let draft {
             let start = draft.start.timeIntervalSince(midnight)
             intervals.append((start, start + Double(draft.minutes * 60)))
@@ -205,26 +214,56 @@ struct DayTimetable: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.sm) {
-            ForEach(entries.filter { $0.block.plannedSeconds >= 86_400 }) { entry in
-                blockCard(entry, height: 70)
-                    .frame(height: 70)
+            let longPlans = entries.filter { $0.block.plannedSeconds >= 86_400 }
+            let longActuals = dayActuals.filter { $0.end.timeIntervalSince($0.start) >= 86_400 }
+            if !longPlans.isEmpty || !longActuals.isEmpty {
+                HStack(alignment: .top, spacing: Space.xxs) {
+                    VStack { ForEach(longPlans) { blockCard($0, height: 70).frame(height: 70) } }
+                        .frame(maxWidth: .infinity)
+                    VStack { ForEach(longActuals) { doneCard($0).frame(height: 70) } }
+                        .frame(maxWidth: .infinity)
+                }.padding(.leading, railWidth + traceWidth)
             }
             grid
         }
     }
 
-    private func blockCard(_ entry: Entry, height: CGFloat) -> some View {
-        TimetableBlockCard(entry: entry, height: height, dimsFinished: dimsFinished,
+    private func blockCard(_ entry: Entry, height: CGFloat, compact: Bool = false) -> some View {
+        TimetableBlockCard(entry: entry, height: height, compact: compact, actuals: actuals, dimsFinished: dimsFinished,
                            onCheckIn: { onCheckIn(entry.block) }, onStart: { onStart(entry.block) },
                            onOpenFocus: onOpenFocus, onComplete: { onComplete(entry.block) },
                            onEdit: { onEdit(entry.block) }, onRemove: { onRemove(entry.block) },
                            onExplain: { onExplain(entry.block) }, onLogActual: { onLogActual(entry.block) })
     }
 
+    private func doneCard(_ item: DayLedgerEntry) -> some View {
+        Button { actuals.edit(item) } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title).font(.subheadline.weight(.semibold)).lineLimit(2)
+                if actuals.recordedIDs.contains(item.id) {
+                    Text(item.start, style: .time).font(.caption2.monospacedDigit())
+                } else {
+                    Text("In progress").font(.caption2)
+                }
+            }
+            .padding(Space.xxs)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(theme.surfaceRaised, in: .rect(cornerRadius: Radius.sm))
+        }
+        .buttonStyle(.plain)
+        .disabled(!actuals.available && !actuals.storedLogIDs.contains(item.id))
+        .accessibilityLabel("Edit done entry " + item.title)
+    }
+
     private var grid: some View {
         GeometryReader { proxy in
             let gridX = railWidth + traceWidth
-            let gridWidth = max(120, proxy.size.width - gridX - Space.xxs)
+            let gridWidth = max(1, (proxy.size.width - gridX - Space.xxs) / 2)
+            let doneX = gridX + gridWidth + Space.xxs
+            let recorded = doneEntries
+            let lanes = TimetableLayout.place(recorded.map {
+                (max(0, $0.start.timeIntervalSince(range.start)), min(range.duration, $0.end.timeIntervalSince(range.start)))
+            }, minSpan: minCollisionSpan)
             ZStack(alignment: .topLeading) {
                 hourMarks(width: proxy.size.width)
 
@@ -241,12 +280,27 @@ struct DayTimetable: View {
                     let placement = placements[entry.id] ?? TimetableLayout.Placement(lane: 0, laneCount: 1)
                     let laneGap = Space.xxs
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
-                    blockCard(entry, height: cardHeight(for: entry))
+                    blockCard(entry, height: cardHeight(for: entry), compact: laneWidth < 180)
                     .frame(width: laneWidth, height: cardHeight(for: entry), alignment: .topLeading)
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
                         y: cardTop(for: entry)
                     )
+                }
+
+                Rectangle().fill(theme.hairline)
+                    .frame(width: 1, height: totalHeight)
+                    .offset(x: doneX - Space.xxs / 2)
+                    .allowsHitTesting(false)
+
+                ForEach(Array(recorded.enumerated()), id: \.element.id) { index, item in
+                    let lane = lanes[index]
+                    let width = max(1, (gridWidth - CGFloat(lane.laneCount - 1) * Space.xxs) / CGFloat(lane.laneCount))
+                    let y = max(0, offset(for: item.start))
+                    let height = max(minCardHeight, min(totalHeight, offset(for: item.end)) - y - 4)
+                    doneCard(item)
+                    .frame(width: width, height: height)
+                    .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: y + 2)
                 }
 
                 if let selection {
@@ -276,7 +330,7 @@ struct DayTimetable: View {
                 if let draft {
                     InlineEntryEditor(seed: draft, title: draftTitle, error: draftError,
                                       save: onSaveDraft, cancel: onCancelDraft, options: onDraftOptions)
-                        .frame(width: gridWidth)
+                        .frame(width: proxy.size.width - gridX)
                         .padding(.top, max(0, offset(for: draft.start)))
                         .padding(.leading, gridX)
                         .id(draft.id)
@@ -455,9 +509,12 @@ private struct DayRailShape: Shape {
 private struct TimetableBlockCard: View {
     @Environment(\.anchorTheme) private var theme
     @State private var showsActions = false
+    @State private var showsMore = false
 
     let entry: DayTimetable.Entry
     let height: CGFloat
+    let compact: Bool
+    let actuals: CalendarActualData
     var dimsFinished: Bool = true
     let onCheckIn: () -> Void
     let onStart: () -> Void
@@ -470,6 +527,14 @@ private struct TimetableBlockCard: View {
 
     private var block: PlanBlock { entry.block }
 
+    private var actionsArrow: Edge {
+        #if os(macOS)
+        .trailing
+        #else
+        .top
+        #endif
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             RoundedRectangle(cornerRadius: 1.5)
@@ -480,13 +545,20 @@ private struct TimetableBlockCard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .top, spacing: Space.xxs) {
-                    Text(block.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(theme.textPrimary)
-                        .lineLimit(height < 58 ? 1 : 2)
-                        .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
-                    actionsButton
+                    CalendarCheckButton(block: block, data: actuals)
+                    Button { showsActions = true } label: {
+                        Text(block.title)
+                            .font(compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
+                            .foregroundStyle(theme.textPrimary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(actionLabel)
+                    if !compact { actionsButton }
+
                 }
                 if height >= 56 {
                     let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated
@@ -504,7 +576,11 @@ private struct TimetableBlockCard: View {
             .padding(.vertical, Space.xxs)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(cardFill, in: .rect(cornerRadius: Radius.sm))
+        .background {
+            Button { showsActions = true } label: {
+                RoundedRectangle(cornerRadius: Radius.sm).fill(cardFill).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityHidden(true)
+        }
         .overlay {
             RoundedRectangle(cornerRadius: Radius.sm)
                 .strokeBorder(
@@ -513,64 +589,58 @@ private struct TimetableBlockCard: View {
                         lineWidth: entry.isCurrent || block.state == .inProgress ? 1.4 : 1,
                         dash: block.state == .skipped || block.state == .moved ? [4, 3] : []
                     )
-                )
+                ).allowsHitTesting(false)
         }
         .opacity(cardOpacity)
-        .contentShape(Rectangle())
-        .onTapGesture { showsActions = true }
-        #if os(macOS)
-        .popover(isPresented: $showsActions, arrowEdge: .trailing) {
+        .popover(isPresented: $showsActions, arrowEdge: actionsArrow) {
             VStack(alignment: .leading, spacing: Space.xxs) {
-                actionChoices
+                if showsMore {
+                    actionRow("Back", icon: "chevron.left") { showsMore = false }
+                    Divider()
+                    secondaryChoices
+                } else {
+                    if entry.linkedSession?.isActive == true {
+                        actionRow("Open timer", icon: "timer") { choose(onOpenFocus) }
+                    } else if block.state == .inProgress {
+                        actionRow("Finish now", icon: "checkmark") { choose(onComplete) }
+                    } else if block.state == .planned && !entry.hasDifferentActiveSession {
+                        actionRow("Start focus", icon: "play") { choose(onStart) }
+                    }
+                    actionRow(block.externalEventKey == nil ? "Edit entry" : "Edit event", icon: "pencil") { choose(onEdit) }
+                    actionRow("More", icon: "ellipsis") { showsMore = true }
+                }
             }
             .padding(Space.xs)
-            .frame(minWidth: 200)
+            .frame(width: 200)
             .anchorTheme()
+            .presentationCompactAdaptation(.popover)
         }
-        #else
-        .confirmationDialog(
-            block.title,
-            isPresented: $showsActions,
-            titleVisibility: .visible
-        ) {
-            actionChoices
-        }
-        #endif
+        .onChange(of: showsActions) { _, open in if !open { showsMore = false } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("anchor.today.block.\(block.id.uuidString)")
     }
 
     @ViewBuilder
     private var actionsButton: some View {
-        #if os(macOS)
-        // Set rather than toggle — the card's own tap gesture also sets
-        // showsActions, and a toggle can race it and close the popover
-        // immediately after it opens.
         Button { showsActions = true } label: {
-            Label(actionLabel, systemImage: stateSymbol)
-                .labelStyle(.iconOnly)
-                .font(.body)
-                .foregroundStyle(stateTint)
+            Image(systemName: "ellipsis")
+                .foregroundStyle(theme.textSecondary)
                 .frame(width: 32, height: 32)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(actionLabel)
         .accessibilityIdentifier("anchor.today.block-actions")
-        #else
-        Menu {
-            actionChoices
-        } label: {
-            Label(actionLabel, systemImage: stateSymbol)
-                .labelStyle(.iconOnly)
-                .font(.body)
-                .foregroundStyle(stateTint)
-                .frame(width: 32, height: 32)
-                .contentShape(.rect)
+    }
+
+    private func actionRow(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, Space.xxs)
+                .contentShape(Rectangle())
         }
-        .accessibilityLabel(actionLabel)
-        .accessibilityIdentifier("anchor.today.block-actions")
-        #endif
+        .buttonStyle(.plain)
     }
 
     private var metaLine: some View {
@@ -597,51 +667,26 @@ private struct TimetableBlockCard: View {
     }
 
     @ViewBuilder
-    private var actionChoices: some View {
-        Button(entry.outcome.map { "Check in · " + $0.rawValue } ?? "Check in…") { choose(onCheckIn) }
-        if entry.linkedSession?.isActive == true {
-            Button("open timer") { choose(onOpenFocus) }
-        } else {
-            switch block.state {
-            case .planned:
-                if !entry.hasDifferentActiveSession {
-                    Button("start now") { choose(onStart) }
-                }
-                Button("edit or move") { choose(onEdit) }
-                Button("finished without timing") { choose(onComplete) }
-            case .inProgress:
-                Button("finish now") { choose(onComplete) }
-            case .completed, .skipped, .moved:
-                Button("edit or move") { choose(onEdit) }
+    private var secondaryChoices: some View {
+        actionRow(entry.outcome.map { "Check in · " + $0.rawValue } ?? "Check in…", icon: "list.clipboard") { choose(onCheckIn) }
+        if entry.linkedSession?.isActive != true {
+            if block.state == .planned {
+                actionRow("Finished without timing", icon: "checkmark") { choose(onComplete) }
             }
-            // Linked sessions own actual timing; reconciliation would replace
-            // any manual timestamps entered here on the next refresh.
             if block.sessionID == nil {
-                Button("log actual time…") { choose(onLogActual) }
+                actionRow("Log actual time…", icon: "clock") { choose(onLogActual) }
             }
         }
-        Button("explain a change") { choose(onExplain) }
+        actionRow("Explain a change", icon: "text.bubble") { choose(onExplain) }
         if block.externalEventKey != nil {
-            Button("Remove from Anchor…", role: .destructive) { choose(onRemove) }
+            Divider()
+            actionRow("Remove from Anchor…", icon: "trash") { choose(onRemove) }
         }
     }
 
     private func choose(_ action: () -> Void) {
         showsActions = false
         action()
-    }
-
-    private var stateSymbol: String {
-        if entry.linkedSession?.isActive == true { return "timer" }
-        if block.state == .inProgress { return "play.circle" }
-        if let outcome = entry.outcome { return outcome.symbol }
-        return switch block.state {
-        case .planned: "play.circle.fill"
-        case .inProgress: "timer"
-        case .completed: "checkmark.circle.fill"
-        case .skipped: "minus.circle"
-        case .moved: "arrow.right.circle"
-        }
     }
 
     private var stateTint: Color {

@@ -42,7 +42,7 @@ struct LogTimeSheet: View {
         _selectedProjectID = State(initialValue: block?.projectID)
         _kind = State(initialValue: block?.kind ?? .focus)
         _start = State(initialValue: resolvedStart)
-        _end = State(initialValue: block?.actualEndedAt ?? min(now, resolvedStart.addingTimeInterval(30 * 60)))
+        _end = State(initialValue: block?.actualEndedAt ?? (isOngoing ? now : min(now, resolvedStart.addingTimeInterval(30 * 60))))
         _stillHappening = State(initialValue: block == nil ? calendar.isDateInToday(day) : isOngoing)
         self.block = block
         self.onSave = onSave
@@ -127,7 +127,7 @@ struct LogTimeSheet: View {
                                 }
                             }
                             if stillHappening {
-                                Text("Anchor keeps this entry open on the timetable. Finish it from the block's actions when you're done.")
+                                Text("To finish later, open the entry in Done and turn off Still happening.")
                                     .font(.caption)
                                     .foregroundStyle(theme.textTertiary)
                             }
