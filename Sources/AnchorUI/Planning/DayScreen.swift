@@ -691,6 +691,12 @@ struct PlanScreen: View {
                 .accessibilityIdentifier("anchor.today.tools")
                 .popover(isPresented: $showsDayTools) {
                     VStack(alignment: .leading, spacing: Space.xxs) {
+                        if !controller.hasSession {
+                            Button("Start an unplanned session", systemImage: "scope") {
+                                showsDayTools = false
+                                onOpenFocus()
+                            }
+                        }
                         logTimeButton
                         copyDayButton
                         calendarsButton
@@ -873,7 +879,10 @@ struct PlanScreen: View {
     }
 
     private func start(_ block: PlanBlock) {
-        guard block.plannedEnd > Date() else { return }
+        guard block.plannedEnd > Date() else {
+            calendarReferenceTime = Date()
+            return
+        }
         guard !controller.hasSession else {
             onOpenFocus()
             return

@@ -2,10 +2,7 @@
 
 Plan the day, protect the present, and learn what moved it.
 
-Replace unwanted habits with good ones, check them off, and schedule the ones
-that need a time. Pick a day, edit or copy its entries, tag them to projects, and
-play an entry. When something interrupts you, park it, pause and come back, or
-end the session. History keeps the plan and what actually happened visible.
+Plan your day in Today, check off what happened, and edit the actual time when it differs. Analysis shows recurring activities from your recorded days.
 
 Runs on macOS, iOS and Apple Watch from one shared codebase. The app is local-first;
 distraction text always stays on your device.
@@ -20,12 +17,7 @@ distraction text always stays on your device.
 - **Today** lets you select, edit, and copy a day's schedule. Copies keep times
   and projects, start unfinished, and preserve existing destination entries.
   Add a spontaneous entry directly; no habit or recurring rule is required.
-- **Habits** carries Indulge's original behavioral artwork from automatic-pattern
-  selection into concrete replacements. Check a habit off directly, undo it,
-  or optionally schedule it. There is no required progression programme.
-- **History** compares the planned and lived day, with interruption evidence,
-  internal choices, external causes, and Unknown kept distinct. Parked items and
-  longer-term analytics live here as secondary views.
+- **Analysis** compares planned and recorded time. Its Insights view shows activities recorded on at least three separate days in the selected period, alongside longer-term focus and interruption trends.
 - **Capture a distraction** (`⌘⇧L`) — park it and keep working, pause and return
   to the same session, or end the session. Break time does not count as focus.
 - **Resuming asks what pulled you away.** A pause is usually an interruption, so
@@ -83,7 +75,7 @@ To explore with three weeks of plausible history instead of an empty database:
 ANCHOR_DEMO_DATA=1 ./path/to/Anchor.app/Contents/MacOS/Anchor
 ```
 
-Set `ANCHOR_INITIAL_TAB` to `focus`, `today`, `habits`, or `history` in demo
+Set `ANCHOR_INITIAL_TAB` to `focus`, `today`, or `history` in demo
 mode. The old `day`, `log`, and `insights` values remain accepted as aliases for
 repeatable screenshot workflows.
 
@@ -177,7 +169,7 @@ These are unresolved requirements retained at the owner’s request. They are no
 
 ### Qualify the simpler daily loop on the owner's devices
 
-Direct habit tracking, daily editing/copying, project-linked entries and pause
+Daily editing/copying, project-linked entries and pause
 recovery are implemented. The development iPhone build is installed; physical
 use, Production CloudKit promotion and the notarized Mac release remain open.
 See [the qualification receipt](docs/qualification/simple-day-2026-09-07/README.md)
