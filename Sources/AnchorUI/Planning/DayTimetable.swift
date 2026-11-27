@@ -182,8 +182,8 @@ struct DayTimetable: View {
                     VStack {
                         ForEach(longPlans) { item in
                             blockCard(item, height: 70).frame(height: 70)
-                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
-                                    drop(CalendarDrag(id: item.id, source: .plan, resizing: resize), at: point)
+                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                                    drop(CalendarDrag(id: item.id, source: .plan, resizing: resize, keepsTime: keepsTime), at: point)
                                 })
                         }
                     }
@@ -191,8 +191,8 @@ struct DayTimetable: View {
                     VStack {
                         ForEach(longActuals) { item in
                             doneCard(item).frame(height: 70)
-                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
-                                    drop(CalendarDrag(id: item.id, source: .actual, resizing: resize), at: point)
+                                .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                                    drop(CalendarDrag(id: item.id, source: .actual, resizing: resize, keepsTime: keepsTime), at: point)
                                 })
                         }
                     }
@@ -277,8 +277,8 @@ struct DayTimetable: View {
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
                     blockCard(entry, height: height, compact: laneWidth < 180)
                     .frame(width: laneWidth, height: height, alignment: .topLeading)
-                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
-                        drop(CalendarDrag(id: entry.id, source: .plan, resizing: resize), at: point)
+                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                        drop(CalendarDrag(id: entry.id, source: .plan, resizing: resize, keepsTime: keepsTime), at: point)
                     })
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
@@ -298,8 +298,8 @@ struct DayTimetable: View {
                     let height = bounds.end - bounds.start
                     doneCard(item, height: height)
                     .frame(width: width, height: height)
-                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize in
-                        drop(CalendarDrag(id: item.id, source: .actual, resizing: resize), at: point)
+                    .modifier(CalendarEntryGesture(interaction: interaction) { point, resize, keepsTime in
+                        drop(CalendarDrag(id: item.id, source: .actual, resizing: resize, keepsTime: keepsTime), at: point)
                     })
                     .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: bounds.start)
                 }

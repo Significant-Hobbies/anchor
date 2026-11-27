@@ -545,8 +545,8 @@ struct PlanScreen: View {
                         if let onChangeActivity {
                             Button("Do something else in this slot") { onChangeActivity(block) }
                         }
-                        Button("Start an unplanned session", action: onOpenFocus)
-                    } label: { Image(systemName: "ellipsis.circle") }
+                        Button("Open Focus", action: onOpenFocus)
+                    } label: { Image(systemName: "arrow.triangle.2.circlepath") }
                     .menuIndicator(.hidden)
                     .accessibilityLabel("More focus actions")
                 }
@@ -736,7 +736,7 @@ struct PlanScreen: View {
         draftError = nil
     }
 
-    private func move(_ drag: CalendarDrag, to column: TimetableColumn, at time: Date, data: CalendarActualData) -> Bool {
+    private func move(_ drag: CalendarDrag, to column: TimetableColumn, at dropTime: Date, data: CalendarActualData) -> Bool {
         let plan = visibleBlocks.first { $0.id == drag.id && !$0.isUnplannedTimeLog }
         let actual = data.entries.first { $0.id == drag.id } ?? data.ongoing.first { $0.id == drag.id }
         let original: DayLedgerEntry
@@ -749,6 +749,7 @@ struct PlanScreen: View {
             original = actual
         }
         if drag.resizing && (drag.source == .plan) != (column == .scheduled) { return false }
+        let time = drag.keepsTime ? (drag.resizing ? original.end : original.start) : dropTime
         var updated = original
         if drag.resizing {
             guard time > original.start else { return false }
