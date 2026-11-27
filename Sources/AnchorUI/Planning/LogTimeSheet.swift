@@ -206,6 +206,8 @@ struct LogTimeSheet: View {
             target.isUnplannedTimeLog = true
             context.insert(target)
         }
+        let titleChanged = target.title != trimmed
+        let notesChanged = target.details != details
         if target.isUnplannedTimeLog {
             target.projectID = selectedProjectID
             target.title = trimmed
@@ -230,6 +232,10 @@ struct LogTimeSheet: View {
                     let store = DayLedgerStore(storeURL: config.url)
                     if let previous = try store.load().entries.first(where: { $0.id == target.id }) {
                         var updated = previous
+                        if target.isUnplannedTimeLog {
+                            if titleChanged { updated.title = trimmed }
+                            if notesChanged { updated.notes = details }
+                        }
                         updated.start = start
                         updated.end = end
                         try store.save(updated, replacing: previous)
