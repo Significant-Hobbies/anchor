@@ -13,6 +13,17 @@ public struct FocusScreen: View {
     private var calendarVisibility = CalendarBlockVisibility()
     @Query(sort: \PlanBlock.plannedStart) private var blocks: [PlanBlock]
     @Query(sort: \FocusSession.startedAt, order: .reverse) private var sessions: [FocusSession]
+    @Query(sort: \Goal.createdAt, order: .reverse) private var goals: [Goal]
+    @Query(sort: \Project.createdAt, order: .reverse) private var projects: [Project]
+    @State private var minutes = 25
+    @State private var notes = ""
+    @State private var goalID: UUID?
+    @State private var projectID: UUID?
+    @State private var tagIDs: [String] = []
+    @State private var detailsExpanded = false
+    @State private var showsEditor = false
+    @State private var checkInBlock: PlanBlock?
+    @State private var previousCheckIn: PlannerCheckIn?
     private let controller: FocusController
     @State private var now = Date()
     @FocusState private var editingActivity: Bool
@@ -34,15 +45,12 @@ public struct FocusScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Space.md) {
                         let slot = scheduledBlock
+                        DoodleScene("FocusDoodle",
+                                    eyebrow: slot == nil ? "Focus" : "Scheduled now",
+                                    title: slot?.title ?? "Open time",
+                                    message: slot.map { timeRange($0) } ?? "Nothing scheduled right now.",
+                                    compact: true)
                         if let block = slot, replacingID != block.id {
-                            Text("Scheduled now")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(theme.textSecondary)
-                            Text(block.title)
-                                .font(.largeTitle.weight(.semibold))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text("\(block.plannedStart.formatted(date: .omitted, time: .shortened)) – \(block.plannedEnd.formatted(date: .omitted, time: .shortened))")
-                                .foregroundStyle(theme.textSecondary)
                             Button("Start focusing") { start(block) }
                                 .buttonStyle(PrimaryButtonStyle(expands: false))
                             Button("Do something else") {
@@ -69,6 +77,9 @@ public struct FocusScreen: View {
                                 }
                                 .submitLabel(.go)
                                 .onSubmit { startActivity(expectedSlot: slot?.id) }
+                            if slot == nil {
+                                sessionOptions
+                            }
                             HStack(spacing: Space.md) {
                                 Button(replacingID != nil && slot == nil ? "Start unplanned session" : "Start focusing") {
                                     startActivity(expectedSlot: slot?.id)
@@ -84,12 +95,33 @@ public struct FocusScreen: View {
                                 }
                             }
                         }
+                        Divider()
+                        if let next = nextAppointment {
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                Text("Up next").font(.caption).foregroundStyle(theme.textSecondary)
+                                Text(next.title).font(.headline)
+                                Text(next.plannedStart.formatted(date: Calendar.current.isDateInToday(next.plannedStart) ? .omitted : .abbreviated, time: .shortened))
+                                    .font(.subheadline).foregroundStyle(theme.textSecondary)
+                            }
+                        }
+                        Button("Add to schedule", systemImage: "calendar.badge.plus") { showsEditor = true }
+                            .buttonStyle(QuietButtonStyle(expands: false))
+                        if let last = lastFinishedBlock {
+                            Button("Check in on " + last.title, systemImage: "checkmark.circle") {
+                                do {
+                                    guard let store = context.plannerCheckInStore else { throw CocoaError(.fileReadUnknown) }
+                                    previousCheckIn = try store.load().records[last.id]
+                                    checkInBlock = last
+                                } catch { loadError = "Couldn’t open this check-in." }
+                            }
+                            .buttonStyle(.plain)
+                        }
                         if let message = loadError ?? controller.lastError {
                             Label(message, systemImage: "exclamationmark.triangle")
                                 .foregroundStyle(theme.negative)
                         }
                     }
-                    .frame(maxWidth: 480, alignment: .leading)
+                    .frame(maxWidth: 620, alignment: .leading)
                     .padding(Space.lg)
                     .frame(maxWidth: .infinity)
                 }
@@ -112,7 +144,52 @@ public struct FocusScreen: View {
             CaptureSheet(controller: controller)
                 .anchorTheme()
         }
+        .sheet(isPresented: $showsEditor) {
+            PlanBlockEditor(initialDay: Date()) { refreshSchedule() }.anchorTheme()
+        }
+        .sheet(item: $checkInBlock) { block in
+            PlannerCheckInSheet(entry: PlannerCheckIn(block: block), previous: previousCheckIn,
+                                onSave: context.savePlannerCheckIn).anchorTheme()
+        }
         .onChange(of: controller.session?.id) { refreshSchedule() }
+    }
+
+    private func timeRange(_ block: PlanBlock) -> String {
+        block.plannedStart.formatted(date: .omitted, time: .shortened) + " – " + block.plannedEnd.formatted(date: .omitted, time: .shortened)
+    }
+
+    private var lastFinishedBlock: PlanBlock? {
+        guard let session = sessions.first, session.state == .finished,
+              let end = session.endedAt, Calendar.current.isDateInToday(end) else { return nil }
+        return calendarVisibility.filter(blocks).first { $0.sessionID == session.id }
+    }
+
+    private var sessionOptions: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Picker("Duration", selection: $minutes) {
+                ForEach(Array(stride(from: 5, through: 180, by: 5)), id: \.self) { value in
+                    Text("\(value) min").tag(value)
+                }
+            }
+            .pickerStyle(.menu)
+            .fixedSize()
+            DisclosureGroup("Session details", isExpanded: $detailsExpanded) {
+                VStack(alignment: .leading, spacing: Space.md) {
+                    Picker("Goal", selection: $goalID) {
+                        Text("No goal").tag(nil as UUID?)
+                        ForEach(goals.filter { !$0.isArchived }) { goal in
+                            Text(goal.title).tag(Optional(goal.id))
+                        }
+                    }
+                    ProjectPicker(selectedID: $projectID)
+                    SavedTagPicker(selectedIDs: $tagIDs)
+                    TextField("Session notes", text: $notes, axis: .vertical)
+                        .textFieldStyle(.roundedBorder)
+                }
+                .padding(.vertical, Space.sm)
+            }
+            .tint(theme.textSecondary)
+        }
     }
 
     private var trimmedActivity: String {
@@ -126,7 +203,15 @@ public struct FocusScreen: View {
         guard current?.id == expectedSlot else { return }
         if let block = current, replacingID == block.id {
             start(block, intent: trimmedActivity)
-        } else if controller.start(goal: nil, intent: trimmedActivity, minutes: 25) != nil {
+        } else if controller.start(goal: goals.first { $0.id == goalID && !$0.isArchived },
+                                   intent: trimmedActivity, minutes: minutes,
+                                   project: projects.first { $0.id == projectID && !$0.isArchived },
+                                   notes: notes, tagIDStrings: tagIDs) != nil {
+            goalID = nil
+            projectID = nil
+            tagIDs = []
+            notes = ""
+            detailsExpanded = false
             activity = ""
             replacingID = nil
         }
