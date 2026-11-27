@@ -277,8 +277,7 @@ struct CalendarActuals<Content: View>: View {
     }
 
     private var store: DayLedgerStore? {
-        guard let config = context.container.configurations.first, !config.isStoredInMemoryOnly else { return nil }
-        return DayLedgerStore(storeURL: config.url)
+        context.plannerSidecarURL.map { DayLedgerStore(storeURL: $0) }
     }
 
     private var actuals: [DayLedgerEntry] {
