@@ -44,6 +44,7 @@ final class AnchorIOSUITests: XCTestCase {
                        "The entry title must contain the intended text before saving")
         app.buttons.ci("Save").tap()
         XCTAssertTrue(app.staticTexts.ci("Read the next chapter").waitForExistence(timeout: 4))
+        app.buttons.ci("anchor.today.tools").tap()
         app.buttons.ci("anchor.today.copy-day").tap()
         XCTAssertTrue(app.buttons.ci("Copy entries").waitForExistence(timeout: 3))
         app.buttons.ci("Copy entries").tap()
@@ -125,22 +126,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH[c] %@", "Continue with")).firstMatch.tap()
         XCTAssertTrue(app.staticTexts.ci("What do you want that time to make room for?").waitForExistence(timeout: 4))
         app.buttons.matching(NSPredicate(format: "label ==[c] %@", "More creativity")).firstMatch.tap()
-        app.buttons.ci("Show me how Anchor protects it").tap()
-
-        XCTAssertTrue(app.staticTexts.ci("Turn that time into something concrete.").waitForExistence(timeout: 4))
-        let shape = app.buttons.ci("Shape these habits")
-        shape.tap()
-        // A tap that lands while the step transition is still settling can miss
-        // the button entirely — retry rather than failing on a swallowed tap.
-        let scheduleTitle = app.staticTexts.ci("Choose when each habit is available.")
-        if !scheduleTitle.waitForExistence(timeout: 4) {
-            let retry = app.buttons.matching(NSPredicate(
-                format: "label ==[c] %@ OR label ==[c] %@", "Shape these habits", "Continue without habits"
-            )).firstMatch
-            retry.tap()
-        }
-        XCTAssertTrue(scheduleTitle.waitForExistence(timeout: 4))
-        app.buttons.ci("Save habits and continue").tap()
+        app.buttons.ci("Continue").tap()
 
         XCTAssertTrue(app.staticTexts.ci("One account for your Significant Hobbies.").waitForExistence(timeout: 5))
         #if ANCHOR_LOCAL_ONLY
@@ -238,6 +224,7 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 3))
         cancel.tap()
         XCTAssertTrue(logTitle.waitForNonExistence(timeout: 3))
+        app.buttons.ci("anchor.today.tools").tap()
         XCTAssertFalse(app.buttons.ci("anchor.today.copy-day").isEnabled,
                        "Cancelling an empty log must leave Copy day disabled")
     }
@@ -371,7 +358,14 @@ final class AnchorIOSUITests: XCTestCase {
         today.tap()
     }
 
+    private func openDayTools(_ app: XCUIApplication) {
+        let tools = app.buttons.ci("anchor.today.tools")
+        for _ in 0..<10 where !tools.isHittable { app.swipeDown() }
+        tools.tap()
+    }
+
     private func verifyTodayLongLabelControls(_ app: XCUIApplication, copyEnabled: Bool) -> [XCUIElement] {
+        openDayTools(app)
         let controls = [app.buttons.ci("anchor.today.copy-day"),
                         app.buttons.ci("anchor.today.log-time"),
                         app.buttons.ci("anchor.today.customize")]
@@ -460,6 +454,7 @@ final class AnchorIOSUITests: XCTestCase {
         XCTAssertTrue(todayTab.waitForExistence(timeout: 5))
         todayTab.tap()
 
+        openDayTools(app)
         let controls = [
             app.buttons.ci("anchor.today.copy-day"),
             app.buttons.ci("anchor.today.log-time"),
@@ -492,22 +487,14 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
-        let habits = app.tabBars.buttons.ci("Habits")
-        XCTAssertTrue(habits.waitForExistence(timeout: 5))
-        // The first cold simulator launch can expose the tab bar before it
-        // accepts selection. Confirm navigation before querying its contents.
-        for _ in 0..<2 {
-            habits.tap()
-            let selected = XCTNSPredicateExpectation(
-                predicate: NSPredicate { _, _ in habits.isSelected }, object: nil
-            )
-            if XCTWaiter.wait(for: [selected], timeout: 5) == .completed { break }
+        func openPatterns() {
+            app.buttons.ci("anchor.toolbar.settings").tap()
+            let editor = app.buttons.ci("anchor.settings.patterns")
+            XCTAssertTrue(editor.waitForExistence(timeout: 5))
+            for _ in 0..<5 where !editor.isHittable { app.swipeUp() }
+            editor.tap()
         }
-        XCTAssertTrue(habits.isSelected, "Habits must be selected before opening its profile editor")
-        let editor = app.buttons.ci("anchor.habits.behavior-profile")
-        XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        editor.tap()
-
+        openPatterns()
         let shortVideos = app.buttons.ci("Short videos")
         XCTAssertTrue(shortVideos.waitForExistence(timeout: 4))
         shortVideos.tap()
@@ -518,74 +505,23 @@ final class AnchorIOSUITests: XCTestCase {
         evidence.lifetime = .keepAlways
         add(evidence)
 
-        app.buttons.ci("Done").tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 3))
-        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
-
         app.terminate()
         app.launch()
-        let reloadedHabits = app.tabBars.buttons.ci("Habits")
-        XCTAssertTrue(reloadedHabits.waitForExistence(timeout: 5))
-        reloadedHabits.tap()
-        XCTAssertTrue(editor.waitForExistence(timeout: 4))
-        XCTAssertEqual(editor.value as? String, "1 pattern · 0 directions")
+        openPatterns()
+        XCTAssertTrue(shortVideos.waitForExistence(timeout: 4))
+        XCTAssertEqual(shortVideos.value as? String, "Selected")
     }
 
     @MainActor
-    func testHabitsCanBeAddedEditedAndRescheduled() {
+    func testHabitsAreDerivedInAnalysis() {
         let app = XCUIApplication()
-        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-habit-management-\(UUID().uuidString).store"
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
+        app.launchEnvironment["ANCHOR_STORE_PATH"] = "/tmp/anchor-observed-\(UUID().uuidString).store"
         app.launch()
-
-        let habits = app.tabBars.buttons.ci("Habits")
-        XCTAssertTrue(habits.waitForExistence(timeout: 5))
-        habits.tap()
-        XCTAssertTrue(app.buttons.ci("anchor.habits.add").waitForExistence(timeout: 5))
-        app.buttons.ci("anchor.habits.add").tap()
-        // Pick the second day before typing — once the keyboard is up it can
-        // cover the weekday chips and swallow the tap.
-        let secondDay = app.buttons.matching(
-            NSPredicate(format: "label ENDSWITH[c] %@", "not selected")
-        ).firstMatch
-        XCTAssertTrue(secondDay.waitForExistence(timeout: 3))
-        let secondDayName = secondDay.label.replacingOccurrences(of: " not selected", with: "")
-        secondDay.tap()
-        XCTAssertTrue(app.buttons.ci("\(secondDayName) selected").waitForExistence(timeout: 3))
-        let title = app.textFields.ci("What will you do?")
-        title.tap()
-        title.typeText("Two-day reset")
-        app.buttons.ci("Save").tap()
-        XCTAssertTrue(app.staticTexts.ci("Two-day reset").waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts.ci("0 of 2 this week").exists)
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Any time")).firstMatch.exists)
-        let checkOff = app.buttons.ci("anchor.habits.complete")
-        XCTAssertTrue(checkOff.exists)
-        checkOff.tap()
-        XCTAssertTrue(app.buttons.ci("Undo check-off").waitForExistence(timeout: 3))
-        app.terminate()
-        app.launch()
-        app.tabBars.buttons.ci("Habits").tap()
-        XCTAssertTrue(app.buttons.ci("Undo check-off").waitForExistence(timeout: 4))
-        app.buttons.ci("Undo check-off").tap()
-        XCTAssertTrue(app.buttons.ci("anchor.habits.complete").exists)
-
-
-        // Habits live on the Habits tab; Today only gains one when it's
-        // scheduled at a time, which places it on the timetable.
-        app.tabBars.buttons.ci("Today").tap()
-        XCTAssertFalse(app.descendants(matching: .any)["anchor.today.habits"].exists)
-
-        app.tabBars.buttons.ci("Habits").tap()
-        app.buttons.ci("Schedule").tap()
-        XCTAssertTrue(app.navigationBars.ci("Place habit").waitForExistence(timeout: 3))
-        app.buttons.ci("Save").tap()
-
-        app.tabBars.buttons.ci("Today").tap()
-        XCTAssertTrue(app.staticTexts.ci("Two-day reset").waitForExistence(timeout: 4))
-
-        keepScreenshot(app, named: "anchor-build19-ios-scheduled-habit-today")
-
+        XCTAssertFalse(app.tabBars.buttons.ci("Habits").exists)
+        app.tabBars.buttons.ci("Analysis").tap()
+        app.buttons.ci("Insights").tap()
+        XCTAssertTrue(app.staticTexts.ci("Habit insights").waitForExistence(timeout: 4))
     }
 
     @MainActor
@@ -657,7 +593,7 @@ final class AnchorIOSUITests: XCTestCase {
         app.launchEnvironment["ANCHOR_ONBOARDING_SKIP"] = "1"
         app.launch()
 
-        for tab in ["Today", "Habits", "Analysis"] {
+        for tab in ["Today", "Analysis"] {
             app.tabBars.buttons.ci(tab).tap()
             let toolbarButton = app.buttons.ci("anchor.toolbar.settings")
             XCTAssertTrue(toolbarButton.waitForExistence(timeout: 3), "Settings toolbar action is missing on \(tab)")

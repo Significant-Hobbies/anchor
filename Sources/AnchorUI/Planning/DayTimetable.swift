@@ -584,9 +584,11 @@ private struct TimetableBlockCard: View {
                         actionRow("Open timer", icon: "timer") { choose(onOpenFocus) }
                     } else if block.state == .inProgress {
                         actionRow("Finish now", icon: "checkmark") { choose(onComplete) }
-                    } else if block.state == .planned && !entry.hasDifferentActiveSession {
-                        actionRow("Start focus", icon: "play") { choose(onStart) }
                     }
+                    let recorded = actuals.recordedIDs.contains(block.id)
+                    actionRow(recorded ? "Edit done entry" : "Mark as done", icon: "checkmark.square") {
+                        choose { actuals.check(block) }
+                    }.disabled(!actuals.available)
                     actionRow(block.externalEventKey == nil ? "Edit entry" : "Edit event", icon: "pencil") { choose(onEdit) }
                     actionRow("More", icon: "ellipsis") { showsMore = true }
                 }
@@ -649,6 +651,13 @@ private struct TimetableBlockCard: View {
 
     @ViewBuilder
     private var secondaryChoices: some View {
+        if block.state == .planned && !entry.hasDifferentActiveSession && entry.linkedSession?.isActive != true && !actuals.recordedIDs.contains(block.id) {
+            TimelineView(.explicit([Date.distantPast, block.plannedEnd])) { _ in
+                if Date() < block.plannedEnd {
+                    actionRow("Start focus", icon: "play") { choose(onStart) }
+                }
+            }
+        }
         actionRow(entry.outcome.map { "Check in · " + $0.rawValue } ?? "Check in…", icon: "list.clipboard") { choose(onCheckIn) }
         if entry.linkedSession?.isActive != true {
             if block.state == .planned {

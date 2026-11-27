@@ -93,7 +93,7 @@ public struct SettingsScreen: View {
                         .foregroundStyle(theme.textSecondary).padding(.bottom, Space.xs)
                     detailRow(.projects).accessibilityIdentifier("anchor.settings.manage-metadata")
                     Divider()
-                    detailRow(.patterns)
+                    detailRow(.patterns).accessibilityIdentifier("anchor.settings.patterns")
                     Divider()
                     detailRow(.privacy)
                     Divider()

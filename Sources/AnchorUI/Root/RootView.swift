@@ -376,9 +376,9 @@ private struct FocusPreludeStage<Actions: View>: View {
 
 /// Tabs, shared by both platforms so the two apps stay conceptually identical.
 public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
-    case focus, today, habits, history
+    case focus, today, history
 
-    static let destinations: [AnchorTab] = [.today, .habits, .history]
+    static let destinations: [AnchorTab] = [.today, .history]
 
     public var id: String { rawValue }
 
@@ -386,7 +386,6 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .focus: "Focus"
         case .today: "Today"
-        case .habits: "Habits"
         case .history: "Analysis"
         }
     }
@@ -395,7 +394,6 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .focus: "scope"
         case .today: "calendar"
-        case .habits: "repeat"
         case .history: "clock.arrow.circlepath"
         }
     }
@@ -403,7 +401,7 @@ public enum AnchorTab: String, CaseIterable, Identifiable, Sendable {
     public static func demoValue(_ rawValue: String) -> AnchorTab? {
         switch rawValue {
         case "day": .today
-        case "analysis", "log", "insights": .history
+        case "analysis", "log", "insights", "habits": .history
         case "settings": .today
         default: AnchorTab(rawValue: rawValue)
         }
@@ -675,7 +673,6 @@ public struct RootView: View {
                 alternativePlanID = block.id
                 navigation.select(.focus)
             }) { navigation.select(.focus) }
-            case .habits: HabitsScreen(plannerDay: plannerDay)
             case .history: HistoryScreen(day: $plannerDay)
             }
         }

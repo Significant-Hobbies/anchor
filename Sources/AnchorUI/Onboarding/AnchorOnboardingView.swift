@@ -16,7 +16,6 @@ public struct AnchorOnboardingView: View {
     @State private var unifiedStep: UnifiedStep = .welcome
     @State private var selectedPatterns: Set<BehaviorPattern> = []
     @State private var desiredDirections: Set<LifeDirection> = []
-    @State private var habitDrafts: [HabitDraft] = []
     @State private var rehearsal = OnboardingRehearsal()
     @State private var goal = ""
     @State private var thought = ""
@@ -36,26 +35,10 @@ public struct AnchorOnboardingView: View {
         case welcome = 0
         case patterns = 1
         case directions = 2
-        case replacements = 3
-        case schedule = 4
         // Keep rehearsal at 5 so an owner who paused the previous onboarding
         // build does not resume on a different screen after this new stage ships.
         case rehearsal = 5
         case account = 6
-    }
-
-    private struct HabitDraft: Identifiable {
-        var direction: LifeDirection
-        var pattern: BehaviorPattern?
-        var title: String
-        var time: Date
-        var usesSuggestedTime: Bool
-        var minutes: Int
-        var weekdays: Set<ScheduleWeekday>
-        var flexibility: ScheduleFlexibility
-        var isSelected: Bool
-
-        var id: LifeDirection { direction }
     }
 
     public init(
@@ -78,8 +61,6 @@ public struct AnchorOnboardingView: View {
                         case .welcome: mergedWelcomeStep
                         case .patterns: patternsStep
                         case .directions: directionsStep
-                        case .replacements: replacementsStep
-                        case .schedule: scheduleStep
                         case .account: accountStep
                         case .rehearsal:
                             switch rehearsal.step {
@@ -118,11 +99,8 @@ public struct AnchorOnboardingView: View {
                 rehearsal = OnboardingRehearsal()
             } else {
                 restoreProfile()
-                prepareHabitDrafts()
-                unifiedStep = UnifiedStep(rawValue: savedUnifiedStep) ?? .welcome
-                if habitDrafts.isEmpty && (unifiedStep == .schedule || unifiedStep == .replacements) {
-                    moveUnified(to: .account)
-                }
+                // Owners paused in the retired habit setup continue with the next step.
+                unifiedStep = (3...4).contains(savedUnifiedStep) ? .account : UnifiedStep(rawValue: savedUnifiedStep) ?? .welcome
                 restore()
             }
         }
@@ -168,7 +146,7 @@ public struct AnchorOnboardingView: View {
 
     private var patternsStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("1 OF 6 · OPTIONAL")
+            onboardingProgress("1 OF 4 · OPTIONAL")
             VStack(spacing: Space.xs) {
                 Text("what tends to take more time than you want?")
                     .font(.largeTitle.weight(.semibold))
@@ -211,7 +189,7 @@ public struct AnchorOnboardingView: View {
 
     private var directionsStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("2 OF 6 · OPTIONAL")
+            onboardingProgress("2 OF 4 · OPTIONAL")
             VStack(spacing: Space.xs) {
                 Text("what do you want that time to make room for?")
                     .font(.largeTitle.weight(.semibold))
@@ -242,147 +220,13 @@ public struct AnchorOnboardingView: View {
 
             VStack(spacing: Space.sm) {
                 profileSaveFailure
-                Button(desiredDirections.isEmpty ? "continue without choosing" : "show me how anchor protects it") {
+                Button(desiredDirections.isEmpty ? "continue without choosing" : "continue") {
                     if persistProfile() {
-                        prepareHabitDrafts()
-                        moveUnified(to: habitDrafts.isEmpty ? .account : .replacements)
+                        moveUnified(to: .account)
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 Button("back") { moveUnified(to: .patterns) }
-                    .buttonStyle(QuietButtonStyle())
-            }
-        }
-    }
-
-    private var replacementsStep: some View {
-        VStack(spacing: Space.lg) {
-            onboardingProgress("3 OF 6 · SUGGESTIONS")
-            VStack(spacing: Space.xs) {
-                Text("turn that time into something concrete.")
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-                    .multilineTextAlignment(.center)
-                Text("Anchor suggests a small replacement for every direction you chose. Keep the ones that genuinely fit.")
-                    .font(.body)
-                    .foregroundStyle(theme.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            if habitDrafts.isEmpty {
-                EmptyStateView(
-                    symbol: "sparkles",
-                    title: "No replacements selected",
-                    message: "That’s fine. You can create habits later, and still use Anchor for your schedule and interruptions."
-                )
-            } else {
-                VStack(spacing: Space.sm) {
-                    ForEach($habitDrafts) { $draft in
-                        Button { toggleHabitDraft(draft.id) } label: {
-                            Card(padding: Space.md) {
-                                HStack(spacing: Space.md) {
-                                    BehavioralDoodleArtwork(direction: draft.direction)
-                                        .frame(width: 86, height: 72)
-                                        .accessibilityHidden(true)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(draft.title)
-                                            .font(.headline)
-                                            .foregroundStyle(theme.textPrimary)
-                                        Text("For \(draft.direction.label.lowercased())")
-                                            .font(.subheadline)
-                                            .foregroundStyle(theme.textSecondary)
-                                        if let pattern = draft.pattern {
-                                            Text("Instead of defaulting to \(pattern.label.lowercased())")
-                                                .font(.caption)
-                                                .foregroundStyle(theme.textTertiary)
-                                        }
-                                    }
-                                    Spacer(minLength: 0)
-                                    Image(systemName: draft.isSelected ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(draft.isSelected ? theme.accent : theme.textTertiary)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityValue(draft.isSelected ? "Selected" : "Not selected")
-                    }
-                }
-            }
-
-            VStack(spacing: Space.sm) {
-                Button(habitDrafts.contains(where: \.isSelected) ? "shape these habits" : "continue without habits") {
-                    moveUnified(to: habitDrafts.contains(where: \.isSelected) ? .schedule : .account)
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                Button("back") { moveUnified(to: .directions) }
-                    .buttonStyle(QuietButtonStyle())
-            }
-        }
-    }
-
-    private var scheduleStep: some View {
-        VStack(spacing: Space.lg) {
-            onboardingProgress("4 OF 6 · YOUR WEEK")
-            VStack(spacing: Space.xs) {
-                Text("choose when each habit is available.")
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-                    .multilineTextAlignment(.center)
-                Text("An exact time is optional. Habits stay available in Today until you complete or place them.")
-                    .font(.body)
-                    .foregroundStyle(theme.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            ForEach($habitDrafts) { $draft in
-                if draft.isSelected {
-                    Card(padding: Space.lg) {
-                        VStack(alignment: .leading, spacing: Space.md) {
-                            HStack {
-                                Image(systemName: draft.direction.symbolName)
-                                    .foregroundStyle(theme.accent)
-                                TextField("Habit name", text: $draft.title)
-                                    .font(.headline)
-                            }
-                            Toggle("Suggest a time", isOn: $draft.usesSuggestedTime)
-                                .tint(theme.accent)
-                            if draft.usesSuggestedTime {
-                                DatePicker("Around", selection: $draft.time, displayedComponents: .hourAndMinute)
-                            }
-                            VStack(alignment: .leading, spacing: Space.xxs) {
-                                Text("Repeats")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(theme.textTertiary)
-                                ViewThatFits(in: .horizontal) {
-                                    HStack(spacing: Space.xxs) {
-                                        weekdayButtons(for: $draft)
-                                    }
-                                    LazyVGrid(columns: compactWeekdayColumns, alignment: .leading, spacing: Space.xxs) {
-                                        weekdayButtons(for: $draft)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !habitDrafts.contains(where: \.isSelected) {
-                EmptyStateView(
-                    symbol: "calendar",
-                    title: "Start with your own schedule",
-                    message: "You can add one-off blocks in Today and recurring habits from Habits."
-                )
-            }
-
-            VStack(spacing: Space.sm) {
-                profileSaveFailure
-                Button("save habits and continue") {
-                    if persistHabitSchedule() { moveUnified(to: .account) }
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(habitDrafts.contains { $0.isSelected && ($0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || $0.weekdays.isEmpty) })
-                Button("back") { moveUnified(to: .replacements) }
                     .buttonStyle(QuietButtonStyle())
             }
         }
@@ -396,34 +240,9 @@ public struct AnchorOnboardingView: View {
         [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 260 : 150, maximum: 280), spacing: Space.sm)]
     }
 
-    private var compactWeekdayColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(minimum: 44), spacing: Space.xxs), count: 4)
-    }
-
-    @ViewBuilder
-    private func weekdayButtons(for draft: Binding<HabitDraft>) -> some View {
-        ForEach(ScheduleWeekday.allCases, id: \.self) { day in
-            Button {
-                if draft.wrappedValue.weekdays.contains(day) {
-                    draft.wrappedValue.weekdays.remove(day)
-                } else {
-                    draft.wrappedValue.weekdays.insert(day)
-                }
-            } label: {
-                Text(day.shortLabel)
-                    .frame(minWidth: 44, minHeight: 44)
-            }
-            .buttonStyle(.bordered)
-            .tint(draft.wrappedValue.weekdays.contains(day) ? theme.accent : theme.textTertiary)
-            .accessibilityLabel(day.label)
-            .accessibilityValue(draft.wrappedValue.weekdays.contains(day) ? "Selected" : "Not selected")
-            .accessibilityAddTraits(draft.wrappedValue.weekdays.contains(day) ? .isSelected : [])
-        }
-    }
-
     private var accountStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("5 OF 6 · OPTIONAL ACCOUNT")
+            onboardingProgress("3 OF 4 · OPTIONAL ACCOUNT")
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: Space.xxl) {
                     accountHero
@@ -493,7 +312,7 @@ public struct AnchorOnboardingView: View {
             }
 
             Button("back") {
-                moveUnified(to: habitDrafts.isEmpty ? .directions : (habitDrafts.contains(where: \.isSelected) ? .schedule : .replacements))
+                moveUnified(to: .directions)
             }
                 .buttonStyle(QuietButtonStyle(expands: false))
                 .frame(maxWidth: .infinity)
@@ -502,7 +321,7 @@ public struct AnchorOnboardingView: View {
 
     private var goalStep: some View {
         VStack(spacing: Space.lg) {
-            onboardingProgress("6 OF 6 · QUICK REHEARSAL")
+            onboardingProgress("4 OF 4 · QUICK REHEARSAL")
             Image("AnchorOnboarding")
                 .resizable()
                 .scaledToFit()
@@ -718,8 +537,7 @@ public struct AnchorOnboardingView: View {
         switch ProcessInfo.processInfo.environment["ANCHOR_ONBOARDING_INITIAL_STEP"] {
         case "patterns": .patterns
         case "directions": .directions
-        case "replacements": .replacements
-        case "schedule": .schedule
+        case "replacements", "schedule": .account
         case "account": .account
         case "rehearsal": .rehearsal
         default: .welcome
@@ -742,91 +560,12 @@ public struct AnchorOnboardingView: View {
     }
 
     private func complete() {
-        // Choices and the generated habit schedule are saved before rehearsal
-        // begins. The final call-to-action only needs to leave onboarding.
         if !isDemo {
             savedUnifiedStep = 0
             savedGoal = ""
             savedStep = 0
         }
         onComplete()
-    }
-
-    private func prepareHabitDrafts() {
-        let existing = Dictionary(uniqueKeysWithValues: habitDrafts.map { ($0.direction, $0) })
-        let patterns = BehaviorPattern.allCases.filter { selectedPatterns.contains($0) }
-        let startOfDay = Calendar.current.startOfDay(for: Date())
-        habitDrafts = LifeDirection.allCases
-            .filter { desiredDirections.contains($0) }
-            .enumerated()
-            .map { index, direction in
-                if let draft = existing[direction] { return draft }
-                let suggestion = direction.habitSuggestion
-                return HabitDraft(
-                    direction: direction,
-                    pattern: patterns.isEmpty ? nil : patterns[index % patterns.count],
-                    title: suggestion.title,
-                    time: Calendar.current.date(byAdding: .minute, value: suggestion.startMinutesFromMidnight, to: startOfDay) ?? startOfDay,
-                    usesSuggestedTime: true,
-                    minutes: suggestion.plannedMinutes,
-                    weekdays: Set(ScheduleWeekday.allCases),
-                    flexibility: .flexible,
-                    isSelected: true
-                )
-            }
-    }
-
-    private func persistHabitSchedule() -> Bool {
-        guard persistProfile() else { return false }
-        let selectedDrafts = habitDrafts.filter(\.isSelected)
-        do {
-            let existing = try context.fetch(FetchDescriptor<ScheduleTemplate>())
-            let calendar = Calendar.current
-            for draft in selectedDrafts {
-                let template: ScheduleTemplate
-                if let saved = existing.first(where: { !$0.isArchived && $0.lifeDirection == draft.direction }) {
-                    template = saved
-                } else {
-                    template = ScheduleTemplate(
-                        title: draft.title,
-                        startMinutesFromMidnight: 0,
-                        plannedSeconds: draft.minutes * 60,
-                        kind: .routine
-                    )
-                    context.insert(template)
-                }
-                template.title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-                template.startMinutesFromMidnight = calendar.component(.hour, from: draft.time) * 60
-                    + calendar.component(.minute, from: draft.time)
-                template.plannedSeconds = draft.minutes * 60
-                template.weekdays = draft.weekdays
-                template.kind = .routine
-                template.flexibility = draft.flexibility
-                template.behaviorPattern = draft.pattern
-                template.lifeDirection = draft.direction
-                template.isBehaviorHabit = true
-                template.habitUsesSuggestedTime = draft.usesSuggestedTime
-                template.habitLevelStartedAt = template.habitLevelStartedAt ?? Date()
-                template.updatedAt = Date()
-            }
-            try context.save()
-            profileSaveError = nil
-            return true
-        } catch {
-            context.rollback()
-            profileSaveError = "Anchor couldn’t save this schedule. Your choices are still here; try again."
-            return false
-        }
-    }
-
-    private func toggleHabitDraft(_ id: LifeDirection) {
-        guard let index = habitDrafts.firstIndex(where: { $0.id == id }) else { return }
-        if habitDrafts[index].isSelected {
-            habitDrafts[index].isSelected = false
-            return
-        }
-        habitDrafts[index].isSelected = true
-        profileSaveError = nil
     }
 
     private func moveUnified(to step: UnifiedStep) {

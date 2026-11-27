@@ -96,11 +96,14 @@ public struct AnalyticsScreen: View {
 
             VStack(alignment: .leading, spacing: Space.lg) {
                 rangePicker
+                CalendarActuals(blocks: calendarVisibility.filter(plans), sessions: sessions, allBlocks: plans) { data in
+                    ObservedHabitsCard(entries: data.entries, blocks: calendarVisibility.filter(plans), days: range.days)
+                }
 
                 if records.isEmpty {
                     EmptyStateView(
                         symbol: "chart.bar.doc.horizontal",
-                        title: "Nothing to show yet",
+                        title: "No focus sessions in this period",
                         message: "Run a focus session and this fills in — where your hours go, and what keeps taking them."
                     )
                 } else {
