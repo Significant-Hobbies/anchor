@@ -224,12 +224,14 @@ struct CalendarActualData {
     let record: (DayLedgerEntry) -> Bool
     let available: Bool
 
+    var move: (DayLedgerEntry) -> Bool = { _ in false }
     let storedLogIDs: Set<UUID>
     let ongoing: [DayLedgerEntry]
     let recordedIDs: Set<UUID>
 
     init(entries: [DayLedgerEntry], edit: @escaping (DayLedgerEntry) -> Void,
-         record: @escaping (DayLedgerEntry) -> Bool, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = []) {
+         record: @escaping (DayLedgerEntry) -> Bool, available: Bool, ongoing: [DayLedgerEntry] = [], storedLogIDs: Set<UUID> = [], move: @escaping (DayLedgerEntry) -> Bool = { _ in false }) {
+        self.move = move
         self.storedLogIDs = storedLogIDs
         self.ongoing = ongoing
         self.entries = entries
@@ -316,7 +318,7 @@ struct CalendarActuals<Content: View>: View {
                 Button("Reload entries", action: reload)
             }
             content(CalendarActualData(entries: actuals, edit: edit, record: { persist($0, replacing: nil) }, available: !unavailable, ongoing: ongoing,
-                                       storedLogIDs: Set(blocks.filter(\.isUnplannedTimeLog).map(\.id))))
+                                       storedLogIDs: Set(blocks.filter(\.isUnplannedTimeLog).map(\.id)), move: move))
         }
         .onAppear(perform: reload)
         .onReceive(NotificationCenter.default.publisher(for: .actualEntriesChanged)) { _ in reload() }
@@ -334,6 +336,27 @@ struct CalendarActuals<Content: View>: View {
                 try save(updated, replacing: item.previous)
             }.anchorTheme()
         }
+    }
+
+    private func move(_ entry: DayLedgerEntry) -> Bool {
+        guard !unavailable else { return false }
+        let previous = saved.first { $0.id == entry.id }
+        if let log = blocks.first(where: { $0.id == entry.id && $0.isUnplannedTimeLog }) {
+            guard entry.start <= Date(), log.actualEndedAt == nil || entry.end <= Date() else {
+                error = "Logged time must be in the past."
+                return false
+            }
+            log.actualStartedAt = entry.start
+            if log.actualEndedAt != nil { log.actualEndedAt = entry.end }
+            log.updatedAt = Date()
+            do { try context.save() } catch {
+                context.rollback()
+                self.error = "Couldn’t move the logged time."
+                return false
+            }
+            guard previous != nil else { return true }
+        }
+        return persist(entry, replacing: previous)
     }
 
     private func edit(_ entry: DayLedgerEntry) {

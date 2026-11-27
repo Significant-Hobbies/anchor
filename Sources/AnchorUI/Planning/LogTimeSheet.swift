@@ -27,6 +27,7 @@ struct LogTimeSheet: View {
     init(
         day: Date,
         suggestedStart: Date? = nil,
+        suggestedTitle: String = "",
         block: PlanBlock? = nil,
         onSave: @escaping () -> Void
     ) {
@@ -37,7 +38,7 @@ struct LogTimeSheet: View {
             : calendar.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
         let resolvedStart = block?.actualStartedAt ?? block?.plannedStart ?? suggestedStart ?? fallbackStart
         let isOngoing = block?.state == .inProgress && block?.actualStartedAt != nil
-        _title = State(initialValue: block?.title ?? "")
+        _title = State(initialValue: block?.title ?? suggestedTitle)
         _details = State(initialValue: block?.details ?? "")
         _selectedProjectID = State(initialValue: block?.projectID)
         _kind = State(initialValue: block?.kind ?? .focus)

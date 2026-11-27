@@ -28,7 +28,7 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("Start focusing").click()
         XCTAssertTrue(app.staticTexts.ci("Mac focus acceptance").waitForExistence(timeout: 4))
 
-        app.buttons.ci("Lock a distraction").click()
+        app.buttons.ci("Log interruption").click()
         let note = app.textFields.ci("Slack from Ravi about the invoice")
         XCTAssertTrue(note.waitForExistence(timeout: 3))
         note.click()
@@ -190,7 +190,7 @@ final class AnchorMacUITests: XCTestCase {
         app.checkBoxes.ci("Repeat weekly").click()
         app.sheets.firstMatch.buttons["anchor.plan.editor.save"].click()
         app.buttons.ci("anchor.today.tools").click()
-        app.buttons.ci("anchor.today.customize").click()
+        app.descendants(matching: .any).ci("anchor.today.customize").firstMatch.click()
         let usualWeek = app.buttons.ci("anchor.timetable.routines")
         XCTAssertTrue(usualWeek.waitForExistence(timeout: 4))
         usualWeek.click()
@@ -547,7 +547,7 @@ final class AnchorMacUITests: XCTestCase {
 
         // Customize — the timetable's own options plus the door to usual week.
         let viewport = app.scrollViews.firstMatch
-        let customize = app.buttons.ci("anchor.today.customize")
+        let customize = app.descendants(matching: .any).ci("anchor.today.customize").firstMatch
         let tools = app.buttons.ci("anchor.today.tools")
         scrollIntoVisibleTimetable(tools, in: viewport)
         tools.click()
@@ -560,9 +560,9 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.timetable.options-done").click()
 
         // Quick log — "still happening" captures an open entry without a timer.
-        let logTime = app.buttons.ci("anchor.today.log-time")
-        scrollIntoVisibleTimetable(tools, in: viewport)
-        tools.click()
+        let logTime = app.descendants(matching: .any).ci("anchor.today.log-time").firstMatch
+        app.buttons.ci("Add done entry").click()
+        app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         logTime.click()
         let logTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(logTitle.waitForExistence(timeout: 3))
@@ -584,8 +584,8 @@ final class AnchorMacUITests: XCTestCase {
         app.buttons.ci("anchor.log.save").click()
 
         // Retroactive log — toggling "Still happening" off records a past span.
-        scrollIntoVisibleTimetable(tools, in: viewport)
-        tools.click()
+        app.buttons.ci("Add done entry").click()
+        app.descendants(matching: .any).ci("Entry actions").firstMatch.click()
         logTime.click()
         let retroTitle = app.textFields.ci("anchor.log.title")
         XCTAssertTrue(retroTitle.waitForExistence(timeout: 3))

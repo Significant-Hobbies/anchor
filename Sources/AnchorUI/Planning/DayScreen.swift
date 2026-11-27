@@ -32,6 +32,7 @@ struct PlanScreen: View {
     @Binding private var today: Date
     @State private var lastCalendarDay = Date()
     @State private var showsDatePicker = false
+    @AppStorage("anchor.calendar.hour-height") private var hourHeight = 56.0
     @AppStorage(TimetableStep.preferenceKey) private var gridStep = TimetableStep.five
     @State private var showsCopyDay = false
     @State private var editorSeed: EditorSeed?
@@ -43,13 +44,11 @@ struct PlanScreen: View {
     @State private var editingBlock: PlanBlock?
     @State private var editingCalendarEvent: PlanBlock?
     @State private var explainingBlock: PlanBlock?
-    @State private var showsLogSheet = false
     @State private var loggingBlock: PlanBlock?
     @State private var gridHasViewport = false
     @State private var gridIsAtStart = true
     @State private var recenterDay = 0
     @State private var parkedDraft: AdvancedDraft?
-    @State private var showsDayTools = false
     @State private var showsDayCalendarEvents = false
     @State private var loadError: String?
     @State private var showsAllCalendarEvents = false
@@ -191,7 +190,7 @@ struct PlanScreen: View {
                                entries: visibleBlocks.filter { !$0.isUnplannedTimeLog && $0.plannedStart < visibleInterval.end && $0.plannedEnd > visibleInterval.start },
                                openDay: { today = $0; viewMode = .day },
                                add: { day in today = day; viewMode = .day; beginDraft(suggestedEntry(on: day)) },
-                               edit: { editingBlock = $0 })
+                               edit: { editingBlock = $0 }, move: { move($0, to: $1, at: $2, data: data) })
                 } else {
                     let calendarEvents = Calendar.current.isDateInToday(today) ? upcomingCalendarEvents(at: calendarReferenceTime)
                         : visibleBlocks.filter { $0.externalEventKey != nil && $0.plannedStart < dayInterval.end && $0.plannedEnd > dayInterval.start }
@@ -207,11 +206,12 @@ struct PlanScreen: View {
                         day: today,
                         entries: timetableEntries.filter { !$0.block.isUnplannedTimeLog },
                         actuals: data,
-                        step: gridStep,
+                        hourHeight: hourHeight, step: gridStep,
                         windowStartHour: timetablePrefs.startHour,
                         windowEndHour: timetablePrefs.endHour,
                         showsLivedTrace: timetablePrefs.showsLivedTrace,
                         dimsFinished: timetablePrefs.dimsFinished,
+                        onDropEntry: { move($0, to: $1, at: $2, data: data) },
                         onCheckIn: openCheckIn,
                         onStart: start,
                         onOpenFocus: onOpenFocus,
@@ -330,7 +330,15 @@ struct PlanScreen: View {
         }) {
             if let calendarCoordinator {
                 NavigationStack {
-                    ScrollView { CalendarSettings(coordinator: calendarCoordinator, inSheet: true, visibleInterval: calendarImportInterval).padding(Space.lg) }
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Space.sm) {
+                            Button(showsDayCalendarEvents ? "Hide event list" : "View event list") {
+                                showsCalendars = false
+                                showsDayCalendarEvents.toggle()
+                            }.accessibilityIdentifier("anchor.today.show-calendar-events")
+                            CalendarSettings(coordinator: calendarCoordinator, inSheet: true, visibleInterval: calendarImportInterval)
+                        }.padding(Space.lg)
+                    }
                         .background(theme.canvas)
                         .navigationTitle("Google Calendar")
                         #if os(iOS)
@@ -384,9 +392,14 @@ struct PlanScreen: View {
         }
         .sheet(item: $advancedDraft) { draft in
             let seed = draft.seed
-            PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes,
-                            suggestedTitle: draft.title, dayIsFull: seed.dayIsFull) { clearDraft(); refresh() }
-                .anchorTheme()
+            if seed.column == .done {
+                LogTimeSheet(day: today, suggestedStart: seed.start, suggestedTitle: draft.title) { clearDraft(); refresh() }
+                    .anchorTheme()
+            } else {
+                PlanBlockEditor(initialDay: seed.start, suggestedStart: seed.start, suggestedMinutes: seed.minutes,
+                                suggestedTitle: draft.title, dayIsFull: seed.dayIsFull) { clearDraft(); refresh() }
+                    .anchorTheme()
+            }
         }
         .sheet(item: $editingBlock) { block in
             blockEditor(block)
@@ -419,10 +432,6 @@ struct PlanScreen: View {
                 }
             }
             .anchorTheme()
-        }
-        .sheet(isPresented: $showsLogSheet) {
-            LogTimeSheet(day: today, onSave: refresh)
-                .anchorTheme()
         }
         .sheet(item: $loggingBlock) { block in
             LogTimeSheet(day: today, block: block, onSave: refresh)
@@ -575,6 +584,9 @@ struct PlanScreen: View {
                         Image(systemName: "chevron.right").font(.caption2)
                     }.font(.subheadline)
                 }.buttonStyle(.plain).accessibilityHint("Show this event on the timetable")
+
+                Spacer(minLength: 0)
+                Button("Focus", systemImage: "scope", action: onOpenFocus).buttonStyle(.borderless)
             } else {
                 HStack {
                     focusRow("Now · " + block.plannedStart.formatted(date: .omitted, time: .shortened),
@@ -691,60 +703,38 @@ struct PlanScreen: View {
     }
 
     private var calendarOptions: some View {
-        Button { showsDayTools = true } label: {
-            Image(systemName: "slider.horizontal.3").frame(minWidth: periodHitSize, minHeight: periodHitSize)
+        Menu {
+            calendarsButton
+            customizeButton
+            Divider()
+            copyDayButton
+        } label: {
+            Image(systemName: "ellipsis.circle").frame(minWidth: periodHitSize, minHeight: periodHitSize)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Calendar options")
+        #if os(macOS)
+        .menuStyle(.borderlessButton)
+        #endif
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("Calendar actions")
         .accessibilityIdentifier("anchor.today.tools")
-        .popover(isPresented: $showsDayTools) {
-            VStack(alignment: .leading, spacing: Space.xxs) {
-                if !controller.hasSession {
-                    Button("Start an unplanned session", systemImage: "scope") {
-                        showsDayTools = false
-                        onOpenFocus()
-                    }
-                }
-                logTimeButton
-                copyDayButton
-                calendarsButton
-                customizeButton
-                Button(showsDayCalendarEvents ? "Hide calendar list" : "Show calendar list", systemImage: "list.bullet") {
-                    showsDayTools = false
-                    showsDayCalendarEvents.toggle()
-                }.accessibilityIdentifier("anchor.today.show-calendar-events")
-            }
-            .buttonStyle(QuietButtonStyle(expands: true))
-            .frame(idealWidth: 220)
-            .padding(Space.sm)
-            .presentationCompactAdaptation(.popover)
-        }
     }
 
     @ViewBuilder private var calendarsButton: some View {
         if calendarCoordinator != nil {
-            Button("calendars", systemImage: "calendar") { showsDayTools = false; showsCalendars = true }
+            Button("Calendars…", systemImage: "calendar") { showsCalendars = true }
                 .accessibilityIdentifier("anchor.today.calendars")
         }
     }
 
     private var copyDayButton: some View {
-        Button("copy day", systemImage: "doc.on.doc") { showsDayTools = false; showsCopyDay = true }
+        Button("Copy day…", systemImage: "doc.on.doc") { showsCopyDay = true }
             .disabled(copyableBlocks.isEmpty)
             .accessibilityIdentifier("anchor.today.copy-day")
     }
 
-    private var logTimeButton: some View {
-        Button("log time", systemImage: "clock.arrow.circlepath") {
-            showsDayTools = false
-            showsLogSheet = true
-        }
-        .accessibilityIdentifier("anchor.today.log-time")
-    }
-
     private var customizeButton: some View {
-        Button("customize", systemImage: "slider.horizontal.3") {
-            showsDayTools = false
+        Button("Timetable settings…", systemImage: "slider.horizontal.3") {
             showsCustomize = true
         }
         .accessibilityIdentifier("anchor.today.customize")
@@ -809,6 +799,57 @@ struct PlanScreen: View {
         editorSeed = nil
         draftTitle = ""
         draftError = nil
+    }
+
+    private func move(_ drag: CalendarDrag, to column: TimetableColumn, at time: Date, data: CalendarActualData) -> Bool {
+        let plan = visibleBlocks.first { $0.id == drag.id && !$0.isUnplannedTimeLog }
+        let actual = data.entries.first { $0.id == drag.id } ?? data.ongoing.first { $0.id == drag.id }
+        let original: DayLedgerEntry
+        switch drag.source {
+        case .plan:
+            guard let plan else { return false }
+            original = DayLedgerEntry(id: plan.id, title: plan.title, start: plan.plannedStart, end: plan.plannedEnd, notes: plan.details, sourcePlanID: plan.id)
+        case .actual:
+            guard let actual else { return false }
+            original = actual
+        }
+        if drag.resizing && (drag.source == .plan) != (column == .scheduled) { return false }
+        var updated = original
+        if drag.resizing {
+            guard time > original.start else { return false }
+            updated.end = time
+        } else {
+            updated.start = time
+            updated.end = time.addingTimeInterval(original.end.timeIntervalSince(original.start))
+        }
+        if column == .done {
+            // Reposition an existing copy without overwriting its edited title or notes.
+            if let actual, drag.source == .plan {
+                updated = actual
+                updated.start = time
+                updated.end = time.addingTimeInterval(actual.end.timeIntervalSince(actual.start))
+            }
+            return data.move(updated)
+        }
+        do {
+            if drag.source == .actual {
+                context.insert(PlanBlock(title: original.title, details: original.notes, plannedStart: updated.start,
+                                         plannedSeconds: Int(updated.end.timeIntervalSince(updated.start))))
+            } else if let plan {
+                plan.plannedStart = updated.start
+                plan.plannedSeconds = Int(updated.end.timeIntervalSince(updated.start))
+                if plan.externalEventKey != nil || plan.templateID != nil { plan.isTemplateOverride = true }
+                plan.updatedAt = Date()
+                context.insert(DivergenceEvent(blockID: plan.id, sessionID: plan.sessionID, kind: .deliberateReplan,
+                                               evidence: .scheduleChange, note: "Moved on the timetable"))
+            }
+            try context.save()
+            return true
+        } catch {
+            context.rollback()
+            loadError = "Couldn’t move this entry. Try again."
+            return false
+        }
     }
 
     private func saveDraft(_ actuals: CalendarActualData) {
@@ -950,6 +991,7 @@ struct TimetableOptionsSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \AnchorPreferences.updatedAt, order: .reverse) private var preferences: [AnchorPreferences]
+    @AppStorage("anchor.calendar.hour-height") private var hourHeight = 56.0
     @AppStorage(TimetableStep.preferenceKey) private var gridStep = TimetableStep.five
     @State private var showsRoutines = false
     @State private var saveError: String?
@@ -965,9 +1007,6 @@ struct TimetableOptionsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.lg) {
-                    Text("The timetable only ever answers one question: what does this day ask of you. These choices shape how it draws that answer.")
-                        .font(.subheadline)
-                        .foregroundStyle(theme.textSecondary)
 
                     if let saveError {
                         Label(saveError, systemImage: "exclamationmark.triangle.fill")
@@ -977,6 +1016,11 @@ struct TimetableOptionsSheet: View {
 
                     Card(padding: Space.lg) {
                         VStack(alignment: .leading, spacing: Space.md) {
+                            Picker("Hour spacing", selection: $hourHeight) {
+                                Text("Compact").tag(44.0)
+                                Text("Standard").tag(56.0)
+                                Text("Spacious").tag(84.0)
+                            }
                             Picker("Grid step", selection: $gridStep) {
                                 ForEach(TimetableStep.allCases, id: \.self) { step in
                                     Text("\(step.rawValue) minutes").tag(step)

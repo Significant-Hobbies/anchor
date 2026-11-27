@@ -107,6 +107,7 @@ struct DayTimetable: View {
     var windowEndHour: Int = 22
     var showsLivedTrace: Bool = true
     var dimsFinished: Bool = true
+    var onDropEntry: (CalendarDrag, TimetableColumn, Date) -> Bool = { _, _, _ in false }
     var onCheckIn: (PlanBlock) -> Void = { _ in }
     var onStart: (PlanBlock) -> Void = { _ in }
     var onOpenFocus: () -> Void = {}
@@ -176,9 +177,9 @@ struct DayTimetable: View {
             let longActuals = dayActuals.filter { $0.end.timeIntervalSince($0.start) >= 86_400 }
             if !longPlans.isEmpty || !longActuals.isEmpty {
                 HStack(alignment: .top, spacing: Space.xxs) {
-                    VStack { ForEach(longPlans) { blockCard($0, height: 70).frame(height: 70) } }
+                    VStack { ForEach(longPlans) { blockCard($0, height: 70).frame(height: 70).draggable(CalendarDrag(id: $0.id, source: .plan)) } }
                         .frame(maxWidth: .infinity)
-                    VStack { ForEach(longActuals) { doneCard($0).frame(height: 70) } }
+                    VStack { ForEach(longActuals) { doneCard($0).frame(height: 70).draggable(CalendarDrag(id: $0.id, source: .actual)) } }
                         .frame(maxWidth: .infinity)
                 }.padding(.leading, railWidth + traceWidth)
             }
@@ -211,7 +212,8 @@ struct DayTimetable: View {
             .padding(.vertical, height < 38 ? 0 : Space.xxs)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(.leading, Space.xxs)
-            .background(category.calendarColor.opacity(0.16), in: .rect(cornerRadius: Radius.sm))
+            .background(category.calendarColor.opacity(0.24), in: .rect(cornerRadius: Radius.sm))
+            .overlay { RoundedRectangle(cornerRadius: Radius.sm).strokeBorder(category.calendarColor.opacity(0.75)) }
             .overlay(alignment: .leading) {
                 Capsule().fill(category.calendarColor).frame(width: 3).padding(.vertical, 2)
             }
@@ -259,6 +261,7 @@ struct DayTimetable: View {
                     let laneWidth = (gridWidth - CGFloat(placement.laneCount - 1) * laneGap) / CGFloat(placement.laneCount)
                     blockCard(entry, height: height, compact: laneWidth < 180)
                     .frame(width: laneWidth, height: height, alignment: .topLeading)
+                    .movableEntry(CalendarDrag(id: entry.id, source: .plan), resize: true)
                     .offset(
                         x: gridX + CGFloat(placement.lane) * (laneWidth + laneGap),
                         y: bounds.start
@@ -277,6 +280,7 @@ struct DayTimetable: View {
                     let height = bounds.end - bounds.start
                     doneCard(item, height: height)
                     .frame(width: width, height: height)
+                    .movableEntry(CalendarDrag(id: item.id, source: .actual), resize: true)
                     .offset(x: doneX + CGFloat(lane.lane) * (width + Space.xxs), y: bounds.start)
                 }
 
@@ -308,6 +312,14 @@ struct DayTimetable: View {
                         .padding(.leading, draft.column == .done ? doneX : gridX)
                         .id(draft.id)
                 }
+            }
+            .dropDestination(for: CalendarDrag.self) { items, point in
+                guard let item = items.first, point.x >= gridX, point.y >= 0, point.y <= totalHeight else { return false }
+                let stepSeconds = Double(step.rawValue * 60)
+                let offset = (point.y / hourHeight * 3600 / stepSeconds).rounded() * stepSeconds
+                let limit = range.duration - (item.resizing ? 0 : stepSeconds)
+                return onDropEntry(item, point.x < doneX ? .scheduled : .done,
+                                   range.start.addingTimeInterval(min(limit, max(0, offset))))
             }
         }
         .frame(height: max(totalHeight, draft.map { offset(for: $0.start) + draftHeight } ?? 0))
@@ -529,7 +541,7 @@ private struct TimetableBlockCard: View {
                     Button { showsActions = true } label: {
                         Text(block.title)
                             .font(height < 38 ? .caption2.weight(.semibold) : compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
-                            .foregroundStyle(theme.textPrimary)
+                            .foregroundStyle(Color.black.opacity(0.91))
                             .lineLimit(height < 38 ? 1 : 2)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -545,7 +557,7 @@ private struct TimetableBlockCard: View {
                     let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated
                     Text("\(block.plannedStart.formatted(date: dateStyle, time: .shortened)) – \(block.plannedEnd.formatted(date: dateStyle, time: .shortened))")
                         .font(.caption2.monospacedDigit())
-                        .foregroundStyle(theme.textTertiary)
+                        .foregroundStyle(Color.black.opacity(0.76))
                         .lineLimit(1)
                 }
                 if height >= 92 {
@@ -559,8 +571,7 @@ private struct TimetableBlockCard: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             Button { showsActions = true } label: {
-                RoundedRectangle(cornerRadius: Radius.sm).fill(cardFill)
-                    .overlay { RoundedRectangle(cornerRadius: Radius.sm).fill(category.calendarColor.opacity(0.14)) }
+                RoundedRectangle(cornerRadius: Radius.sm).fill(category.calendarColor)
                     .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityHidden(true)
         }
@@ -575,6 +586,7 @@ private struct TimetableBlockCard: View {
                 ).allowsHitTesting(false)
         }
         .help(category.rawValue.capitalized)
+        .foregroundStyle(Color.black.opacity(0.91))
         .opacity(cardOpacity)
         .popover(isPresented: $showsActions, arrowEdge: actionsArrow) {
             VStack(alignment: .leading, spacing: Space.xxs) {
@@ -610,7 +622,7 @@ private struct TimetableBlockCard: View {
     private var actionsButton: some View {
         Button { showsActions = true } label: {
             Image(systemName: "ellipsis")
-                .foregroundStyle(theme.textSecondary)
+                .foregroundStyle(Color.black.opacity(0.72))
                 .frame(width: 32, height: 32)
                 .contentShape(.rect)
         }
@@ -635,7 +647,7 @@ private struct TimetableBlockCard: View {
                 Text(projectName)
                 Text("·")
             }
-            Text(block.kind.label)
+            Text(category.rawValue.capitalized)
             Text("·")
             Text(block.flexibility.label)
             if block.templateID != nil {
@@ -648,7 +660,7 @@ private struct TimetableBlockCard: View {
             }
         }
         .font(.caption2)
-        .foregroundStyle(theme.textTertiary)
+        .foregroundStyle(Color.black.opacity(0.76))
         .lineLimit(1)
     }
 
@@ -695,10 +707,6 @@ private struct TimetableBlockCard: View {
         case .skipped, .moved: theme.textTertiary
         default: theme.accent
         }
-    }
-
-    private var cardFill: Color {
-        entry.isCurrent || block.state == .inProgress ? theme.surfaceRaised : theme.surface
     }
 
     private var cardOpacity: Double {

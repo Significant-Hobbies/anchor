@@ -38,7 +38,7 @@ public struct FocusScreen: View {
         ZStack {
             theme.canvas.ignoresSafeArea()
             if controller.hasSession {
-                RunningSessionView(controller: controller)
+                RunningSessionView(controller: controller, nextBlock: nextAppointment)
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
             } else if let block = scheduledBlock, !showsAdHocComposer {
                 scheduledStart(block)
@@ -125,6 +125,7 @@ public struct FocusScreen: View {
         .animation(Motion.gentle, value: controller.hasSession)
         .task {
             refreshSchedule()
+            if !controller.hasSession && scheduledBlock == nil { showsAdHocComposer = true }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
                 now = Date()
@@ -151,6 +152,14 @@ public struct FocusScreen: View {
         guard let latest = sessions.first(where: { $0.startedAt <= Date() }), latest.state == .finished,
               let endedAt = latest.endedAt, Calendar.current.isDateInToday(endedAt) else { return nil }
         return calendarVisibility.filter(blocks).first { $0.sessionID == latest.id }
+    }
+
+    private var nextAppointment: PlanBlock? {
+        calendarVisibility.filter(blocks).first { block in
+            block.plannedStart > now && block.state == .planned && !block.isUnplannedTimeLog
+                && (block.sessionID == nil || block.sessionID != controller.session?.id)
+                && (block.externalEventKey == nil || block.plannedSeconds < 86_400)
+        }
     }
 
     private var scheduledBlock: PlanBlock? {
@@ -200,10 +209,10 @@ public struct FocusScreen: View {
                         .foregroundStyle(theme.negative)
                 }
 
-                Text("Once started, Lock a distraction stays on top of the timer with quick interruption options.")
-                    .font(.footnote)
-                    .foregroundStyle(theme.textTertiary)
-                    .multilineTextAlignment(.center)
+                if let nextAppointment, nextAppointment.id != block.id {
+                    Text("Up next · " + nextAppointment.title + " · " + nextAppointment.plannedStart.formatted(date: Calendar.current.isDateInToday(nextAppointment.plannedStart) ? .omitted : .abbreviated, time: .shortened))
+                        .font(.subheadline).foregroundStyle(theme.textSecondary)
+                }
             }
             .padding(Space.lg)
             .frame(maxWidth: 980)
@@ -610,7 +619,7 @@ public struct RootView: View {
         }
         .sheet(isPresented: $navigation.showsFocus, onDismiss: { alternativePlanID = nil }) {
             NavigationStack {
-                FocusScreen(controller: controller, composeWhenIdle: !controller.hasSession && alternativePlanID == nil, alternativePlanID: alternativePlanID)
+                FocusScreen(controller: controller, alternativePlanID: alternativePlanID)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Back to Today") { navigation.select(.today) }
