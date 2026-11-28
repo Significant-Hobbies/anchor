@@ -39,6 +39,7 @@ private struct DailyChecklistView: View {
     @State private var checklist: DailyChecklist?
     @State private var yesterday = false
     @State private var isEditing = false
+    @State private var canRecover = false
     @State private var title = ""
     @State private var message: String?
     @FocusState private var enteringTitle: Bool
@@ -95,12 +96,17 @@ private struct DailyChecklistView: View {
                                 .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                     }
-                } else {
-                    Button("Retry", action: reload)
                 }
 
                 if let message {
                     Text(message).font(.footnote).foregroundStyle(theme.caution)
+                }
+                if checklist == nil {
+                    if canRecover {
+                        Button("Start a new checklist") { save { try store.recover() } }
+                    } else {
+                        Button("Retry", action: reload)
+                    }
                 }
             }
             .padding(Space.md)
@@ -166,8 +172,14 @@ private struct DailyChecklistView: View {
         do {
             checklist = try store.load()
             message = nil
+            canRecover = false
+        } catch is DecodingError {
+            checklist = nil
+            canRecover = true
+            message = "Anchor couldn’t read the saved checklist. Starting a new one keeps a copy of the original file."
         } catch {
             checklist = nil
+            canRecover = false
             message = "Couldn’t open the checklist."
         }
     }

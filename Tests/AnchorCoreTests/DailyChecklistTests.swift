@@ -3,6 +3,24 @@ import Testing
 @testable import AnchorCore
 
 struct DailyChecklistTests {
+    @Test func recoveryPreservesUnreadableFile() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("anchor.store")
+        let file = url.appendingPathExtension("daily-checklist.json")
+        let invalid = Data("{".utf8)
+        try invalid.write(to: file)
+
+        let store = DailyChecklistStore(storeURL: url)
+        #expect(throws: DecodingError.self) { try store.add("Check the schedule") }
+        #expect(try store.recover().items.isEmpty)
+        #expect(try store.add("Check the schedule").items.count == 1)
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        let backup = try #require(files.first { $0.pathExtension == "unreadable" })
+        #expect(try Data(contentsOf: backup) == invalid)
+    }
+
     @Test func recurringItemsPersistAndOnlyTheLastTwoLocalDatesCanBeChecked() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -36,7 +54,7 @@ struct DailyChecklistTests {
         let nextDay = try store.setChecked(true, itemID: item.id, on: "2026-3-9", now: { afterMidnight }, timeZone: { timeZone })
         #expect(nextDay.items.first?.isChecked(on: "2026-3-9") == true)
         #expect(nextDay.items.first?.isChecked(on: today) == true)
-        #expect(nextDay.items.first?.isChecked(on: yesterday) == false)
+        #expect(nextDay.items.first?.isChecked(on: yesterday) == true)
         #expect(try store.remove(item.id).items.isEmpty)
     }
 }

@@ -608,7 +608,8 @@ struct PlanScreen: View {
 
     private func checklistAndCalendarOptions(_ data: CalendarActualData) -> some View {
         HStack(spacing: Space.xxs) {
-            if let storeURL = context.plannerSidecarURL {
+            if Calendar.current.isDateInToday(today) || Calendar.current.isDateInYesterday(today),
+               let storeURL = context.plannerSidecarURL {
                 DailyChecklistButton(day: today, store: DailyChecklistStore(storeURL: storeURL), hitSize: periodHitSize)
             }
             calendarOptions(data)

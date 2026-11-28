@@ -62,15 +62,16 @@ public struct DailyChecklistStore {
             let dates = DailyChecklist.availableDates(at: now(), timeZone: timeZone())
             guard dates.contains(day) else { throw EditError.dateClosed }
             guard let index = checklist.items.firstIndex(where: { $0.id == itemID }) else { throw EditError.itemRemoved }
-            for index in checklist.items.indices {
-                checklist.items[index].checkedDates.formIntersection(dates)
-            }
             if checked {
                 checklist.items[index].checkedDates.insert(day)
             } else {
                 checklist.items[index].checkedDates.remove(day)
             }
         }
+    }
+
+    public func recover() throws -> DailyChecklist {
+        try update(recoverUnreadable: true) { _ in }
     }
 
     private func load(from file: URL) throws -> DailyChecklist {
@@ -81,12 +82,19 @@ public struct DailyChecklistStore {
         }
     }
 
-    private func update(_ edit: (inout DailyChecklist) throws -> Void) throws -> DailyChecklist {
+    private func update(recoverUnreadable: Bool = false, _ edit: (inout DailyChecklist) throws -> Void) throws -> DailyChecklist {
         var coordinationError: NSError?
         var result: Result<DailyChecklist, Error>?
         NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { file in
             result = Result {
-                var checklist = try load(from: file)
+                var checklist: DailyChecklist
+                do {
+                    checklist = try load(from: file)
+                } catch is DecodingError where recoverUnreadable {
+                    let backup = file.appendingPathExtension(UUID().uuidString + ".unreadable")
+                    try FileManager.default.copyItem(at: file, to: backup)
+                    checklist = DailyChecklist()
+                }
                 try edit(&checklist)
                 try JSONEncoder().encode(checklist).write(to: file, options: .atomic)
                 return checklist
