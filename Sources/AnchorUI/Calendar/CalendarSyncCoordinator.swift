@@ -45,6 +45,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     @Published public private(set) var availableCalendars: [String: [GoogleCalendarInfo]] = [:]
     @Published public private(set) var status: String?
     @Published public private(set) var connectionIssue: String?
+    @Published public private(set) var importIssues: [String: String] = [:]
     @Published public private(set) var calendarListIssues: [String: String] = [:]
     @Published public private(set) var isConnecting = false
 
@@ -104,12 +105,13 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     /// Runs the OAuth flow: browser sign-in, code exchange, identity lookup,
     /// calendar list. Connecting the same Google identity again refreshes its
     /// credentials and calendar list without duplicating the account.
-    public func connect() async {
+    @discardableResult
+    public func connect(reconnecting expected: ConnectedGoogleAccount? = nil) async -> Bool {
         guard !clientID.isEmpty else {
             connectionIssue = "Google sign-in is not configured in this build yet."
-            return
+            return false
         }
-        guard !isConnecting else { return }
+        guard !isConnecting else { return false }
         connectionIssue = nil
         isConnecting = true
         defer { isConnecting = false }
@@ -138,14 +140,19 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             } else {
                 identity = try await calendarStore.accountIdentity(accessToken: tokens.accessToken)
             }
+            if let expected, expected.id != identity.id {
+                connectionIssue = "Choose \(expected.email.isEmpty ? expected.displayName : expected.email) in Google to reconnect this calendar."
+                return false
+            }
             let calendars: [GoogleCalendarInfo]
             do {
                 calendars = try await calendarStore.calendars(accessToken: tokens.accessToken)
             } catch {
                 connectionIssue = "Couldn’t load calendars for \(identity.displayName). "
                     + Self.connectionMessage(for: error)
-                return
+                return false
             }
+            guard expected == nil || accounts.contains(where: { $0.id == identity.id }) else { return false }
             try await credentialStore.save(
                 GoogleCredentials(
                     accessToken: tokens.accessToken,
@@ -173,11 +180,13 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             var disconnected = disconnectedAccountIDs
             if disconnected.remove(account.id) != nil { persistDisconnected(disconnected) }
             connectionIssue = nil
+            return true
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             connectionIssue = nil
         } catch {
             connectionIssue = Self.connectionMessage(for: error)
         }
+        return false
     }
 
     private static func connectionMessage(for error: Error) -> String {
@@ -192,6 +201,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             await tokenClient.revoke(credentials.refreshToken)
         }
         try? await credentialStore.delete(accountID: accountID)
+        importIssues.removeValue(forKey: accountID)
         accounts.removeAll { $0.id == accountID }
         persistAccounts()
         availableCalendars.removeValue(forKey: accountID)
@@ -302,6 +312,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         }
 
         let failures = accessFailures.merging(report.failureReasons) { _, reason in reason }
+        importIssues = failures.filter { eligible.contains($0.key) }
         let details = requested.compactMap { account -> String? in
             guard eligible.contains(account.id), let reason = failures[account.id] else { return nil }
             let label = account.email.isEmpty ? account.displayName : account.email

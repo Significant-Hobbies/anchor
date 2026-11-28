@@ -85,6 +85,21 @@ struct CalendarCoordinatorTests {
         #expect(reopened.accounts == coordinator.accounts)
     }
 
+    @Test("Account-specific reconnect refuses a different Google identity")
+    func reconnectChecksSelectedIdentity() async throws {
+        let defaults = freshDefaults()
+        let credentials = InMemoryCredentialStore()
+        let target = ConnectedGoogleAccount(id: "work", email: "user@example.com", displayName: "Work", selectedCalendarIDs: ["team"])
+        try await seedAccount(target, into: defaults, store: credentials)
+        let http = StubGoogleHTTP()
+        http.body = #"{"access_token":"new","refresh_token":"refresh","expires_in":3600}"#
+        let coordinator = makeCoordinator(defaults: defaults, http: http, credentials: credentials)
+        await coordinator.connect(reconnecting: target)
+        #expect(coordinator.connectionIssue?.contains(target.email) == true)
+        #expect(coordinator.accounts == [target])
+        #expect(try await credentials.load(accountID: "108") == nil)
+    }
+
     @Test("A failed calendar list preserves selections, credentials, and the sign-in error during background sync")
     func calendarListFailurePreservesReconnect() async throws {
         let defaults = freshDefaults()

@@ -35,10 +35,11 @@ public struct DayLedgerComparison {
     public let plannedSeconds, recordedSeconds: Double
     public let linkedVarianceSeconds, unplannedSeconds: Double
 
-    public init(period: DateInterval, plans: [DayLedgerEntry], actuals: [DayLedgerEntry]) {
-        self.plans = plans.filter { $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
-        self.actuals = actuals.filter { $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
-        let byID = Dictionary(actuals.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    public init(period: DateInterval, plans: [DayLedgerEntry], actuals: [DayLedgerEntry], finishedBy: Date = .distantFuture) {
+        self.plans = plans.filter { $0.end <= finishedBy && $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
+        let finishedActuals = actuals.filter { $0.end <= finishedBy }
+        self.actuals = finishedActuals.filter { $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
+        let byID = Dictionary(finishedActuals.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let planIDs = Set(plans.map(\.id))
         var same = 0, different = 0
         var variance: Double = 0

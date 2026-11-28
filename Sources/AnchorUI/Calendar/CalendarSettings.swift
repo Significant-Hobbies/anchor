@@ -85,6 +85,10 @@ public struct CalendarSettings: View {
                 }
                 Spacer()
                 Menu {
+                    Button("Reconnect account", systemImage: "person.crop.circle.badge.checkmark") {
+                        reconnect(account)
+                    }
+                    .disabled(coordinator.isConnecting)
                     Button("Refresh calendars", systemImage: "arrow.clockwise") {
                         Task { await coordinator.refreshCalendars(accountID: account.id) }
                     }
@@ -112,6 +116,10 @@ public struct CalendarSettings: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .accessibilityLabel("More actions for \(account.displayName)")
+            }
+            if coordinator.importIssues[account.id] != nil {
+                Button("Reconnect account") { reconnect(account) }
+                    .disabled(coordinator.isConnecting)
             }
             if let issue = coordinator.calendarListIssues[account.id] {
                 Text(issue).font(.subheadline).foregroundStyle(theme.caution)
@@ -148,6 +156,17 @@ public struct CalendarSettings: View {
         .task {
             if (coordinator.availableCalendars[account.id] ?? []).isEmpty {
                 await coordinator.refreshCalendars(accountID: account.id)
+            }
+        }
+    }
+
+    private func reconnect(_ account: ConnectedGoogleAccount) {
+        Task {
+            guard await coordinator.connect(reconnecting: account) else { return }
+            if let visibleInterval {
+                await coordinator.sync(context: context, window: visibleInterval)
+            } else {
+                await coordinator.sync(context: context, blocks: planBlocks)
             }
         }
     }

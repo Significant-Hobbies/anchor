@@ -62,12 +62,7 @@ public struct ScheduledFocusResolver: Sendable {
             .filter { block in
                 let inSlot = block.plannedStart <= now && now < block.plannedStart.addingTimeInterval(TimeInterval(block.plannedSeconds))
                 return (currentOnly ? inSlot : calendar.isDate(block.plannedStart, inSameDayAs: now))
-                    && block.isUnplannedTimeLog != true
-                    && (!recorded.contains(block.id) || (block.externalEventKey != nil && block.plannedStart > now))
-                    && (block.externalEventKey == nil || block.plannedSeconds < 86_400 || block.state == .inProgress)
-                    && block.state != .completed
-                    && block.state != .skipped
-                    && block.state != .moved
+                    && isOpen(block, recorded: recorded, now: now)
             }
             .sorted { $0.plannedStart < $1.plannedStart }
 
@@ -77,5 +72,19 @@ public struct ScheduledFocusResolver: Sendable {
                 && now < $0.plannedStart.addingTimeInterval(TimeInterval($0.plannedSeconds))
         }) { return current }
         return open.first { $0.plannedStart > now }
+    }
+
+    public func nextAppointment(from blocks: [PlanBlockRecord], recorded: Set<UUID>, now: Date) -> PlanBlockRecord? {
+        blocks.filter { $0.plannedStart > now && $0.state == .planned && isOpen($0, recorded: recorded, now: now) }
+            .min { $0.plannedStart < $1.plannedStart }
+    }
+
+    private func isOpen(_ block: PlanBlockRecord, recorded: Set<UUID>, now: Date) -> Bool {
+        block.isUnplannedTimeLog != true
+            && (!recorded.contains(block.id) || (block.externalEventKey != nil && block.plannedStart > now))
+            && (block.externalEventKey == nil || block.plannedSeconds < 86_400 || block.state == .inProgress)
+            && block.state != .completed
+            && block.state != .skipped
+            && block.state != .moved
     }
 }

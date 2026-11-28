@@ -101,7 +101,20 @@ public struct AnalyticsScreen: View {
                 #endif
                 rangePicker
                 CalendarActuals(blocks: calendarVisibility.filter(plans), sessions: sessions, allBlocks: plans) { data in
-                    ObservedHabitsCard(entries: data.entries, blocks: calendarVisibility.filter(plans), days: range.days)
+                    let visible = calendarVisibility.filter(plans)
+                    if data.available {
+                        let now = Date()
+                        let comparison = DayLedgerComparison(
+                            period: DateInterval(start: periodStart, end: now),
+                            plans: visible.filter { !$0.isUnplannedTimeLog }.map { DayLedgerEntry(plan: $0).atMinutePrecision },
+                            actuals: data.entries.map(\.atMinutePrecision),
+                            finishedBy: now
+                        )
+                        if !comparison.plans.isEmpty || !comparison.actuals.isEmpty {
+                            Card { LedgerSummary(data: comparison, title: "Scheduled and recorded · finished slots") }
+                        }
+                    }
+                    ObservedHabitsCard(entries: data.entries, blocks: visible, days: range.days)
                 }
 
                 SectionHeader("Interruptions")
@@ -111,7 +124,7 @@ public struct AnalyticsScreen: View {
                     EmptyStateView(
                         symbol: "chart.bar.doc.horizontal",
                         title: "No focus sessions in this period",
-                        message: "Run a focus session and this fills in — where your hours go, and what keeps taking them."
+                        message: "Timed focus sessions appear here when you use the Focus timer."
                     )
                 } else {
                     tiles(overview)

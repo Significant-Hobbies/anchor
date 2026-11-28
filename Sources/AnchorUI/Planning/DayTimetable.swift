@@ -80,6 +80,25 @@ enum TimetableLayout {
 
 }
 
+private struct SlotTimeRange: View {
+    let category: ActivityCategory
+    let start: Date
+    let end: Date
+
+    var body: some View {
+        let sameDay = Calendar.current.isDate(start, inSameDayAs: end)
+        let interval = start..<max(start, end)
+        let times = interval.formatted(.interval.hour().minute())
+        let range = sameDay ? times : interval.formatted(.interval.month().day().hour().minute())
+        ViewThatFits(in: .horizontal) {
+            Text("\(category.rawValue.capitalized) · \(range)").fixedSize()
+            Text(range).lineLimit(1)
+        }
+        .font(.caption2.monospacedDigit())
+        .accessibilityLabel("\(category.rawValue.capitalized), \(range)")
+    }
+}
+
 /// The day as a real timetable: an hour rail on the left, blocks at their
 /// clock position sized by duration, a thin "lived" trace beside the rail
 /// showing when work actually happened, and a now-line when the day is today.
@@ -221,7 +240,7 @@ struct DayTimetable: View {
                 }
                 if height >= 38 {
                     if actuals.recordedIDs.contains(item.id) {
-                        Text("\(category.rawValue.capitalized) · \(item.start.formatted(date: .omitted, time: .shortened))").font(.caption2.monospacedDigit()).lineLimit(1)
+                        SlotTimeRange(category: category, start: item.start, end: item.end)
                     } else {
                         Text("In progress").font(.caption2)
                     }
@@ -574,11 +593,8 @@ private struct TimetableBlockCard: View {
 
                 }
                 if height >= (compact ? 38 : 56) {
-                    let dateStyle: Date.FormatStyle.DateStyle = Calendar.current.isDate(block.plannedStart, inSameDayAs: block.plannedEnd) ? .omitted : .abbreviated
-                    Text("\(category.rawValue.capitalized) · \(block.plannedStart.formatted(date: dateStyle, time: .shortened)) – \(block.plannedEnd.formatted(date: dateStyle, time: .shortened))")
-                        .font(.caption2.monospacedDigit())
+                    SlotTimeRange(category: category, start: block.plannedStart, end: block.plannedEnd)
                         .foregroundStyle(Color.black.opacity(0.76))
-                        .lineLimit(1)
                 }
                 if height >= 92 {
                     metaLine

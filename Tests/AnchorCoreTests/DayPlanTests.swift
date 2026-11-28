@@ -582,6 +582,8 @@ struct DayPlanTests {
                                       plannedSeconds: 3600, externalEventKey: "imported")
         let gym = PlanBlockRecord(id: UUID(), title: "Gym", plannedStart: now.addingTimeInterval(9000), plannedSeconds: 3600)
         let resolver = ScheduledFocusResolver()
+        #expect(resolver.nextAppointment(from: [gym], recorded: [gym.id], now: now) == nil)
+        #expect(resolver.nextAppointment(from: [gym, meeting], recorded: [meeting.id], now: now)?.id == meeting.id)
         #expect(resolver.nextBlock(from: [gym, meeting], recorded: [meeting.id], now: now, calendar: Fixture.calendar)?.id == meeting.id)
         #expect(resolver.nextBlock(from: [gym, meeting], recorded: [meeting.id], now: meeting.plannedStart, calendar: Fixture.calendar)?.id == gym.id)
     }
