@@ -22,7 +22,7 @@ struct DailyChecklistButton: View {
         .accessibilityLabel("Daily checklist")
         .accessibilityIdentifier("anchor.today.checklist")
         .popover(isPresented: $showingChecklist) {
-            DailyChecklistView(store: store, day: day)
+            DailyChecklistView(store: store, day: day, hitSize: hitSize)
                 .anchorTheme()
         }
     }
@@ -32,8 +32,10 @@ private struct DailyChecklistView: View {
     @Environment(\.anchorTheme) private var theme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var sizeClass
     let store: DailyChecklistStore
     let day: Date
+    let hitSize: CGFloat
     @State private var checklist: DailyChecklist?
     @State private var yesterday = false
     @State private var isEditing = false
@@ -106,6 +108,7 @@ private struct DailyChecklistView: View {
         #if os(macOS)
         .frame(width: 318)
         #else
+        .frame(width: sizeClass == .regular ? 318 : nil)
         .presentationDetents([.medium, .large])
         #endif
         .background(theme.canvas)
@@ -131,7 +134,7 @@ private struct DailyChecklistView: View {
                     Text(item.title)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: max(30, hitSize), alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

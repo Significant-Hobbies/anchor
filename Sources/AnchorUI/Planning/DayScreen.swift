@@ -545,7 +545,7 @@ struct PlanScreen: View {
             periodArrow(-1)
             Button { showsDatePicker.toggle() } label: {
                 HStack(spacing: Space.xxs) {
-                    Text(today, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
+                    Text(today, format: navigationDateStyle)
                         .font(.subheadline.weight(.semibold))
                     Image(systemName: "chevron.down").font(.caption2)
                 }
@@ -575,6 +575,14 @@ struct PlanScreen: View {
                 .fixedSize(horizontal: true, vertical: false)
                 .accessibilityLabel("Go to today")
         }
+    }
+
+    private var navigationDateStyle: Date.FormatStyle {
+        let date = Date.FormatStyle.dateTime.day().month(.abbreviated)
+        if horizontalSizeClass == .compact {
+            return Calendar.current.isDate(today, equalTo: .now, toGranularity: .year) ? date : date.year()
+        }
+        return date.weekday(.abbreviated).year()
     }
 
     private var periodHitSize: CGFloat {
