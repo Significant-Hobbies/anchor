@@ -220,13 +220,13 @@ struct PlanScreen: View {
                         dateNavigation
                         if Calendar.current.isDateInToday(today) { status.fixedSize(horizontal: true, vertical: false) }
                         Spacer(minLength: 0)
-                        calendarOptions(data)
+                        checklistAndCalendarOptions(data)
                     }
                     VStack(alignment: .leading, spacing: Space.xxs) {
                         HStack {
                             dateNavigation
                             Spacer(minLength: 0)
-                            calendarOptions(data)
+                            checklistAndCalendarOptions(data)
                         }
                         if Calendar.current.isDateInToday(today) { status }
                     }
@@ -545,7 +545,7 @@ struct PlanScreen: View {
             periodArrow(-1)
             Button { showsDatePicker.toggle() } label: {
                 HStack(spacing: Space.xxs) {
-                    Text(today, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
+                    Text(today, format: navigationDateStyle)
                         .font(.subheadline.weight(.semibold))
                     Image(systemName: "chevron.down").font(.caption2)
                 }
@@ -577,6 +577,14 @@ struct PlanScreen: View {
         }
     }
 
+    private var navigationDateStyle: Date.FormatStyle {
+        let date = Date.FormatStyle.dateTime.day().month(.abbreviated)
+        if horizontalSizeClass == .compact {
+            return Calendar.current.isDate(today, equalTo: .now, toGranularity: .year) ? date : date.year()
+        }
+        return date.weekday(.abbreviated).year()
+    }
+
     private var periodHitSize: CGFloat {
         #if os(macOS)
         28
@@ -596,6 +604,16 @@ struct PlanScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(direction < 0 ? "Previous day" : "Next day")
+    }
+
+    private func checklistAndCalendarOptions(_ data: CalendarActualData) -> some View {
+        HStack(spacing: Space.xxs) {
+            if Calendar.current.isDateInToday(today) || Calendar.current.isDateInYesterday(today),
+               let storeURL = context.plannerSidecarURL {
+                DailyChecklistButton(day: today, store: DailyChecklistStore(storeURL: storeURL), hitSize: periodHitSize)
+            }
+            calendarOptions(data)
+        }
     }
 
     private func calendarOptions(_ data: CalendarActualData) -> some View {
