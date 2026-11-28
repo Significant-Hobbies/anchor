@@ -220,13 +220,13 @@ struct PlanScreen: View {
                         dateNavigation
                         if Calendar.current.isDateInToday(today) { status.fixedSize(horizontal: true, vertical: false) }
                         Spacer(minLength: 0)
-                        calendarOptions(data)
+                        checklistAndCalendarOptions(data)
                     }
                     VStack(alignment: .leading, spacing: Space.xxs) {
                         HStack {
                             dateNavigation
                             Spacer(minLength: 0)
-                            calendarOptions(data)
+                            checklistAndCalendarOptions(data)
                         }
                         if Calendar.current.isDateInToday(today) { status }
                     }
@@ -596,6 +596,15 @@ struct PlanScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(direction < 0 ? "Previous day" : "Next day")
+    }
+
+    private func checklistAndCalendarOptions(_ data: CalendarActualData) -> some View {
+        HStack(spacing: Space.xxs) {
+            if let storeURL = context.plannerSidecarURL {
+                DailyChecklistButton(day: today, store: DailyChecklistStore(storeURL: storeURL), hitSize: periodHitSize)
+            }
+            calendarOptions(data)
+        }
     }
 
     private func calendarOptions(_ data: CalendarActualData) -> some View {
