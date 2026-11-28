@@ -281,6 +281,16 @@ struct CalendarSyncTests {
 
     // MARK: - OAuth pieces
 
+    @Test func reconnectActionOnlyAppliesToAccountAuthorizationFailures() {
+        #expect(GoogleCalendarError.requiresReconnect(GoogleCalendarError.missingRefreshToken))
+        #expect(GoogleCalendarError.requiresReconnect(GoogleCalendarError.api(status: 401, message: "")))
+        let badRequest = GoogleCalendarError.api(status: 400, message: "")
+        #expect(GoogleCalendarError.requiresReconnect(badRequest, refreshingAccess: true))
+        #expect(!GoogleCalendarError.requiresReconnect(badRequest))
+        #expect(!GoogleCalendarError.requiresReconnect(URLError(.notConnectedToInternet)))
+        #expect(!GoogleCalendarError.requiresReconnect(GoogleCalendarError.api(status: 429, message: "")))
+    }
+
     @Test("Authorization request carries PKCE, offline access, and the reversed scheme")
     func authorizationRequestShape() throws {
         let clientID = "abc123.apps.googleusercontent.com"

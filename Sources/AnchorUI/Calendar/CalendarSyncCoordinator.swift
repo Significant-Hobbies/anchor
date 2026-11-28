@@ -45,6 +45,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     @Published public private(set) var availableCalendars: [String: [GoogleCalendarInfo]] = [:]
     @Published public private(set) var status: String?
     @Published public private(set) var connectionIssue: String?
+    @Published public private(set) var reconnectAccounts: Set<String> = []
     @Published public private(set) var calendarListIssues: [String: String] = [:]
     @Published public private(set) var isConnecting = false
 
@@ -104,12 +105,13 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     /// Runs the OAuth flow: browser sign-in, code exchange, identity lookup,
     /// calendar list. Connecting the same Google identity again refreshes its
     /// credentials and calendar list without duplicating the account.
-    public func connect() async {
+    @discardableResult
+    public func connect(reconnecting expected: ConnectedGoogleAccount? = nil) async -> Bool {
         guard !clientID.isEmpty else {
             connectionIssue = "Google sign-in is not configured in this build yet."
-            return
+            return false
         }
-        guard !isConnecting else { return }
+        guard !isConnecting else { return false }
         connectionIssue = nil
         isConnecting = true
         defer { isConnecting = false }
@@ -138,13 +140,21 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             } else {
                 identity = try await calendarStore.accountIdentity(accessToken: tokens.accessToken)
             }
+            if let expected, expected.id != identity.id {
+                connectionIssue = "Choose \(expected.email.isEmpty ? expected.displayName : expected.email) in Google to reconnect this calendar."
+                return false
+            }
             let calendars: [GoogleCalendarInfo]
             do {
                 calendars = try await calendarStore.calendars(accessToken: tokens.accessToken)
             } catch {
                 connectionIssue = "Couldn’t load calendars for \(identity.displayName). "
                     + Self.connectionMessage(for: error)
-                return
+                return false
+            }
+            guard expected == nil || accounts.contains(where: { $0.id == identity.id }) else {
+                connectionIssue = "This account was removed during sign-in. Add it again to reconnect."
+                return false
             }
             try await credentialStore.save(
                 GoogleCredentials(
@@ -172,12 +182,15 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             upsert(account)
             var disconnected = disconnectedAccountIDs
             if disconnected.remove(account.id) != nil { persistDisconnected(disconnected) }
+            reconnectAccounts.remove(account.id)
             connectionIssue = nil
+            return true
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             connectionIssue = nil
         } catch {
             connectionIssue = Self.connectionMessage(for: error)
         }
+        return false
     }
 
     private static func connectionMessage(for error: Error) -> String {
@@ -192,6 +205,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             await tokenClient.revoke(credentials.refreshToken)
         }
         try? await credentialStore.delete(accountID: accountID)
+        reconnectAccounts.remove(accountID)
         accounts.removeAll { $0.id == accountID }
         persistAccounts()
         availableCalendars.removeValue(forKey: accountID)
@@ -216,6 +230,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             account.selectedCalendarIDs.removeAll { $0 == calendarID }
         }
         upsert(account)
+        if account.selectedCalendarIDs.isEmpty { reconnectAccounts.remove(accountID) }
     }
 
     /// Refreshes the calendar list for a connected account — used after
@@ -259,6 +274,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
 
         let requested = accounts.filter { !$0.selectedCalendarIDs.isEmpty }
         var syncAccounts: [CalendarSyncAccount] = []
+        var expiredAccess: Set<String> = []
         var accessFailures: [String: String] = [:]
         for account in requested {
             do {
@@ -269,6 +285,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
                     selectedCalendarIDs: Set(account.selectedCalendarIDs)
                 ))
             } catch {
+                if GoogleCalendarError.requiresReconnect(error, refreshingAccess: true) { expiredAccess.insert(account.id) }
                 accessFailures[account.id] = GoogleCalendarError.importMessage(for: error, refreshingAccess: true)
             }
         }
@@ -276,6 +293,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         let batch = await service.fetch(accounts: syncAccounts, window: window)
         guard !Task.isCancelled else { return nil }
         let eligible = Set(requested.filter { accounts.contains($0) }.map(\.id))
+        reconnectAccounts = expiredAccess.union(batch.reconnectAccounts).intersection(eligible)
         guard !eligible.isEmpty else { return nil }
         guard !context.hasChanges else {
             return syncFailure("Calendar import paused while planner edits are being saved. Try again.")

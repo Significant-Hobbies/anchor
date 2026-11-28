@@ -28,14 +28,14 @@ private struct LedgerRows: View {
     @Environment(\.anchorTheme) private var theme
     @State private var showsWeek = false
     private var plans: [DayLedgerEntry] {
-        blocks.filter { !$0.isUnplannedTimeLog }.map { DayLedgerEntry(id: $0.id, title: $0.title, start: $0.plannedStart, end: $0.plannedEnd, notes: $0.details, sourcePlanID: $0.id) }
+        blocks.filter { !$0.isUnplannedTimeLog }.map(DayLedgerEntry.init(plan:))
     }
 
     var body: some View {
         let period = Calendar.current.dateInterval(of: .day, for: day)!
         // Date pickers and slot labels expose minutes. Compare those same
         // visible boundaries even when a timer or imported plan stores seconds.
-        let allPlans = plans.map(minutePrecision), allActuals = data.entries.map(minutePrecision)
+        let allPlans = plans.map(\.atMinutePrecision), allActuals = data.entries.map(\.atMinutePrecision)
         let comparison = DayLedgerComparison(period: period, plans: allPlans, actuals: allActuals)
         VStack(alignment: .leading, spacing: Space.md) {
             HStack {
@@ -97,10 +97,10 @@ private struct LedgerRows: View {
                     }
                     Divider()
                 }
-                summary(comparison, title: "Day differences")
+                LedgerSummary(data: comparison, title: "Day differences")
                 DisclosureGroup("Week differences", isExpanded: $showsWeek) {
                     if let week = Calendar.current.dateInterval(of: .weekOfYear, for: day) {
-                        summary(DayLedgerComparison(period: week, plans: allPlans, actuals: allActuals),
+                        LedgerSummary(data: DayLedgerComparison(period: week, plans: allPlans, actuals: allActuals),
                                 title: week.start.formatted(date: .abbreviated, time: .omitted) + " – " + week.end.addingTimeInterval(-1).formatted(date: .abbreviated, time: .omitted))
                     }
                 }.font(.subheadline)
@@ -108,15 +108,6 @@ private struct LedgerRows: View {
         }
         .padding(Space.md)
         .background(theme.surface, in: .rect(cornerRadius: Radius.lg))
-    }
-
-    private func minutePrecision(_ entry: DayLedgerEntry) -> DayLedgerEntry {
-        var result = entry
-        result.start = Date(timeIntervalSinceReferenceDate: floor(entry.start.timeIntervalSinceReferenceDate / 60) * 60)
-        let end = Date(timeIntervalSinceReferenceDate: floor(entry.end.timeIntervalSinceReferenceDate / 60) * 60)
-        // Sub-minute activity still belongs to the day where it occurred.
-        result.end = max(result.start.addingTimeInterval(1), end)
-        return result
     }
 
     private func pair<Left: View, Right: View>(@ViewBuilder left: () -> Left,
@@ -166,12 +157,48 @@ private struct LedgerRows: View {
         return changes.joined(separator: " · ")
     }
 
-    private func summary(_ data: DayLedgerComparison, title: String) -> some View {
-        VStack(alignment: .leading, spacing: Space.xxs) {
-            Text(title).font(.subheadline.bold())
-            Text("\(Int(data.plannedSeconds / 60)) min planned · \(Int(data.recordedSeconds / 60)) min in recorded slots")
-            Text("\(data.matched) as planned · \(data.changed) changed · \(data.unplanned) unplanned · \(data.unrecorded) unrecorded")
-                .foregroundStyle(theme.textSecondary)
+    private func newEntry(_ period: DateInterval) {
+        let end = period.contains(Date()) ? Date() : Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: period.start) ?? period.end
+        data.edit(DayLedgerEntry(title: "", start: max(period.start, end.addingTimeInterval(-1800)), end: end))
+    }
+
+}
+
+extension DayLedgerEntry {
+    init(plan: PlanBlock) {
+        self.init(id: plan.id, title: plan.title, start: plan.plannedStart, end: plan.plannedEnd,
+                  notes: plan.details, sourcePlanID: plan.id)
+    }
+
+    var atMinutePrecision: DayLedgerEntry {
+        var result = self
+        result.start = Date(timeIntervalSinceReferenceDate: floor(start.timeIntervalSinceReferenceDate / 60) * 60)
+        let end = Date(timeIntervalSinceReferenceDate: floor(self.end.timeIntervalSinceReferenceDate / 60) * 60)
+        // Sub-minute activity still belongs to the day where it occurred.
+        result.end = max(result.start.addingTimeInterval(1), end)
+        return result
+    }
+
+}
+
+struct LedgerSummary: View {
+    @Environment(\.anchorTheme) private var theme
+    let data: DayLedgerComparison
+    let title: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.sm) {
+            Text(title).font(.headline)
+            HStack(alignment: .firstTextBaseline, spacing: Space.lg) {
+                total("Scheduled", seconds: data.plannedSeconds)
+                total("Recorded", seconds: data.recordedSeconds)
+            }
+            let outcomes = [(data.matched, "as planned"), (data.changed, "changed"),
+                            (data.unplanned, "unplanned"), (data.unrecorded, "unrecorded")]
+                .filter { $0.0 > 0 }
+                .map { "\($0.0) \($0.1)" }
+            if !outcomes.isEmpty {
+                Text(outcomes.joined(separator: " · ")).foregroundStyle(theme.textSecondary)
+            }
             let delta = Int((data.linkedVarianceSeconds / 60).rounded())
             if delta != 0 {
                 Text("Recorded slots spanned \(abs(delta)) min " + (delta > 0 ? "more" : "less") + " than planned in this period.")
@@ -182,10 +209,14 @@ private struct LedgerRows: View {
             }
         }.font(.caption).frame(maxWidth: .infinity, alignment: .leading)
     }
-
-    private func newEntry(_ period: DateInterval) {
-        let end = period.contains(Date()) ? Date() : Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: period.start) ?? period.end
-        data.edit(DayLedgerEntry(title: "", start: max(period.start, end.addingTimeInterval(-1800)), end: end))
+    private func total(_ label: String, seconds: Double) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption).foregroundStyle(theme.textSecondary)
+            Text(Format.duration(seconds))
+                .font(.system(.title2, design: .rounded).weight(.semibold))
+                .monospacedDigit()
+        }
+        .accessibilityElement(children: .combine)
     }
 
 }

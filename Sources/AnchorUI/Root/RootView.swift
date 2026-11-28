@@ -220,11 +220,9 @@ public struct FocusScreen: View {
     }
 
     private var nextAppointment: PlanBlock? {
-        calendarVisibility.filter(blocks).first { block in
-            block.plannedStart > now && block.state == .planned && !block.isUnplannedTimeLog
-                && (block.sessionID == nil || block.sessionID != controller.session?.id)
-                && (block.externalEventKey == nil || block.plannedSeconds < 86_400)
-        }
+        let visible = calendarVisibility.filter(blocks).filter { $0.sessionID == nil || $0.sessionID != controller.session?.id }
+        let next = ScheduledFocusResolver().nextAppointment(from: visible.map { $0.snapshot() }, recorded: recorded, now: now)
+        return visible.first { $0.id == next?.id }
     }
 
     private var scheduledBlock: PlanBlock? {

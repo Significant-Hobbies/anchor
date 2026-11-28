@@ -40,6 +40,27 @@ struct DayLedgerTests {
         #expect(try Data(contentsOf: backup) == Data("broken record".utf8))
     }
 
+    @Test func insightsOnlyCountFinishedSlotsAndPreserveFuturePlanLinks() {
+        let planned = entry("Call", 720, 750)
+        var earlier = planned
+        earlier.start = midnight.addingTimeInterval(60 * 500)
+        earlier.end = earlier.start.addingTimeInterval(900)
+        let next = entry("Gym", 800, 830)
+        let period = DateInterval(start: midnight, duration: 600 * 60)
+        let result = DayLedgerComparison(period: period, plans: [planned, next], actuals: [earlier, next], finishedBy: period.end)
+        #expect(result.plannedSeconds == 0 && result.recordedSeconds == 900)
+        #expect(result.changed == 1 && result.unplanned == 0 && result.unavailablePlans == 0)
+    }
+
+    @Test func overrunStillInProgressIsNotAnUnrecordedSlot() {
+        let planned = entry("Call", 720, 750)
+        var overrun = planned
+        overrun.end = planned.end.addingTimeInterval(35)
+        let period = DateInterval(start: midnight, end: planned.end.addingTimeInterval(10))
+        let result = DayLedgerComparison(period: period, plans: [planned], actuals: [overrun], finishedBy: period.end)
+        #expect(result.unrecorded == 0 && result.plans.isEmpty && result.actuals.isEmpty)
+    }
+
     @Test func separatesUnrecordedUnplannedAndChangedAndClipsAtMidnight() {
         let period = DateInterval(start: midnight, duration: 86400)
         let plan = entry("Draft", 540, 570), same = entry("Lunch", 720, 750), pending = entry("Read", 780, 800)

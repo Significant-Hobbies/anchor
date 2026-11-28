@@ -246,6 +246,7 @@ public struct CalendarSyncService: Sendable {
                 batch.events += events
                 batch.fetchedCalendars[account.id] = account.selectedCalendarIDs
             } catch {
+                if GoogleCalendarError.requiresReconnect(error) { batch.reconnectAccounts.insert(account.id) }
                 batch.failureReasons[account.id] = GoogleCalendarError.importMessage(for: error)
             }
         }
@@ -259,6 +260,7 @@ public struct CalendarEventBatch: Sendable {
     fileprivate var window: DateInterval
     fileprivate var events: [GoogleCalendarEvent] = []
     fileprivate var fetchedCalendars: [String: Set<String>] = [:]
+    public fileprivate(set) var reconnectAccounts: Set<String> = []
     fileprivate var failureReasons: [String: String] = [:]
 
     public func reconcile(
