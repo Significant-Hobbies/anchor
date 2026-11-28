@@ -85,17 +85,38 @@ private struct SlotTimeRange: View {
     let start: Date
     let end: Date
 
-    var body: some View {
+    var range: String {
         let sameDay = Calendar.current.isDate(start, inSameDayAs: end)
         let interval = start..<max(start, end)
         let times = interval.formatted(.interval.hour().minute())
-        let range = sameDay ? times : interval.formatted(.interval.month().day().hour().minute())
+        return sameDay ? times : interval.formatted(.interval.month().day().hour().minute())
+    }
+
+    var body: some View {
         ViewThatFits(in: .horizontal) {
             Text("\(category.rawValue.capitalized) · \(range)").fixedSize()
             Text(range).lineLimit(1)
         }
         .font(.caption2.monospacedDigit())
         .accessibilityLabel("\(category.rawValue.capitalized), \(range)")
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func inlineSlotTime(_ time: SlotTimeRange, when enabled: Bool) -> some View {
+        if enabled {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.xs) {
+                    self
+                    Text(time.range).font(.caption2.monospacedDigit())
+                }
+                .fixedSize(horizontal: true, vertical: false)
+                self
+            }
+        } else {
+            self
+        }
     }
 }
 
@@ -238,6 +259,8 @@ struct DayTimetable: View {
                     Image(systemName: category.calendarSymbol).font(.caption2).accessibilityHidden(true)
                     Text(item.title).font(height < 38 ? .caption2.weight(.semibold) : .subheadline.weight(.semibold)).lineLimit(height < 38 ? 1 : 2)
                 }
+                .inlineSlotTime(SlotTimeRange(category: category, start: item.start, end: item.end),
+                                when: height < 38 && actuals.recordedIDs.contains(item.id))
                 if height >= 38 {
                     if actuals.recordedIDs.contains(item.id) {
                         SlotTimeRange(category: category, start: item.start, end: item.end)
@@ -583,6 +606,8 @@ private struct TimetableBlockCard: View {
                             .foregroundStyle(Color.black.opacity(0.91))
                             .lineLimit(height < 56 ? 1 : 2)
                             .multilineTextAlignment(.leading)
+                            .inlineSlotTime(SlotTimeRange(category: category, start: block.plannedStart, end: block.plannedEnd),
+                                            when: height < (compact ? 38 : 56))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                     }
