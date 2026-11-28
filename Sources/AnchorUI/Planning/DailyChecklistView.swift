@@ -159,13 +159,7 @@ private struct DailyChecklistView: View {
 
     private func add() {
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        do {
-            checklist = try store.add(title)
-            title = ""
-            message = nil
-        } catch {
-            message = "Couldn’t add the item. Try again."
-        }
+        if save({ try store.add(title) }) { title = "" }
     }
 
     private func reload() {
@@ -184,17 +178,22 @@ private struct DailyChecklistView: View {
         }
     }
 
-    private func save(_ change: () throws -> DailyChecklist) {
+    @discardableResult
+    private func save(_ change: () throws -> DailyChecklist) -> Bool {
         do {
             checklist = try change()
             message = nil
+            return true
         } catch DailyChecklistStore.EditError.dateClosed {
             message = "You can only check items for today and yesterday."
         } catch DailyChecklistStore.EditError.itemRemoved {
             reload()
+        } catch is DecodingError {
+            reload()
         } catch {
             message = "Couldn’t save the checklist. Try again."
         }
+        return false
     }
 }
 #endif
