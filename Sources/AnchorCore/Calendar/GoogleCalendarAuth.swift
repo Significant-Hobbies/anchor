@@ -56,6 +56,15 @@ public enum GoogleCalendarError: LocalizedError, Equatable, Sendable {
     case api(status: Int, message: String)
     case keychain(status: Int32)
 
+    public static func requiresReconnect(_ error: Error, refreshingAccess: Bool = false) -> Bool {
+        guard let error = error as? GoogleCalendarError else { return false }
+        switch error {
+        case .missingRefreshToken, .api(status: 401, message: _): return true
+        case .api(status: 400, message: _): return refreshingAccess
+        default: return false
+        }
+    }
+
     /// Only display known failure classes. Google response bodies may contain private identifiers.
     public static func importMessage(for error: Error, refreshingAccess: Bool = false) -> String {
         if let network = error as? URLError {

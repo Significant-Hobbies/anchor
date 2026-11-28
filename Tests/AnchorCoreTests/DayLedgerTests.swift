@@ -52,6 +52,15 @@ struct DayLedgerTests {
         #expect(result.changed == 1 && result.unplanned == 0 && result.unavailablePlans == 0)
     }
 
+    @Test func overrunStillInProgressIsNotAnUnrecordedSlot() {
+        let planned = entry("Call", 720, 750)
+        var overrun = planned
+        overrun.end = planned.end.addingTimeInterval(35)
+        let period = DateInterval(start: midnight, end: planned.end.addingTimeInterval(10))
+        let result = DayLedgerComparison(period: period, plans: [planned], actuals: [overrun], finishedBy: period.end)
+        #expect(result.unrecorded == 0 && result.plans.isEmpty && result.actuals.isEmpty)
+    }
+
     @Test func separatesUnrecordedUnplannedAndChangedAndClipsAtMidnight() {
         let period = DateInterval(start: midnight, duration: 86400)
         let plan = entry("Draft", 540, 570), same = entry("Lunch", 720, 750), pending = entry("Read", 780, 800)

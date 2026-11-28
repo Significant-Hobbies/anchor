@@ -35,8 +35,10 @@ public struct DayLedgerComparison {
     public let plannedSeconds, recordedSeconds: Double
     public let linkedVarianceSeconds, unplannedSeconds: Double
 
-    public init(period: DateInterval, plans: [DayLedgerEntry], actuals: [DayLedgerEntry], finishedBy: Date = .distantFuture) {
-        self.plans = plans.filter { $0.end <= finishedBy && $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
+    public init(period: DateInterval, plans: [DayLedgerEntry], actuals: [DayLedgerEntry], finishedBy: Date = .distantFuture,
+                matches: (DayLedgerEntry, DayLedgerEntry) -> Bool = { $0.matches($1) }) {
+        let unfinishedActualIDs = Set(actuals.lazy.filter { $0.end > finishedBy }.map(\.id))
+        self.plans = plans.filter { $0.end <= finishedBy && !unfinishedActualIDs.contains($0.id) && $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
         let finishedActuals = actuals.filter { $0.end <= finishedBy }
         self.actuals = finishedActuals.filter { $0.seconds(in: period) > 0 }.sorted { ($0.start, $0.title) < ($1.start, $1.title) }
         let byID = Dictionary(finishedActuals.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -46,7 +48,7 @@ public struct DayLedgerComparison {
         for plan in self.plans {
             guard let actual = byID[plan.id] else { continue }
             variance += actual.seconds(in: period) - plan.seconds(in: period)
-            if plan.matches(actual) { same += 1 } else { different += 1 }
+            if matches(plan, actual) { same += 1 } else { different += 1 }
         }
         matched = same
         unrecorded = self.plans.count - same - different

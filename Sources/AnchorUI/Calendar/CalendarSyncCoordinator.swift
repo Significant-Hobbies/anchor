@@ -45,7 +45,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
     @Published public private(set) var availableCalendars: [String: [GoogleCalendarInfo]] = [:]
     @Published public private(set) var status: String?
     @Published public private(set) var connectionIssue: String?
-    @Published public private(set) var importIssues: [String: String] = [:]
+    @Published public private(set) var reconnectAccounts: Set<String> = []
     @Published public private(set) var calendarListIssues: [String: String] = [:]
     @Published public private(set) var isConnecting = false
 
@@ -152,7 +152,10 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
                     + Self.connectionMessage(for: error)
                 return false
             }
-            guard expected == nil || accounts.contains(where: { $0.id == identity.id }) else { return false }
+            guard expected == nil || accounts.contains(where: { $0.id == identity.id }) else {
+                connectionIssue = "This account was removed during sign-in. Add it again to reconnect."
+                return false
+            }
             try await credentialStore.save(
                 GoogleCredentials(
                     accessToken: tokens.accessToken,
@@ -179,6 +182,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             upsert(account)
             var disconnected = disconnectedAccountIDs
             if disconnected.remove(account.id) != nil { persistDisconnected(disconnected) }
+            reconnectAccounts.remove(account.id)
             connectionIssue = nil
             return true
         } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
@@ -201,7 +205,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             await tokenClient.revoke(credentials.refreshToken)
         }
         try? await credentialStore.delete(accountID: accountID)
-        importIssues.removeValue(forKey: accountID)
+        reconnectAccounts.remove(accountID)
         accounts.removeAll { $0.id == accountID }
         persistAccounts()
         availableCalendars.removeValue(forKey: accountID)
@@ -226,6 +230,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
             account.selectedCalendarIDs.removeAll { $0 == calendarID }
         }
         upsert(account)
+        if account.selectedCalendarIDs.isEmpty { reconnectAccounts.remove(accountID) }
     }
 
     /// Refreshes the calendar list for a connected account — used after
@@ -269,6 +274,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
 
         let requested = accounts.filter { !$0.selectedCalendarIDs.isEmpty }
         var syncAccounts: [CalendarSyncAccount] = []
+        var expiredAccess: Set<String> = []
         var accessFailures: [String: String] = [:]
         for account in requested {
             do {
@@ -279,6 +285,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
                     selectedCalendarIDs: Set(account.selectedCalendarIDs)
                 ))
             } catch {
+                if GoogleCalendarError.requiresReconnect(error, refreshingAccess: true) { expiredAccess.insert(account.id) }
                 accessFailures[account.id] = GoogleCalendarError.importMessage(for: error, refreshingAccess: true)
             }
         }
@@ -286,6 +293,7 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         let batch = await service.fetch(accounts: syncAccounts, window: window)
         guard !Task.isCancelled else { return nil }
         let eligible = Set(requested.filter { accounts.contains($0) }.map(\.id))
+        reconnectAccounts = expiredAccess.union(batch.reconnectAccounts).intersection(eligible)
         guard !eligible.isEmpty else { return nil }
         guard !context.hasChanges else {
             return syncFailure("Calendar import paused while planner edits are being saved. Try again.")
@@ -312,7 +320,6 @@ public final class CalendarSyncCoordinator: NSObject, ObservableObject {
         }
 
         let failures = accessFailures.merging(report.failureReasons) { _, reason in reason }
-        importIssues = failures.filter { eligible.contains($0.key) }
         let details = requested.compactMap { account -> String? in
             guard eligible.contains(account.id), let reason = failures[account.id] else { return nil }
             let label = account.email.isEmpty ? account.displayName : account.email

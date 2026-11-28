@@ -106,9 +106,10 @@ public struct AnalyticsScreen: View {
                         let now = Date()
                         let comparison = DayLedgerComparison(
                             period: DateInterval(start: periodStart, end: now),
-                            plans: visible.filter { !$0.isUnplannedTimeLog }.map { DayLedgerEntry(plan: $0).atMinutePrecision },
-                            actuals: data.entries.map(\.atMinutePrecision),
-                            finishedBy: now
+                            plans: visible.filter { !$0.isUnplannedTimeLog }.map { DayLedgerEntry(plan: $0) },
+                            actuals: data.entries,
+                            finishedBy: now,
+                            matches: { $0.atMinutePrecision.matches($1.atMinutePrecision) }
                         )
                         if !comparison.plans.isEmpty || !comparison.actuals.isEmpty {
                             Card { LedgerSummary(data: comparison, title: "Scheduled and recorded · finished slots") }
@@ -278,6 +279,14 @@ public struct AnalyticsScreen: View {
         }
     }
 
+    private func sessionCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 session" : "\(count) sessions"
+    }
+
+    private func interruptionCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 interruption" : "\(count) interruptions"
+    }
+
     // MARK: Headline
 
     private func tiles(_ overview: AnalyticsEngine.Overview) -> some View {
@@ -291,13 +300,13 @@ public struct AnalyticsScreen: View {
             StatTile(
                 label: "Focused",
                 value: Format.duration(overview.focusedSeconds),
-                detail: "\(overview.sessionCount) sessions",
+                detail: sessionCountLabel(overview.sessionCount),
                 symbol: "hourglass"
             )
             StatTile(
                 label: "Ran to plan",
                 value: Format.percent(overview.completionRate),
-                detail: "\(overview.completedCount) of \(overview.sessionCount) sessions",
+                detail: "\(overview.completedCount) of \(sessionCountLabel(overview.sessionCount))",
                 symbol: "checkmark.seal",
                 tint: theme.positive
             )
@@ -701,7 +710,7 @@ public struct AnalyticsScreen: View {
                                 fraction: stat.focusedSeconds / max(1, maximum),
                                 tint: AnchorTheme.tint(index)
                             )
-                            Text("\(stat.sessionCount) sessions · \(stat.distractionCount) interruptions")
+                            Text("\(sessionCountLabel(stat.sessionCount)) · \(interruptionCountLabel(stat.distractionCount))")
                                 .font(.system(size: 11))
                                 .foregroundStyle(theme.textTertiary)
                         }
@@ -743,7 +752,7 @@ public struct AnalyticsScreen: View {
                                 tint: AnchorTheme.tint(index)
                             )
                             Text(
-                                "\(stat.sessionCount) sessions · \(Format.percent(stat.completionRate)) completed · \(String(format: "%.1f", stat.interruptionsPerHour))/h"
+                                "\(sessionCountLabel(stat.sessionCount)) · \(Format.percent(stat.completionRate)) completed · \(String(format: "%.1f", stat.interruptionsPerHour))/h"
                             )
                             .font(.system(size: 11))
                             .foregroundStyle(theme.textTertiary)

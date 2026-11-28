@@ -117,7 +117,7 @@ public struct CalendarSettings: View {
                 .fixedSize()
                 .accessibilityLabel("More actions for \(account.displayName)")
             }
-            if coordinator.importIssues[account.id] != nil {
+            if coordinator.reconnectAccounts.contains(account.id) {
                 Button("Reconnect account") { reconnect(account) }
                     .disabled(coordinator.isConnecting)
             }
